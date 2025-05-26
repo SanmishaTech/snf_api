@@ -14,7 +14,7 @@ const agencyRoutes = require("./routes/agencyRoutes");
 const productRoutes = require("./routes/productRoutes");
 const swaggerRouter = require("./swagger");
 const vendorOrderRoutes = require("./routes/vendorOrderRoutes");
-
+const userRoutes = require("./routes/users");
 const app = express();
 
 app.use(morgan("dev"));
@@ -62,7 +62,7 @@ console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
 
 app.use("/api/auth", authRoutes);
-
+app.use("/api/users", userRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/products", productRoutes);
