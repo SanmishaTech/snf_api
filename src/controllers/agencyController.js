@@ -1,0 +1,301 @@
+const asyncHandler = require('express-async-handler');
+const bcrypt = require('bcryptjs');
+const { PrismaClient } = require('@prisma/client');
+const createError = require('http-errors');
+const validateRequest  = require('../utils/validateRequest');
+const { z } = require('zod'); // Add Zod import
+
+const prisma = new PrismaClient();
+
+// --- Zod Schemas Definition ---
+// Base schema for common agency fields
+const agencyBaseSchema = z.object({
+  name: z.string().min(2, { message: 'Agency name must be at least 2 characters long' }),
+  contactPersonName: z.string().optional(),
+  address1: z.string().min(5, { message: 'Address line 1 must be at least 5 characters long' }),
+  address2: z.string().optional(),
+  city: z.string().min(2, { message: 'City is required' }),
+  pincode: z.string().regex(/^\d{6}$/, { message: 'Pincode must be 6 digits' }).transform(Number).or(z.number()),
+  mobile: z.string().regex(/^\d{10}$/, { message: 'Mobile number must be 10 digits' }),
+  alternateMobile: z.string().regex(/^\d{10}$/, { message: 'Alternate mobile number must be 10 digits' }).optional().or(z.literal('')),
+  email: z.string().email({ message: 'Invalid email address for agency contact' }).optional().or(z.literal('')) // Agency's own contact email, optional
+});
+
+// Schema for creating a new agency, including user details for the agency's primary user
+const createAgencySchema = agencyBaseSchema.extend({
+  userFullName: z.string().min(2, { message: 'User full name must be at least 2 characters long' }),
+  userLoginEmail: z.string().email({ message: 'Invalid login email address for user' }),
+  userPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' })
+});
+// --- End Zod Schemas Definition ---
+
+/**
+ * @desc    Create a new agency and a new user for that agency
+ * @route   POST /api/agencies
+ * @access  Private/Admin (AGENCIES_CREATE)
+ */
+const createAgency = asyncHandler(async (req, res, next) => {
+  const { role, status, ...requestBody } = req.body; // Exclude role and status if they are not part of the direct input for creation schema
+
+  const validationResult = await validateRequest(createAgencySchema, requestBody, req.files || {});
+
+  if (validationResult.errors) {
+    return res.status(400).json(validationResult);
+  }
+
+  // If we reach here, validationResult is the actual validated data.
+  const {
+    userFullName,
+    userLoginEmail,
+    userPassword,
+    // All other fields from agencyBaseSchema are in agencyDataInput
+    ...agencyDataInput 
+  } = validationResult;
+
+  const { email: agencyEmail, contactPersonName, alternateMobile, ...otherAgencyFields } = agencyDataInput;
+
+  const existingUserByLoginEmail = await prisma.user.findUnique({ where: { email: userLoginEmail } });
+  if (existingUserByLoginEmail) {
+    return next(createError(400, `User with login email ${userLoginEmail} already exists.`));
+  }
+
+  if (agencyEmail) {
+    const existingAgencyByContactEmail = await prisma.agency.findUnique({ where: { email: agencyEmail } });
+    if (existingAgencyByContactEmail) {
+      return next(createError(400, `Agency with contact email ${agencyEmail} already exists.`));
+    }
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(userPassword, salt);
+
+  try {
+    const newAgencyWithUser = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: userFullName,
+          email: userLoginEmail,
+          password: hashedPassword,
+          role: 'AGENCY',
+          active: true,
+        },
+      });
+
+      const newAgency = await tx.agency.create({
+        data: {
+          ...otherAgencyFields, // Spread the rest of the agency fields
+          email: agencyEmail,       // Agency's own contact email
+          contactPersonName,    // Explicitly include
+          alternateMobile,      // Explicitly include
+          user: {
+            connect: { id: newUser.id },
+          },
+        },
+        include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+      });
+      return newAgency;
+    });
+
+    res.status(201).json(newAgencyWithUser);
+  } catch (error) {
+    console.error("Error during agency/user creation transaction:", error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+        let field = error.meta.target.includes('User_email_key') ? 'User login email' : 'Agency contact email';
+        return next(createError(400, `${field} is already in use.`));
+    }
+    return next(createError(500, 'Failed to create agency and user.'));
+  }
+});
+
+/**
+ * @desc    Get all agencies
+ * @route   GET /api/agencies
+ * @access  Private/Admin (AGENCIES_LIST)
+ */
+const getAllAgencies = asyncHandler(async (req, res, next) => {
+  const { 
+    page = 1, 
+    limit = 10, 
+    sortBy = 'name', 
+    sortOrder = 'asc', 
+    search = '', 
+    active = 'all' 
+  } = req.query;
+
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+
+  if (isNaN(pageNum) || pageNum < 1) {
+    return next(createError(400, 'Invalid page number'));
+  }
+  if (isNaN(limitNum) || limitNum < 1) {
+    return next(createError(400, 'Invalid limit number'));
+  }
+
+  const whereConditions = {};
+
+  if (search) {
+    whereConditions.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { city: { contains: search, mode: 'insensitive' } },
+      { user: {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ]
+        }
+      }
+    ];
+  }
+
+  if (active !== 'all') {
+    whereConditions.user = {
+      ...whereConditions.user,
+      active: active === 'true'
+    };
+  }
+
+  const validSortByFields = ['name', 'email', 'city', 'createdAt', 'updatedAt']; 
+  const orderByField = validSortByFields.includes(sortBy) ? sortBy : 'name';
+  const orderByDirection = sortOrder === 'desc' ? 'desc' : 'asc';
+
+  try {
+    const agencies = await prisma.agency.findMany({
+      where: whereConditions,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+      orderBy: {
+        [orderByField]: orderByDirection,
+      },
+      include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+    });
+
+    const totalRecords = await prisma.agency.count({
+      where: whereConditions,
+    });
+
+    const totalPages = Math.ceil(totalRecords / limitNum);
+
+    res.status(200).json({
+      data: agencies,
+      totalPages,
+      totalRecords,
+      currentPage: pageNum,
+    });
+  } catch (error) {
+    console.error('Error fetching agencies:', error);
+    next(createError(500, 'Failed to fetch agencies'));
+  }
+});
+
+/**
+ * @desc    Get a single agency by ID
+ * @route   GET /api/agencies/:id
+ * @access  Private (AGENCIES_READ for Admin, or Agency for their own profile)
+ */
+const getAgencyById = asyncHandler(async (req, res, next) => {
+  const agencyId = parseInt(req.params.id, 10);
+  if (isNaN(agencyId)) {
+    return next(createError(400, 'Invalid agency ID format'));
+  }
+
+  const agency = await prisma.agency.findUnique({
+    where: { id: agencyId },
+    include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+  });
+
+  if (!agency) {
+    return next(createError(404, `Agency with ID ${agencyId} not found`));
+  }
+
+  if (req.user.role === 'AGENCY' && agency.userId !== req.user.id) {
+    return next(createError(403, 'Forbidden: You can only view your own agency profile.'));
+  }
+
+  res.status(200).json(agency);
+});
+
+/**
+ * @desc    Update an agency
+ * @route   PUT /api/agencies/:id
+ * @access  Private (AGENCIES_UPDATE for Admin, or Agency for their own profile)
+ */
+const updateAgency = asyncHandler(async (req, res, next) => {
+  const agencyId = parseInt(req.params.id, 10);
+  if (isNaN(agencyId)) {
+    return next(createError(400, 'Invalid agency ID format'));
+  }
+
+  const validationResult = await validateRequest(agencyBaseSchema, req.body, req.files || {});
+
+  if (validationResult.errors) {
+    return res.status(400).json(validationResult);
+  }
+
+  // If we reach here, validationResult is the actual validated data.
+  const { 
+    email,
+    contactPersonName,
+    alternateMobile,
+    ...otherAgencyFields
+  } = validationResult;
+
+  const existingAgency = await prisma.agency.findUnique({ where: { id: agencyId } });
+  if (!existingAgency) {
+    return next(createError(404, `Agency with ID ${agencyId} not found`));
+  }
+
+  if (req.user.role === 'AGENCY' && existingAgency.userId !== req.user.id) {
+    return next(createError(403, 'Forbidden: You can only update your own agency profile.'));
+  }
+
+  if (email && email !== existingAgency.email) {
+    const agencyWithNewEmail = await prisma.agency.findUnique({ where: { email } });
+    if (agencyWithNewEmail) {
+      return next(createError(400, `Agency email ${email} is already in use.`));
+    }
+  }
+
+  const updatedAgency = await prisma.agency.update({
+    where: { id: agencyId },
+    data: {
+      ...otherAgencyFields, // Spread the rest of the agency fields
+      email,              // Explicitly include email
+      contactPersonName,  // Explicitly include
+      alternateMobile,    // Explicitly include
+    },
+    include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+  });
+
+  res.status(200).json(updatedAgency);
+});
+
+/**
+ * @desc    Delete an agency
+ * @route   DELETE /api/agencies/:id
+ * @access  Private/Admin (AGENCIES_DELETE)
+ */
+const deleteAgency = asyncHandler(async (req, res, next) => {
+  const agencyId = parseInt(req.params.id, 10);
+  if (isNaN(agencyId)) {
+    return next(createError(400, 'Invalid agency ID format'));
+  }
+
+  const agency = await prisma.agency.findUnique({ where: { id: agencyId } });
+  if (!agency) {
+    return next(createError(404, `Agency with ID ${agencyId} not found`));
+  }
+
+  await prisma.agency.delete({ where: { id: agencyId } });
+
+  res.status(200).json({ message: `Agency with ID ${agencyId} deleted successfully` });
+});
+
+module.exports = {
+  createAgency,
+  getAllAgencies,
+  getAgencyById,
+  updateAgency,
+  deleteAgency,
+};
