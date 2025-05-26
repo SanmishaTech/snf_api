@@ -6,9 +6,9 @@ const cors = require("cors");
 const createError = require("http-errors");
 const path = require("path");
 require("dotenv").config();
- 
+
 const authRoutes = require("./routes/auth");
- 
+
 const vendorRoutes = require("./routes/vendorRoutes");
 const agencyRoutes = require("./routes/agencyRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -54,8 +54,8 @@ app.use(express.urlencoded({ extended: true }));
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-      path.resolve(__dirname, "..", "..", "SNF-FrontEnd", "dist")
-    : path.resolve(__dirname, "..", "..", "SNF-FrontEnd", "dist");
+      path.resolve(__dirname, "..", "..", "snf", "dist")
+    : path.resolve(__dirname, "..", "..", "snf", "dist");
 
 console.log(`Frontend build path: ${frontendDistPath}`);
 
@@ -71,8 +71,7 @@ console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
 
 app.use("/api/auth", authRoutes);
- 
- 
+
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/products", productRoutes);
