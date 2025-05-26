@@ -31,7 +31,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://localhost:3000"];
+  : ["http://localhost:5173", "http://13.126.180.52"];
 
 app.use(
   cors({
