@@ -57,7 +57,7 @@ const frontendDistPath =
       path.resolve(__dirname, "..", "..", "snf", "dist")
     : path.resolve(__dirname, "..", "..", "snf", "dist");
 
-console.log(`Frontend build path: ${frontendDistPath}`);
+console.log(`Frontend bui ld path: ${frontendDistPath}`);
 
 console.log(`Serving frontend static files from: ${frontendDistPath}`);
 app.use(express.static(frontendDistPath));
