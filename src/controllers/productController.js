@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const createError = require('http-errors');
 const Validate = require('../utils/validateRequest')
 const { z } = require('zod');
+const validateRequest = require('../utils/validateRequest');
 
 const prisma = new PrismaClient();
 
@@ -11,8 +12,7 @@ const productSchema = z.object({
   name: z.string().min(1, { message: "Product name is required" }),
   url: z.string().url({ message: 'Invalid URL format' }).optional().nullable(),
   price: z.string().min(1, { message: 'Price is required' }),
-  date: z.string().refine((date) => !isNaN(new Date(date).getTime()), { message: 'Invalid date format' }),
-  quantity: z.number().int().min(0, { message: 'Quantity must be a non-negative integer' }),
+  unit: z.string().optional().nullable(), // Added unit field
 });
 
 /**
@@ -25,7 +25,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
   const validationerrors = Validate(productSchema, req.body, res)
  
 
-  const { name, url, price, date, quantity } = req.body;
+  const { name, url, price, unit } = req.body; // Added unit
 
   try {
     const newProduct = await prisma.product.create({
@@ -33,8 +33,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
         name,
         url,
         price,
-        date: new Date(date),
-        quantity,
+        unit, // Ensure unit is included
       },
     });
     res.status(201).json(newProduct);
@@ -79,7 +78,7 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     ];
   }
 
-  const validSortByFields = ['name', 'url', 'price', 'date', 'quantity', 'createdAt', 'updatedAt'];
+  const validSortByFields = ['name', 'url', 'price', 'unit', 'createdAt', 'updatedAt']; // Added 'unit'
   const orderByField = validSortByFields.includes(sortBy) ? sortBy : 'createdAt';
   const orderByDirection = sortOrder === 'desc' ? 'desc' : 'asc';
 
@@ -144,15 +143,12 @@ const updateProduct = asyncHandler(async (req, res, next) => {
     return next(createError(400, 'Invalid product ID format'));
   }
 
-  const validationResult = productSchema.safeParse(req.body);
-  if (!validationResult.success) {
-    return next(createError(400, {
-      message: 'Validation failed',
-      errors: validationResult.error.flatten().fieldErrors,
-    }));
-  }
+   const validationResult = validateRequest(productSchema, req.body, res)
+    if(validationResult.errors){
+      return res.status(401).send(validationResult)
+    }
 
-  const { name, url, price, date, quantity } = validationResult.data;
+  const { name, url, price, unit } = req.body; // Added unit
 
   try {
     const existingProduct = await prisma.product.findUnique({ where: { id: productId } });
@@ -166,8 +162,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
         name,
         url,
         price,
-        date: new Date(date),
-        quantity,
+        unit, // Ensure unit is included
       },
     });
     res.status(200).json(updatedProduct);

@@ -136,13 +136,7 @@ exports.createVendorOrder = async (req, res, next) => {
         },
       });
 
-      // Update product quantities (decrement)
-      for (const item of orderItems) {
-        await tx.product.update({
-          where: { id: parseInt(item.productId) },
-          data: { quantity: { decrement: parseInt(item.quantity) } },
-        });
-      }
+
       return createdOrder;
     });
 
@@ -649,6 +643,103 @@ exports.recordDelivery = async (req, res, next) => {
 // @desc    Delete vendor order
 // @route   DELETE /api/vendor-orders/:id
 // @access  Private (ADMIN)
+// @desc    Get logged in AGENCY's orders
+// @route   GET /api/vendor-orders/my-agency-orders
+// @access  Private (AGENCY)
+exports.getMyAgencyOrders = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'AGENCY') {
+      return next(createError(403, 'Forbidden: Access restricted to AGENCY role.'));
+    }
+
+    const agencyUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { agency: true },
+    });
+
+    if (!agencyUser || !agencyUser.agency) {
+      return next(createError(404, 'Agency profile not found for this user.'));
+    }
+    const agencyId = agencyUser.agency.id;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { search, status, date } = req.query;
+
+    let whereClause = {
+      items: {
+        some: {
+          agencyId: agencyId,
+        },
+      },
+    };
+
+    if (status) {
+      if (Object.values(OrderStatus).includes(status.toUpperCase())) {
+        whereClause.status = status.toUpperCase();
+      } else {
+        return next(createError(400, `Invalid status filter. Valid statuses are: ${Object.values(OrderStatus).join(', ')}`));
+      }
+    }
+
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      whereClause.orderDate = {
+        gte: startDate,
+        lte: endDate,
+      };
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { poNumber: { contains: search, mode: 'insensitive' } },
+        { vendor: { name: { contains: search, mode: 'insensitive' } } },
+        // Add more sophisticated search across item names if needed later
+      ];
+    }
+
+    const orders = await prisma.vendorOrder.findMany({
+      where: whereClause,
+      include: {
+        vendor: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, price: true, unit: true } },
+            agency: { select: { id: true, name: true } }, // Included for completeness, though filtered by agencyId
+          },
+        },
+        deliveredBy: { select: { id: true, name: true, email: true } },
+        receivedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { orderDate: 'desc' },
+      skip: skip,
+      take: limit,
+    });
+
+    const totalOrders = await prisma.vendorOrder.count({
+      where: whereClause,
+    });
+
+    const totalPages = Math.ceil(totalOrders / limit);
+
+    res.json({
+      data: orders,
+      page,
+      totalPages,
+      totalItems: totalOrders,
+    });
+
+  } catch (error) {
+    console.error('Error fetching agency orders:', error);
+    next(createError(500, 'Failed to fetch agency orders.'));
+  }
+};
+
 exports.deleteVendorOrder = async (req, res, next) => {
   const orderId = parseInt(req.params.id);
 
@@ -663,19 +754,7 @@ exports.deleteVendorOrder = async (req, res, next) => {
     }
 
     // IMPORTANT: Handle product quantity restoration if order is cancelled/deleted
-    // This should be done in a transaction.
     await prisma.$transaction(async (tx) => {
-        // Restore product quantities
-        for (const item of order.items) {
-            await tx.product.update({
-                where: { id: item.productId },
-                data: { quantity: { increment: item.quantity } },
-            });
-        }
-        // Delete order items (will happen automatically due to onDelete: Cascade on relation, but explicit is fine)
-        // await tx.orderItem.deleteMany({ where: { vendorOrderId: orderId } });
-        
-        // Delete the order
         await tx.vendorOrder.delete({ where: { id: orderId } });
     });
 

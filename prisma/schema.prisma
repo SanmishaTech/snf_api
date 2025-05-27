@@ -96,8 +96,7 @@ model Product {
   name      String
   url       String?
   price     Float       // Changed from String to Float
-  date      DateTime    // Assuming this is 'listing date' or similar
-  quantity  Int         // Represents stock quantity
+  unit      String?     // Unit of the product (e.g., kg, pcs, ltr)
   deliveredQuantity Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -21,6 +21,9 @@ router.get('/', auth, vendorOrderController.getAllVendorOrders);
 // GET /api/vendor-orders/my - Get orders for the logged-in VENDOR
 router.get('/my', auth, vendorOrderController.getMyVendorOrders);
 
+// GET /api/vendor-orders/my-agency-orders - Get orders for the logged-in AGENCY
+router.get('/my-agency-orders', auth, vendorOrderController.getMyAgencyOrders);
+
 // GET /api/vendor-orders/:id - Get a single vendor order by ID
 router.get('/:id', vendorOrderController.getVendorOrderById);
 

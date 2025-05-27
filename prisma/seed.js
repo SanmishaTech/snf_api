@@ -34,15 +34,8 @@ async function main() {
   console.log("Starting seeding...");
 
   // Clean up existing data
-  await prisma.$transaction([
- 
-    prisma.user.deleteMany(),
-     
-  ]);
+  await prisma.$transaction([prisma.user.deleteMany()]);
 
- 
-
- 
   // Create Admin User
   console.log("Creating admin user...");
   const adminPassword = await bcrypt.hash("admin123", SALT_ROUNDS);
@@ -56,7 +49,6 @@ async function main() {
       lastLogin: new Date(),
     },
   });
-
 
   console.log("Seeding completed successfully!");
 }
