@@ -14623,7 +14623,7 @@ function Wt(e, t) {
   return { ...i, mutate: o, mutateAsync: i.mutate };
 }
 const Th = "SNF",
-  JM = () => "http://localhost:3000",
+  JM = () => "http://13.126.180.52",
   eD = JM(),
   tD = !1;
 var Ru = {},
