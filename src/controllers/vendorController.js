@@ -3,6 +3,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 const createError = require('http-errors');
 const { z } = require('zod');
 const bcrypt = require('bcryptjs'); // Added for password hashing
+const validateTraining = require('../utils/validateRequest');
 
 // Zod schema for vendor data (used for update)
 const vendorBaseSchema = z.object({
@@ -12,9 +13,9 @@ const vendorBaseSchema = z.object({
   address2: z.string().optional().nullable(),
   city: z.string().nonempty('City is required'),
   pincode: z.number().int('Pincode must be an integer'),
-  mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10,15}$/, 'Mobile number must be 10-15 digits'),
-  alternateMobile: z.string().regex(/^\d{10,15}$/, 'Alternate mobile must be 10-15 digits').optional().nullable(), 
-  email: z.string().email('Invalid email format for vendor contact').nonempty('Vendor contact email is required'),
+  mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
+  alternateMobile: z.string().regex(/^\d{10}$/, 'Alternate mobile must be 10 digits').optional().nullable(), 
+  email: z.union([z.literal(''), z.string().email('Invalid email format for vendor contact')]).optional().nullable(),
 });
 
 // Zod schema for incoming data when creating a vendor with a new user
@@ -24,9 +25,9 @@ const createUserAndVendorSchema = z.object({
   userPassword: z.string().min(6, "User password must be at least 6 characters"),
   vendorName: z.string().nonempty('Vendor name is required'),
   contactPersonName: z.string().min(1, "Contact person's name is required").optional().nullable(), 
-  vendorContactEmail: z.string().email('Invalid email format for vendor contact').nonempty('Vendor contact email is required'),
-  mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10,15}$/, 'Mobile number must be 10-15 digits'),
-  alternateMobile: z.string().regex(/^\d{10,15}$/, 'Alternate mobile must be 10-15 digits').optional().nullable(), 
+  vendorContactEmail: z.union([z.literal(''), z.string().email('Invalid email format for vendor contact')]).optional().nullable(),
+  mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
+  alternateMobile: z.string().regex(/^\d{10}$/, 'Alternate mobile must be 10 digits').optional().nullable(), 
   address1: z.string().nonempty('Address line 1 is required'),
   address2: z.string().optional().nullable(),
   city: z.string().nonempty('City is required'),
@@ -34,11 +35,12 @@ const createUserAndVendorSchema = z.object({
 });
 
 const createVendor = asyncHandler(async (req, res, next) => {
-  const validationResult = createUserAndVendorSchema.safeParse(req.body);
-  if (!validationResult.success) {
-    return next(createError(400, { message: 'Validation failed', errors: validationResult.error.flatten().fieldErrors }));
-  }
-
+  // const validationResult = createUserAndVendorSchema.safeParse(req.body);
+  // if (!validationResult.success) {
+  //   return next(createError(400, { message: 'Validation failed', errors: validationResult.error.flatten().fieldErrors }));
+  // }
+  const validationresults = await validateTraining(createUserAndVendorSchema, req.body, res);
+  
   const {
     userFullName,
     userLoginEmail,
@@ -52,16 +54,18 @@ const createVendor = asyncHandler(async (req, res, next) => {
     address2,
     city,
     pincode
-  } = validationResult.data;
+  } = req.body;
 
   const existingUserByLoginEmail = await prisma.user.findUnique({ where: { email: userLoginEmail } });
   if (existingUserByLoginEmail) {
     return next(createError(400, `User with login email ${userLoginEmail} already exists.`));
   }
 
-  const existingVendorByContactEmail = await prisma.vendor.findUnique({ where: { email: vendorContactEmail } });
-  if (existingVendorByContactEmail) {
-    return next(createError(400, `A vendor profile with contact email ${vendorContactEmail} already exists.`));
+  if (vendorContactEmail && typeof vendorContactEmail === 'string' && vendorContactEmail.trim() !== '') {
+    const existingVendorByContactEmail = await prisma.vendor.findUnique({ where: { email: vendorContactEmail } });
+    if (existingVendorByContactEmail) {
+      return next(createError(400, `A vendor profile with contact email ${vendorContactEmail} already exists.`));
+    }
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -200,14 +204,47 @@ const deleteVendor = asyncHandler(async (req, res, next) => {
     return next(createError(400, 'Invalid vendor ID format'));
   }
 
-  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
-  if (!vendor) {
+  const vendorDetails = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { userId: true },
+  });
+
+  if (!vendorDetails) {
     return next(createError(404, `Vendor with ID ${vendorId} not found`));
   }
 
-  await prisma.vendor.delete({ where: { id: vendorId } });
+  const userIdToDelete = vendorDetails.userId;
 
-  res.status(200).json({ message: `Vendor with ID ${vendorId} deleted successfully` });
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Delete VendorOrders associated with the vendor.
+      // This will cascade-delete associated OrderItems due to `onDelete: Cascade`
+      // in the OrderItem model's vendorOrder relation.
+      await tx.vendorOrder.deleteMany({
+        where: { vendorId: vendorId },
+      });
+
+      // Products are not deleted as they are general catalog items and not exclusively owned by a vendor.
+      // The Vendor record itself will be deleted when its associated User is deleted (next step in the code)
+      // due to `onDelete: Cascade` on the `Vendor.user` relation.
+
+      // Step 5: Delete the associated user
+      if (userIdToDelete) {
+        await tx.user.delete({
+          where: { id: userIdToDelete },
+        });
+      }
+    });
+
+    res.status(200).json({ message: `Vendor with ID ${vendorId} and all associated data deleted successfully.` });
+  } catch (error) {
+    console.error(`Detailed error deleting vendor ${vendorId}:`, error); // Enhanced logging
+    if (error.code === 'P2003') { // Prisma foreign key constraint violation
+      return next(createError(409, `Cannot delete vendor (ID: ${vendorId}). It is still referenced by other records (e.g., Orders, Products, or OrderItems). Please ensure all related data is removed or reassigned. Details: ${error.meta?.field_name ? 'Field: ' + error.meta.field_name : error.message}`));
+    }
+    // Generic server error for other issues
+    return next(createError(500, `Could not delete vendor with ID ${vendorId}. An unexpected error occurred. Check server logs for details.`));
+  }
 });
 
 module.exports = {

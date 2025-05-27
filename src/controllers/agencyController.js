@@ -17,7 +17,7 @@ const agencyBaseSchema = z.object({
   city: z.string().min(2, { message: 'City is required' }),
   pincode: z.string().regex(/^\d{6}$/, { message: 'Pincode must be 6 digits' }).transform(Number).or(z.number()),
   mobile: z.string().regex(/^\d{10}$/, { message: 'Mobile number must be 10 digits' }),
-  alternateMobile: z.string().regex(/^\d{10}$/, { message: 'Alternate mobile number must be 10 digits' }).optional().or(z.literal('')),
+  alternateMobile: z.any().optional().nullable(),
   email: z.string().email({ message: 'Invalid email address for agency contact' }).optional().or(z.literal('')) // Agency's own contact email, optional
 });
 

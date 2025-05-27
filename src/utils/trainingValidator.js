@@ -23,7 +23,7 @@ const validateTraining = async (schema, data, res) => {
       });
       
       // Send the error response
-      res.status(400).json({ errors });
+     await res.status(400).send({ errors });
       return null;
     }
     
@@ -32,7 +32,7 @@ const validateTraining = async (schema, data, res) => {
   } catch (error) {
     // Handle any unexpected errors
     console.error("Training validation error:", error);
-    res.status(500).json({ 
+    await res.status(500).send({ 
       errors: { 
         message: "Server error during validation",
         details: error.message 

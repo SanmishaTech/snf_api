@@ -198,7 +198,21 @@ const deleteProduct = asyncHandler(async (req, res, next) => {
       return next(createError(404, `Product with ID ${productId} not found`));
     }
 
-    await prisma.product.delete({ where: { id: productId } });
+    // Start a transaction
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Delete OrderItems associated with the product
+      await tx.orderItem.deleteMany({
+        where: { productId: productId },
+      });
+
+      // Step 2: Delete the product itself
+      // The initial findUnique check (lines 195-198) already confirms product existence.
+      // If it's deleted between that check and this point, delete will gracefully handle it (or Prisma throws P2025).
+      await tx.product.delete({
+        where: { id: productId },
+      });
+    });
+
     res.status(200).json({ message: `Product with ID ${productId} deleted successfully` });
   } catch (error) {
     console.error('Error deleting product:', error);

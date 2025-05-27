@@ -2,15 +2,24 @@ const express = require('express');
 const router = express.Router();
 const vendorOrderController = require('../controllers/vendorOrderController');
 const auth = require('../middleware/auth');
+const createError = require('http-errors'); // Added for error handling in custom middleware
+
+// Middleware to check if user is ADMIN or AGENCY
+const isAdminOrAgency = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'AGENCY')) {
+    return next(createError(403, 'Forbidden: Access restricted to ADMIN or AGENCY roles.'));
+  }
+  next();
+};
 
 // POST /api/vendor-orders - Create a new vendor order
 router.post('/', auth, vendorOrderController.createVendorOrder);
 
 // GET /api/vendor-orders - Get all vendor orders (for ADMIN, AGENCY)
-router.get('/',  vendorOrderController.getAllVendorOrders);
+router.get('/', auth, vendorOrderController.getAllVendorOrders);
 
 // GET /api/vendor-orders/my - Get orders for the logged-in VENDOR
-router.get('/my', vendorOrderController.getMyVendorOrders);
+router.get('/my', auth, vendorOrderController.getMyVendorOrders);
 
 // GET /api/vendor-orders/:id - Get a single vendor order by ID
 router.get('/:id', vendorOrderController.getVendorOrderById);

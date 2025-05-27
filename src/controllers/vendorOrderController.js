@@ -212,11 +212,13 @@ exports.getMyVendorOrders = async (req, res, next) => {
         where: { id: req.user.id },
         include: { vendor: { select: { id: true } } }
     });
+    console.log(userWithVendor)
 
     if (!userWithVendor || !userWithVendor.vendor) {
         return next(createError(403, "User is not associated with a vendor."));
     }
     const vendorId = userWithVendor.vendor.id;
+    console.log(vendorId)
 
     const { page = 1, limit = 10, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -230,9 +232,8 @@ exports.getMyVendorOrders = async (req, res, next) => {
       where,
       orderBy: { [sortBy]: sortOrder },
       include: {
+        vendor: true,
         items: { include: { product: true, agency: true } },
-        deliveredBy: { select: { id: true, name: true, email: true } },
-        receivedBy: { select: { id: true, name: true, email: true } },
       },
     });
      const totalOrders = await prisma.vendorOrder.count({ where });
@@ -278,47 +279,119 @@ exports.getVendorOrderById = async (req, res, next) => {
   }
 };
 
-// @desc    Update vendor order (e.g., notes, PO number)
+// @desc    Update vendor order (e.g., notes, PO number, items)
 // @route   PUT /api/vendor-orders/:id
 // @access  Private (e.g., ADMIN, or VENDOR if it's their order and status is PENDING)
 exports.updateVendorOrder = async (req, res, next) => {
   const orderId = parseInt(req.params.id);
-  const { poNumber, deliveryDate, contactPersonName, notes } = req.body;
+  const {
+    poNumber,
+    orderDate, // Added orderDate as potentially updatable
+    deliveryDate,
+    contactPersonName,
+    notes,
+    orderItems, // Expected: [{ productId, quantity, agencyId }]
+    vendorId
+  } = req.body;
 
   try {
-    const order = await prisma.vendorOrder.findUnique({ where: { id: orderId } });
-    if (!order) {
-      return next(createError(404, 'Order not found'));
+    const updatedOrderInTransaction = await prisma.$transaction(async (tx) => {
+      const order = await tx.vendorOrder.findUnique({ where: { id: orderId } });
+      if (!order) {
+        throw createError(404, 'Order not found');
+      }
+
+      // Authorization check (adapt as needed)
+      // if (req.user.role !== 'ADMIN' && !(req.user.vendorId === order.vendorId && order.status === OrderStatus.PENDING)) {
+      //   throw createError(403, 'Not authorized to update this order');
+      // }
+
+      let dataToUpdate = {
+        poNumber: poNumber !== undefined ? poNumber : order.poNumber,
+        orderDate: orderDate ? new Date(orderDate) : order.orderDate,
+        deliveryDate: deliveryDate ? new Date(deliveryDate) : order.deliveryDate,
+        contactPersonName: contactPersonName !== undefined ? contactPersonName : order.contactPersonName,
+        notes: notes !== undefined ? notes : order.notes,
+        vendorId: vendorId ? parseInt(vendorId) : order.vendorId,
+        // totalAmount will be set if orderItems are processed
+      };
+
+      if (orderItems && Array.isArray(orderItems)) {
+        // Delete existing items for this order
+        await tx.orderItem.deleteMany({
+          where: { vendorOrderId: orderId },
+        });
+
+        let newTotalAmount = 0;
+        const itemsToCreateData = [];
+
+        if (orderItems.length > 0) { // Only process if there are items to add
+            for (const item of orderItems) {
+                if (!item.productId || item.quantity === undefined || !item.agencyId) { // quantity can be 0 if allowed, but must be present
+                    throw createError(400, `OrderItem missing productId, quantity, or agencyId.`);
+                }
+                if (item.quantity < 0) { // Allow 0 quantity if it means removing item effectively, but not negative
+                    throw createError(400, `Quantity for product ID ${item.productId} must be non-negative.`);
+                }
+
+                const product = await tx.product.findUnique({ where: { id: parseInt(item.productId) } });
+                if (!product) {
+                    throw createError(404, `Product with ID ${item.productId} not found.`);
+                }
+
+                const agency = await tx.agency.findUnique({ where: { id: parseInt(item.agencyId) } });
+                if (!agency) {
+                    throw createError(404, `Agency with ID ${item.agencyId} not found.`);
+                }
+                
+                // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
+                if (parseInt(item.quantity) > 0) {
+                    itemsToCreateData.push({
+                        productId: parseInt(item.productId),
+                        quantity: parseInt(item.quantity),
+                        priceAtPurchase: parseFloat(product.price),
+                        agencyId: parseInt(item.agencyId),
+                        vendorOrderId: orderId // ensure vendorOrderId is set for createMany
+                    });
+                    newTotalAmount += parseFloat(product.price) * parseInt(item.quantity);
+                }
+            }
+
+            if (itemsToCreateData.length > 0) {
+                await tx.orderItem.createMany({
+                    data: itemsToCreateData,
+                });
+            }
+        }
+        // If orderItems is an empty array, all items are deleted and totalAmount becomes 0.
+        dataToUpdate.totalAmount = newTotalAmount;
+      } else {
+        // If orderItems is not provided (undefined or null), keep existing totalAmount
+        // This means we are not touching items or totalAmount in this case.
+        dataToUpdate.totalAmount = order.totalAmount; 
+      }
+
+      return tx.vendorOrder.update({
+        where: { id: orderId },
+        data: dataToUpdate,
+        include: {
+          vendor: true,
+          items: { include: { product: true, agency: true } },
+        },
+      });
+    }); // End of transaction
+
+    res.json(updatedOrderInTransaction);
+
+  } catch (error) {
+    if (error.statusCode) { // If it's an error created by createError
+        return next(error);
     }
-
-    // Add authorization: e.g., only admin or vendor (if order is PENDING) can update
-    // if (req.user.role !== 'ADMIN' && !(req.user.vendorId === order.vendorId && order.status === OrderStatus.PENDING)) {
-    //   return next(createError(403, 'Not authorized to update this order'));
-    // }
-    
-    // Cannot update items or totalAmount here directly, that would require a more complex logic
-    // or separate endpoints. This is for general order details.
-
-    const updatedOrder = await prisma.vendorOrder.update({
-      where: { id: orderId },
-      data: {
-        poNumber,
-        deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
-        contactPersonName,
-        notes,
-      },
-       include: {
-        vendor: true,
-        items: { include: { product: true, agency: true } },
-      },
-    });
-    res.json(updatedOrder);
-  } catch (error)
-{
     if (error.code === 'P2002' && error.meta?.target?.includes('poNumber')) {
         return next(createError(400, 'Purchase Order number already exists.'));
     }
-    next(error);
+    console.error("Error updating order:", error); // For server logs
+    next(createError(500, 'Failed to update order. ' + error.message));
   }
 };
 

@@ -55,7 +55,7 @@ model Vendor {
   pincode          Int
   mobile           String
   alternateMobile  String?  @map("alternate_mobile")
-  email            String   @unique
+  email            String?   @unique
   userId           Int      @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -79,7 +79,7 @@ model Agency {
   pincode          Int
   alternateMobile  String?  @map("alternate_mobile")
 
-  email            String   @unique
+  email            String?   @unique
   userId           Int      @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
