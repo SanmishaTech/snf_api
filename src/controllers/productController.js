@@ -70,11 +70,10 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
 
   const whereConditions = {};
   if (search) {
-    // Basic search on URL or price. Adjust as needed.
+    // Basic search on name and URL. Price is Float, so 'contains' is not applicable.
     whereConditions.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { url: { contains: search, mode: 'insensitive' } },
-      { price: { contains: search, mode: 'insensitive' } }, 
+      { name: { contains: search } },
+      { url: { contains: search } },
     ];
   }
 

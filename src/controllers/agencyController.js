@@ -136,13 +136,13 @@ const getAllAgencies = asyncHandler(async (req, res, next) => {
 
   if (search) {
     whereConditions.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-      { city: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search } },
+      { email: { contains: search } },
+      { city: { contains: search } },
       { user: {
           OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search } },
+            { email: { contains: search } },
           ]
         }
       }

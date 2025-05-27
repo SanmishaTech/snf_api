@@ -110,10 +110,83 @@ const createVendor = asyncHandler(async (req, res, next) => {
 });
 
 const getAllVendors = asyncHandler(async (req, res, next) => {
-  const vendors = await prisma.vendor.findMany({
-    include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
-  });
-  res.status(200).json(vendors);
+  const { 
+    page = 1, 
+    limit = 10, 
+    sortBy = 'name', 
+    sortOrder = 'asc', 
+    search = '', 
+    active = 'all' // 'all', 'true', 'false'
+  } = req.query;
+
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const skip = (pageNum - 1) * limitNum;
+
+  let whereConditions = {};
+
+  if (search) {
+    whereConditions.OR = [
+      { name: { contains: search } },
+      { email: { contains: search } },
+      { contactPersonName: { contains: search } },
+      { mobile: { contains: search } },
+      { city: { contains: search } },
+    ];
+    whereConditions.OR.push({
+      user: {
+        OR: [
+          { name: { contains: search } },
+          { email: { contains: search } },
+        ],
+      },
+    });
+  }
+
+  if (active !== 'all') {
+    whereConditions.user = {
+      active: active === 'true'
+    };
+  }
+
+  const orderByClause = {};
+  if (sortBy) {
+    orderByClause[sortBy] = sortOrder === 'desc' ? 'desc' : 'asc';
+  }
+
+  try {
+    const vendors = await prisma.vendor.findMany({
+      where: whereConditions,
+      include: { 
+        user: { 
+          select: { 
+            id: true, 
+            name: true, // This is user's full name
+            email: true, // This is user's login email
+            role: true, 
+            active: true 
+          }
+        }
+      },
+      skip: skip,
+      take: limitNum,
+      orderBy: orderByClause,
+    });
+
+    const totalRecords = await prisma.vendor.count({
+      where: whereConditions,
+    });
+
+    res.status(200).json({
+      data: vendors,
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / limitNum),
+      currentPage: pageNum,
+    });
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    next(createError(500, 'Failed to fetch vendors.'));
+  }
 });
 
 const getVendorById = asyncHandler(async (req, res, next) => {

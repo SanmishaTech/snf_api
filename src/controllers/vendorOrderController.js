@@ -159,14 +159,24 @@ exports.createVendorOrder = async (req, res, next) => {
 // @access  Private (ADMIN, AGENCY)
 exports.getAllVendorOrders = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, status, vendorId, agencyId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, search, status, vendorId, agencyId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
     if (status) where.status = status;
     if (vendorId) where.vendorId = parseInt(vendorId);
-    if (agencyId) { // Filter by orders containing items from a specific agency
+    // If agencyId filter is applied, it's an AND condition with other filters
+    if (agencyId) {
         where.items = { some: { agencyId: parseInt(agencyId) } };
+    }
+
+    if (search) {
+      where.OR = [
+        { poNumber: { contains: search } },
+        { vendor: { name: { contains: search } } }, // Corrected/verified structure
+        { items: { some: { product: { name: { contains: search } } } } },
+        { items: { some: { agency: { name: { contains: search } } } } }
+      ];
     }
 
     const orders = await prisma.vendorOrder.findMany({
@@ -211,14 +221,23 @@ exports.getMyVendorOrders = async (req, res, next) => {
     if (!userWithVendor || !userWithVendor.vendor) {
         return next(createError(403, "User is not associated with a vendor."));
     }
-    const vendorId = userWithVendor.vendor.id;
-    console.log(vendorId)
+    const currentVendorId = userWithVendor.vendor.id;
+    console.log(currentVendorId)
 
-    const { page = 1, limit = 10, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, search, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query; // Added 'search'
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const where = { vendorId: vendorId };
-    if (status) where.status = status;
+    // Base condition: always filter by the current vendor's ID
+    const where = { vendorId: currentVendorId }; 
+    if (status) where.status = status.toUpperCase();
 
+    if (search) {
+      // The OR conditions are applied in conjunction with the vendorId filter
+      where.OR = [
+        { poNumber: { contains: search } },
+        { items: { some: { product: { name: { contains: search } } } } },
+        { items: { some: { agency: { name: { contains: search } } } } }
+      ];
+    }
 
     const orders = await prisma.vendorOrder.findMany({
       skip,
@@ -596,18 +615,9 @@ exports.recordDelivery = async (req, res, next) => {
             newStatus = OrderStatus.ASSIGNED; // Or PENDING based on exact workflow
         }
         // If PENDING or ASSIGNED, it remains as is (newStatus is already order.status)
-      } else if (totalDeliveredQuantity > 0 && totalDeliveredQuantity < totalOrderedQuantity) {
+      } else if (totalDeliveredQuantity > 0) {
         // If partially delivered (some items delivered, but not all quantity)
-        if (order.status === OrderStatus.PENDING) {
-          newStatus = OrderStatus.ASSIGNED; // Move from PENDING to ASSIGNED
-        }
-        // If order.status is already ASSIGNED, it remains ASSIGNED (newStatus is order.status).
-        // If order.status was DELIVERED and now it's less, it should probably become ASSIGNED.
-        else if (order.status === OrderStatus.DELIVERED) {
-            newStatus = OrderStatus.ASSIGNED;
-        }
-      } else if (totalDeliveredQuantity >= totalOrderedQuantity) {
-        // If fully delivered (or more, though prevented earlier)
+        // Mark as DELIVERED even when partial quantity is delivered
         newStatus = OrderStatus.DELIVERED;
       }
       
@@ -697,9 +707,10 @@ exports.getMyAgencyOrders = async (req, res, next) => {
 
     if (search) {
       whereClause.OR = [
-        { poNumber: { contains: search, mode: 'insensitive' } },
-        { vendor: { name: { contains: search, mode: 'insensitive' } } },
-        // Add more sophisticated search across item names if needed later
+        { poNumber: { contains: search } },
+        { vendor: { name: { contains: search } } },
+        { items: { some: { product: { name: { contains: search } } } } }
+        // No need to search by agency name here as orders are already for a specific agency
       ];
     }
 
