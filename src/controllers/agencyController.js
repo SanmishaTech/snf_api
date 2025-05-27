@@ -13,7 +13,7 @@ const agencyBaseSchema = z.object({
   name: z.string().min(2, { message: 'Agency name must be at least 2 characters long' }),
   contactPersonName: z.string().optional(),
   address1: z.string().min(5, { message: 'Address line 1 must be at least 5 characters long' }),
-  address2: z.string().optional(),
+  address2: z.any().optional(),
   city: z.string().min(2, { message: 'City is required' }),
   pincode: z.string().regex(/^\d{6}$/, { message: 'Pincode must be 6 digits' }).transform(Number).or(z.number()),
   mobile: z.string().regex(/^\d{10}$/, { message: 'Mobile number must be 10 digits' }),
