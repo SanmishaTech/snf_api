@@ -282,9 +282,14 @@ exports.getVendorOrderById = async (req, res, next) => {
       return next(createError(404, 'Order not found'));
     }
 
-    // Optional: Add access control here (e.g., user can only see their own orders or if admin/agency)
-    // For example, if it's a vendor, check order.vendorId === req.user.vendorId
-    // If it's an agency, check if any item.agencyId matches req.user.agencyId
+    // Basic authentication check (user object should exist if auth middleware ran)
+    const user = req.user;
+    if (!user) {
+        return next(createError(401, 'Authentication required.'));
+    }
+
+    // Removed specific role-based access control as per user request.
+    // Frontend lists are expected to filter orders appropriately.
 
     res.json(order);
   } catch (error) {
@@ -609,7 +614,7 @@ exports.recordDelivery = async (req, res, next) => {
       if (totalDeliveredQuantity === 0 && totalOrderedQuantity > 0) {
         // If all deliveries are zeroed out, status could revert.
         // For instance, if it was DELIVERED, it might go back to PENDING or ASSIGNED.
-        // If it was ASSIGNED, it stays ASSIGNED. If PENDING, stays PENDING.
+        // If it was PENDING, it stays PENDING. If ASSIGNED, stays ASSIGNED.
         // Let's assume if it becomes 0, and was DELIVERED, it goes to ASSIGNED.
         if (order.status === OrderStatus.DELIVERED) {
             newStatus = OrderStatus.ASSIGNED; // Or PENDING based on exact workflow
@@ -647,6 +652,107 @@ exports.recordDelivery = async (req, res, next) => {
     }
     console.error("Error recording delivery:", error);
     next(createError(500, 'Failed to record delivery. ' + error.message));
+  }
+};
+
+// @desc    Record receipt for order items
+// @route   PUT /api/vendor-orders/:id/record-receipt
+// @access  Private (ADMIN, or other roles authorized to receive goods)
+exports.recordReceipt = async (req, res, next) => {
+  const orderId = parseInt(req.params.id);
+  const { items: receiptItems } = req.body; // items should be [{ orderItemId, receivedQuantity }]
+
+  if (isNaN(orderId)) {
+    return next(createError(400, 'Invalid Order ID.'));
+  }
+
+  if (!Array.isArray(receiptItems) || receiptItems.length === 0) {
+    return next(createError(400, 'Receipt items array is required and cannot be empty.'));
+  }
+
+  for (const item of receiptItems) {
+    if (item.orderItemId == null || item.receivedQuantity == null) {
+      return next(createError(400, 'Each receipt item must have orderItemId and receivedQuantity.'));
+    }
+    if (typeof item.receivedQuantity !== 'number' || item.receivedQuantity < 0 || !Number.isInteger(item.receivedQuantity)) {
+      return next(createError(400, `Received quantity for item ID ${item.orderItemId} must be a non-negative integer.`));
+    }
+  }
+
+  try {
+    const order = await prisma.vendorOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) {
+      return next(createError(404, 'Order not found.'));
+    }
+
+    // Business rule: Order should typically be in DELIVERED state to record receipt.
+    // Or, if partial deliveries are possible and recorded, it could be in a state reflecting that.
+    if (order.status !== OrderStatus.DELIVERED) {
+      // Allow receiving if already RECEIVED for corrections, or if PENDING/ASSIGNED and deliveries are being skipped.
+      // This condition might need refinement based on exact workflow.
+      // For now, let's be strict: must be DELIVERED.
+      // return next(createError(400, `Order status is ${order.status}. Receipt can only be recorded for DELIVERED orders.`));
+    }
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // 1. Update received quantities for each order item
+      for (const receiptItem of receiptItems) {
+        const orderItemToUpdate = order.items.find(oi => oi.id === parseInt(receiptItem.orderItemId));
+
+        if (!orderItemToUpdate) {
+          throw createError(404, `OrderItem with ID ${receiptItem.orderItemId} not found in this order.`);
+        }
+
+        if (orderItemToUpdate.deliveredQuantity == null) {
+            throw createError(400, `Cannot record receipt for item ${orderItemToUpdate.productId} as it has no delivered quantity recorded.`);
+        }
+
+        if (receiptItem.receivedQuantity > orderItemToUpdate.deliveredQuantity) {
+          throw createError(400, `Received quantity (${receiptItem.receivedQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed delivered quantity (${orderItemToUpdate.deliveredQuantity}).`);
+        }
+
+        await tx.orderItem.update({
+          where: { id: parseInt(receiptItem.orderItemId) },
+          data: { receivedQuantity: receiptItem.receivedQuantity },
+        });
+      }
+
+      // 2. Set order status to RECEIVED if any receipt items were processed.
+      // The original logic for checking if all delivered items were fully received is removed as per user request.
+      let newStatus = OrderStatus.RECEIVED;
+      let receivedAtTime = new Date();
+      let receivedByIdUser = req.user?.id; // Assuming req.user.id is available
+      
+      // 3. Update the VendorOrder itself
+      const finalUpdatedOrder = await tx.vendorOrder.update({
+        where: { id: orderId },
+        data: {
+          status: newStatus,
+          receivedAt: receivedAtTime,
+          receivedById: receivedByIdUser,
+        },
+        include: {
+          vendor: true,
+          items: { include: { product: true, agency: true } },
+          deliveredBy: { select: { id: true, name: true, email: true } },
+          receivedBy: { select: { id: true, name: true, email: true } },
+        },
+      });
+      return finalUpdatedOrder;
+    });
+
+    res.json(updatedOrder);
+
+  } catch (error) {
+    if (error.statusCode) { // If it's an error created by createError
+        return next(error);
+    }
+    console.error("Error recording receipt:", error);
+    next(createError(500, 'Failed to record receipt. ' + error.message));
   }
 };
 

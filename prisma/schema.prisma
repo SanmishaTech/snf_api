@@ -18,7 +18,7 @@ enum OrderStatus {
   PENDING
   DELIVERED
   RECEIVED
-}
+ }
 
 model User {
   id                Int       @id @default(autoincrement())
@@ -157,6 +157,7 @@ model OrderItem {
   agencyId          Int         // From OrderForm
   agency            Agency      @relation(fields: [agencyId], references: [id])
   deliveredQuantity Int?        // Actual quantity delivered by vendor
+  receivedQuantity  Int?        // Actual quantity received by store/admin
   
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt

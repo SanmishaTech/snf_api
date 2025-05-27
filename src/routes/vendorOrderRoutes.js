@@ -25,7 +25,7 @@ router.get('/my', auth, vendorOrderController.getMyVendorOrders);
 router.get('/my-agency-orders', auth, vendorOrderController.getMyAgencyOrders);
 
 // GET /api/vendor-orders/:id - Get a single vendor order by ID
-router.get('/:id', vendorOrderController.getVendorOrderById);
+router.get('/:id', auth, vendorOrderController.getVendorOrderById);
 
 // PUT /api/vendor-orders/:id - Update a vendor order (e.g., notes, PO number)
 router.put('/:id', vendorOrderController.updateVendorOrder);
@@ -38,6 +38,9 @@ router.patch('/:id/delivery', vendorOrderController.markOrderDelivered);
 
 // PUT /api/vendor-orders/:id/record-delivery - Record delivered quantities for order items
 router.put('/:id/record-delivery', auth, vendorOrderController.recordDelivery);
+
+// PUT /api/vendor-orders/:id/record-receipt - Record received quantities for order items
+router.put('/:id/record-receipt', auth, vendorOrderController.recordReceipt);
 
 // PATCH /api/vendor-orders/:id/reception - Mark order as received (by AGENCY who placed it or ADMIN)
 // This might require knowing which agency placed the order, or if it's a general reception confirmation.
