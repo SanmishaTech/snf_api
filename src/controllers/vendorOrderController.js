@@ -612,6 +612,8 @@ exports.recordDelivery = async (req, res, next) => {
 
       let newStatus = order.status; // Default to current status
       if (totalDeliveredQuantity === 0 && totalOrderedQuantity > 0) {
+        newStatus = OrderStatus.DELIVERED;
+
         // If all deliveries are zeroed out, status could revert.
         // For instance, if it was DELIVERED, it might go back to PENDING or ASSIGNED.
         // If it was PENDING, it stays PENDING. If ASSIGNED, stays ASSIGNED.

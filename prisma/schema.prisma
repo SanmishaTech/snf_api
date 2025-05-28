@@ -7,160 +7,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  VENDOR
-  AGENCY
-  ADMIN
-  MEMBER
- }
-
-enum OrderStatus {
-  PENDING
-  DELIVERED
-  RECEIVED
- }
-
 model User {
-  id                Int       @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   name              String
-  email             String    @unique
+  email             String        @unique
   password          String
   role              Role
   mobile            Int?
-  active            Boolean   @default(true)
+  active            Boolean       @default(true)
   lastLogin         DateTime?
   resetToken        String?
   resetTokenExpires DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  vendor            Vendor?   // Relation to Vendor model
-  agency            Agency?   // Relation to Agency model
-
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  agency            Agency?
   deliveredOrders   VendorOrder[] @relation("DeliveredBy")
   receivedOrders    VendorOrder[] @relation("ReceivedBy")
-  // Optional: If you want to track which user created the order
-  // createdOrders     VendorOrder[] @relation("CreatedBy")
+  vendor            Vendor?
 
   @@map("users")
 }
 
 model Vendor {
-  id               Int      @id @default(autoincrement())
-  name             String
-  contactPersonName String?  @map("contact_person_name")
-  address1         String
-  address2         String?
-  city             String
-  pincode          Int
-  mobile           String
-  alternateMobile  String?  @map("alternate_mobile")
-  email            String?   @unique
-  userId           Int      @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  orders            VendorOrder[] // Relation to VendorOrder
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                Int           @id @default(autoincrement())
+  name              String
+  contactPersonName String?       @map("contact_person_name")
+  address1          String
+  address2          String?
+  city              String
+  pincode           Int
+  mobile            String
+  alternateMobile   String?       @map("alternate_mobile")
+  email             String?       @unique
+  userId            Int           @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  orders            VendorOrder[]
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("vendors")
 }
 
 model Agency {
-  id               Int      @id @default(autoincrement())
-  name             String
-  contactPersonName String?  @map("contact_person_name")
-
-  mobile           String
-  address1         String
-  address2         String?
-  city             String
-  pincode          Int
-  alternateMobile  String?  @map("alternate_mobile")
-
-  email            String?   @unique
-  userId           Int      @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  orderItems        OrderItem[]   // Relation to OrderItem
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                Int         @id @default(autoincrement())
+  name              String
+  contactPersonName String?     @map("contact_person_name")
+  mobile            String
+  address1          String
+  address2          String?
+  city              String
+  pincode           Int
+  alternateMobile   String?     @map("alternate_mobile")
+  email             String?     @unique
+  userId            Int         @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItems        OrderItem[]
 
   @@map("agencies")
 }
 
 model Product {
-  id        Int      @id @default(autoincrement())
-  name      String
-  url       String?
-  price     Float       // Changed from String to Float
-  unit      String?     // Unit of the product (e.g., kg, pcs, ltr)
+  id                Int         @id @default(autoincrement())
+  name              String
+  url               String?
+  price             Float
   deliveredQuantity Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  orderItems  OrderItem[] // Relation to OrderItem
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  unit              String?
+  orderItems        OrderItem[]
 
   @@map("products")
 }
 
 model VendorOrder {
   id                Int         @id @default(autoincrement())
-  poNumber          String?     // From OrderForm
-  orderDate         DateTime    // From OrderForm & image (order_date)
-  deliveryDate      DateTime?   // From OrderForm (expected delivery)
-  
-  vendorId          Int         // From OrderForm
-  vendor            Vendor      @relation(fields: [vendorId], references: [id])
-  
-  contactPersonName String?     // From OrderForm (can be denormalized or fetched via vendor)
-  notes             String?     // From OrderForm
-  
-  status            OrderStatus @default(PENDING) // From image
-
-  deliveredById     Int?        // From image (deliveredBy)
-  deliveredBy       User?       @relation("DeliveredBy", fields: [deliveredById], references: [id])
-  deliveredAt       DateTime?   // From image (deliveredAT)
-  
-  receivedById      Int?        // From image (recievedBy - typo corrected)
-  receivedBy        User?       @relation("ReceivedBy", fields: [receivedById], references: [id])
-  receivedAt        DateTime?   // From image (recievedAT - typo corrected)
-
-  // Optional: If you want to track which user created the order
-  // createdById       Int?
-  // createdBy         User?       @relation("CreatedBy", fields: [createdById], references: [id])
-
-  totalAmount       Float?      // Calculated total from OrderForm
-
-  items             OrderItem[] // Relation to OrderItem
-
+  poNumber          String?
+  orderDate         DateTime
+  deliveryDate      DateTime?
+  vendorId          Int
+  contactPersonName String?
+  notes             String?
+  status            OrderStatus @default(PENDING)
+  deliveredById     Int?
+  deliveredAt       DateTime?
+  receivedById      Int?
+  receivedAt        DateTime?
+  totalAmount       Float?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+  items             OrderItem[]
+  deliveredBy       User?       @relation("DeliveredBy", fields: [deliveredById], references: [id])
+  receivedBy        User?       @relation("ReceivedBy", fields: [receivedById], references: [id])
+  vendor            Vendor      @relation(fields: [vendorId], references: [id])
 
-  @@map("vendor_orders") // Maps to the table name from your image
+  @@index([deliveredById], map: "vendor_orders_deliveredById_fkey")
+  @@index([receivedById], map: "vendor_orders_receivedById_fkey")
+  @@index([vendorId], map: "vendor_orders_vendorId_fkey")
+  @@map("vendor_orders")
 }
 
 model OrderItem {
   id                Int         @id @default(autoincrement())
-  
   vendorOrderId     Int
-  vendorOrder       VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-  
   productId         Int
-  product           Product     @relation(fields: [productId], references: [id])
-  
-  quantity          Int         // From OrderForm & image
-  priceAtPurchase   Float       // Store price at time of purchase for accuracy
-  
-  agencyId          Int         // From OrderForm
-  agency            Agency      @relation(fields: [agencyId], references: [id])
-  deliveredQuantity Int?        // Actual quantity delivered by vendor
-  receivedQuantity  Int?        // Actual quantity received by store/admin
-  
+  quantity          Int
+  priceAtPurchase   Float
+  agencyId          Int
+  deliveredQuantity Int?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+  receivedQuantity  Int?
+  agency            Agency      @relation(fields: [agencyId], references: [id])
+  product           Product     @relation(fields: [productId], references: [id])
+  vendorOrder       VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
 
+  @@index([agencyId], map: "vendor_order_items_agencyId_fkey")
+  @@index([productId], map: "vendor_order_items_productId_fkey")
+  @@index([vendorOrderId], map: "vendor_order_items_vendorOrderId_fkey")
   @@map("vendor_order_items")
+}
+
+enum Role {
+  VENDOR
+  AGENCY
+  ADMIN
+  MEMBER
+}
+
+enum OrderStatus {
+  PENDING
+  DELIVERED
+  RECEIVED
 }
