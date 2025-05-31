@@ -12,6 +12,8 @@ const isAdminOrAgency = (req, res, next) => {
   next();
 };
 
+router.get('/get-order-details', vendorOrderController.getOrderDetailsByDate);
+
 // POST /api/vendor-orders - Create a new vendor order
 router.post('/', auth, vendorOrderController.createVendorOrder);
 
@@ -49,5 +51,6 @@ router.patch('/:id/reception', vendorOrderController.markOrderReceived);
 
 // DELETE /api/vendor-orders/:id - Delete a vendor order (ADMIN only - use with caution)
 router.delete('/:id', vendorOrderController.deleteVendorOrder);
+
 
 module.exports = router;

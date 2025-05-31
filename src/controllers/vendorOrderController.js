@@ -144,11 +144,11 @@ exports.createVendorOrder = async (req, res, next) => {
   } catch (error) {
     console.error("Error creating vendor order:", error);
     if (error.code === 'P2002' && error.meta?.target?.includes('poNumber')) {
-        const offendingPo = poNumberToSave || inputPoNumber || 'the provided/generated PO Number';
-        return next(createError(400, `Purchase Order number '${offendingPo}' already exists.`));
+      const offendingPo = poNumberToSave || inputPoNumber || 'the provided/generated PO Number';
+      return next(createError(400, `Purchase Order number '${offendingPo}' already exists.`));
     }
     if (error.message.includes("Not enough stock") || error.message.includes("not found")) {
-        return next(error); // Forward specific validation errors
+      return next(error); // Forward specific validation errors
     }
     next(createError(500, "Failed to create vendor order. " + error.message));
   }
@@ -167,7 +167,7 @@ exports.getAllVendorOrders = async (req, res, next) => {
     if (vendorId) where.vendorId = parseInt(vendorId);
     // If agencyId filter is applied, it's an AND condition with other filters
     if (agencyId) {
-        where.items = { some: { agencyId: parseInt(agencyId) } };
+      where.items = { some: { agencyId: parseInt(agencyId) } };
     }
 
     if (search) {
@@ -193,10 +193,10 @@ exports.getAllVendorOrders = async (req, res, next) => {
     });
     const totalOrders = await prisma.vendorOrder.count({ where });
     res.json({
-        data: orders,
-        totalPages: Math.ceil(totalOrders / parseInt(limit)),
-        currentPage: parseInt(page),
-        totalOrders,
+      data: orders,
+      totalPages: Math.ceil(totalOrders / parseInt(limit)),
+      currentPage: parseInt(page),
+      totalOrders,
     });
   } catch (error) {
     next(error);
@@ -213,13 +213,13 @@ exports.getMyVendorOrders = async (req, res, next) => {
     // For this example, let's assume the vendor's ID is linked via their user profile.
     // You might need to adjust this based on your User-Vendor relationship.
     const userWithVendor = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        include: { vendor: { select: { id: true } } }
+      where: { id: req.user.id },
+      include: { vendor: { select: { id: true } } }
     });
     console.log(userWithVendor)
 
     if (!userWithVendor || !userWithVendor.vendor) {
-        return next(createError(403, "User is not associated with a vendor."));
+      return next(createError(403, "User is not associated with a vendor."));
     }
     const currentVendorId = userWithVendor.vendor.id;
     console.log(currentVendorId)
@@ -227,7 +227,7 @@ exports.getMyVendorOrders = async (req, res, next) => {
     const { page = 1, limit = 10, search, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query; // Added 'search'
     const skip = (parseInt(page) - 1) * parseInt(limit);
     // Base condition: always filter by the current vendor's ID
-    const where = { vendorId: currentVendorId }; 
+    const where = { vendorId: currentVendorId };
     if (status) where.status = status.toUpperCase();
 
     if (search) {
@@ -249,12 +249,12 @@ exports.getMyVendorOrders = async (req, res, next) => {
         items: { include: { product: true, agency: true } },
       },
     });
-     const totalOrders = await prisma.vendorOrder.count({ where });
+    const totalOrders = await prisma.vendorOrder.count({ where });
     res.json({
-        data: orders,
-        totalPages: Math.ceil(totalOrders / parseInt(limit)),
-        currentPage: parseInt(page),
-        totalOrders,
+      data: orders,
+      totalPages: Math.ceil(totalOrders / parseInt(limit)),
+      currentPage: parseInt(page),
+      totalOrders,
     });
   } catch (error) {
     next(error);
@@ -285,7 +285,7 @@ exports.getVendorOrderById = async (req, res, next) => {
     // Basic authentication check (user object should exist if auth middleware ran)
     const user = req.user;
     if (!user) {
-        return next(createError(401, 'Authentication required.'));
+      return next(createError(401, 'Authentication required.'));
     }
 
     // Removed specific role-based access control as per user request.
@@ -344,49 +344,49 @@ exports.updateVendorOrder = async (req, res, next) => {
         const itemsToCreateData = [];
 
         if (orderItems.length > 0) { // Only process if there are items to add
-            for (const item of orderItems) {
-                if (!item.productId || item.quantity === undefined || !item.agencyId) { // quantity can be 0 if allowed, but must be present
-                    throw createError(400, `OrderItem missing productId, quantity, or agencyId.`);
-                }
-                if (item.quantity < 0) { // Allow 0 quantity if it means removing item effectively, but not negative
-                    throw createError(400, `Quantity for product ID ${item.productId} must be non-negative.`);
-                }
-
-                const product = await tx.product.findUnique({ where: { id: parseInt(item.productId) } });
-                if (!product) {
-                    throw createError(404, `Product with ID ${item.productId} not found.`);
-                }
-
-                const agency = await tx.agency.findUnique({ where: { id: parseInt(item.agencyId) } });
-                if (!agency) {
-                    throw createError(404, `Agency with ID ${item.agencyId} not found.`);
-                }
-                
-                // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
-                if (parseInt(item.quantity) > 0) {
-                    itemsToCreateData.push({
-                        productId: parseInt(item.productId),
-                        quantity: parseInt(item.quantity),
-                        priceAtPurchase: parseFloat(product.price),
-                        agencyId: parseInt(item.agencyId),
-                        vendorOrderId: orderId // ensure vendorOrderId is set for createMany
-                    });
-                    newTotalAmount += parseFloat(product.price) * parseInt(item.quantity);
-                }
+          for (const item of orderItems) {
+            if (!item.productId || item.quantity === undefined || !item.agencyId) { // quantity can be 0 if allowed, but must be present
+              throw createError(400, `OrderItem missing productId, quantity, or agencyId.`);
+            }
+            if (item.quantity < 0) { // Allow 0 quantity if it means removing item effectively, but not negative
+              throw createError(400, `Quantity for product ID ${item.productId} must be non-negative.`);
             }
 
-            if (itemsToCreateData.length > 0) {
-                await tx.orderItem.createMany({
-                    data: itemsToCreateData,
-                });
+            const product = await tx.product.findUnique({ where: { id: parseInt(item.productId) } });
+            if (!product) {
+              throw createError(404, `Product with ID ${item.productId} not found.`);
             }
+
+            const agency = await tx.agency.findUnique({ where: { id: parseInt(item.agencyId) } });
+            if (!agency) {
+              throw createError(404, `Agency with ID ${item.agencyId} not found.`);
+            }
+
+            // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
+            if (parseInt(item.quantity) > 0) {
+              itemsToCreateData.push({
+                productId: parseInt(item.productId),
+                quantity: parseInt(item.quantity),
+                priceAtPurchase: parseFloat(product.price),
+                agencyId: parseInt(item.agencyId),
+                vendorOrderId: orderId // ensure vendorOrderId is set for createMany
+              });
+              newTotalAmount += parseFloat(product.price) * parseInt(item.quantity);
+            }
+          }
+
+          if (itemsToCreateData.length > 0) {
+            await tx.orderItem.createMany({
+              data: itemsToCreateData,
+            });
+          }
         }
         // If orderItems is an empty array, all items are deleted and totalAmount becomes 0.
         dataToUpdate.totalAmount = newTotalAmount;
       } else {
         // If orderItems is not provided (undefined or null), keep existing totalAmount
         // This means we are not touching items or totalAmount in this case.
-        dataToUpdate.totalAmount = order.totalAmount; 
+        dataToUpdate.totalAmount = order.totalAmount;
       }
 
       return tx.vendorOrder.update({
@@ -403,10 +403,10 @@ exports.updateVendorOrder = async (req, res, next) => {
 
   } catch (error) {
     if (error.statusCode) { // If it's an error created by createError
-        return next(error);
+      return next(error);
     }
     if (error.code === 'P2002' && error.meta?.target?.includes('poNumber')) {
-        return next(createError(400, 'Purchase Order number already exists.'));
+      return next(createError(400, 'Purchase Order number already exists.'));
     }
     console.error("Error updating order:", error); // For server logs
     next(createError(500, 'Failed to update order. ' + error.message));
@@ -452,90 +452,90 @@ exports.updateVendorOrderStatus = async (req, res, next) => {
 // @route   PATCH /api/vendor-orders/:id/delivery
 // @access  Private (VENDOR, ADMIN, AGENCY)
 exports.markOrderDelivered = async (req, res, next) => {
-    const orderId = parseInt(req.params.id);
-    // const { deliveredAt } = req.body; // Optional: allow specifying delivery time
+  const orderId = parseInt(req.params.id);
+  // const { deliveredAt } = req.body; // Optional: allow specifying delivery time
 
-    try {
-        const order = await prisma.vendorOrder.findUnique({ where: { id: orderId } });
-        if (!order) {
-            return next(createError(404, 'Order not found'));
-        }
-
-        if (order.status === OrderStatus.DELIVERED && order.deliveredById && order.deliveredAt) {
-            return res.status(400).json({ message: 'Order already marked as delivered.' });
-        }
-        
-        // Authorization: Ensure the user is the vendor for this order, or an admin/agency
-        // if (req.user.role === 'VENDOR' && req.user.vendorId !== order.vendorId) {
-        //    return next(createError(403, 'Not authorized to mark this order as delivered.'));
-        // }
-
-
-        const updatedOrder = await prisma.vendorOrder.update({
-            where: { id: orderId },
-            data: {
-                status: OrderStatus.DELIVERED,
-                deliveredById: req.user.id, // Logged-in user marked it as delivered
-                deliveredAt: new Date(), // Current time
-            },
-            include: {
-                vendor: true,
-                items: { include: { product: true, agency: true } },
-                deliveredBy: { select: { id: true, name: true, email: true } },
-            },
-        });
-        res.json(updatedOrder);
-    } catch (error) {
-        next(error);
+  try {
+    const order = await prisma.vendorOrder.findUnique({ where: { id: orderId } });
+    if (!order) {
+      return next(createError(404, 'Order not found'));
     }
+
+    if (order.status === OrderStatus.DELIVERED && order.deliveredById && order.deliveredAt) {
+      return res.status(400).json({ message: 'Order already marked as delivered.' });
+    }
+
+    // Authorization: Ensure the user is the vendor for this order, or an admin/agency
+    // if (req.user.role === 'VENDOR' && req.user.vendorId !== order.vendorId) {
+    //    return next(createError(403, 'Not authorized to mark this order as delivered.'));
+    // }
+
+
+    const updatedOrder = await prisma.vendorOrder.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.DELIVERED,
+        deliveredById: req.user.id, // Logged-in user marked it as delivered
+        deliveredAt: new Date(), // Current time
+      },
+      include: {
+        vendor: true,
+        items: { include: { product: true, agency: true } },
+        deliveredBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    res.json(updatedOrder);
+  } catch (error) {
+    next(error);
+  }
 };
 
 // @desc    Mark order as received
 // @route   PATCH /api/vendor-orders/:id/reception
 // @access  Private (AGENCY, ADMIN)
 exports.markOrderReceived = async (req, res, next) => {
-    const orderId = parseInt(req.params.id);
-    // const { receivedAt } = req.body; // Optional: allow specifying reception time
+  const orderId = parseInt(req.params.id);
+  // const { receivedAt } = req.body; // Optional: allow specifying reception time
 
-    try {
-        const order = await prisma.vendorOrder.findUnique({ 
-            where: { id: orderId },
-            include: { items: true } // Need items to check agency involvement
-        });
-        if (!order) {
-            return next(createError(404, 'Order not found'));
-        }
-
-        if (order.receivedById && order.receivedAt) {
-             return res.status(400).json({ message: 'Order already marked as received.' });
-        }
-
-        // Authorization: Ensure the user is an admin or an agency involved in this order
-        // let isAgencyInvolved = false;
-        // if (req.user.role === 'AGENCY') {
-        //     isAgencyInvolved = order.items.some(item => item.agencyId === req.user.agencyId);
-        // }
-        // if (req.user.role !== 'ADMIN' && !isAgencyInvolved) {
-        //    return next(createError(403, 'Not authorized to mark this order as received.'));
-        // }
-
-        const updatedOrder = await prisma.vendorOrder.update({
-            where: { id: orderId },
-            data: {
-                // status: OrderStatus.DELIVERED, // Status should already be DELIVERED by vendor
-                receivedById: req.user.id, // Logged-in user marked it as received
-                receivedAt: new Date(),    // Current time
-            },
-            include: {
-                vendor: true,
-                items: { include: { product: true, agency: true } },
-                receivedBy: { select: { id: true, name: true, email: true } },
-            },
-        });
-        res.json(updatedOrder);
-    } catch (error) {
-        next(error);
+  try {
+    const order = await prisma.vendorOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true } // Need items to check agency involvement
+    });
+    if (!order) {
+      return next(createError(404, 'Order not found'));
     }
+
+    if (order.receivedById && order.receivedAt) {
+      return res.status(400).json({ message: 'Order already marked as received.' });
+    }
+
+    // Authorization: Ensure the user is an admin or an agency involved in this order
+    // let isAgencyInvolved = false;
+    // if (req.user.role === 'AGENCY') {
+    //     isAgencyInvolved = order.items.some(item => item.agencyId === req.user.agencyId);
+    // }
+    // if (req.user.role !== 'ADMIN' && !isAgencyInvolved) {
+    //    return next(createError(403, 'Not authorized to mark this order as received.'));
+    // }
+
+    const updatedOrder = await prisma.vendorOrder.update({
+      where: { id: orderId },
+      data: {
+        // status: OrderStatus.DELIVERED, // Status should already be DELIVERED by vendor
+        receivedById: req.user.id, // Logged-in user marked it as received
+        receivedAt: new Date(),    // Current time
+      },
+      include: {
+        vendor: true,
+        items: { include: { product: true, agency: true } },
+        receivedBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    res.json(updatedOrder);
+  } catch (error) {
+    next(error);
+  }
 };
 
 
@@ -617,9 +617,9 @@ exports.recordDelivery = async (req, res, next) => {
         // If all deliveries are zeroed out, status could revert.
         // For instance, if it was DELIVERED, it might go back to PENDING or ASSIGNED.
         // If it was PENDING, it stays PENDING. If ASSIGNED, stays ASSIGNED.
-        // Let's assume if it becomes 0, and was DELIVERED, it goes to ASSIGNED.
+        // Let's assume if it becomes 0, and was DELIVERED, it goes back to ASSIGNED.
         if (order.status === OrderStatus.DELIVERED) {
-            newStatus = OrderStatus.ASSIGNED; // Or PENDING based on exact workflow
+          newStatus = OrderStatus.ASSIGNED; // Or PENDING based on exact workflow
         }
         // If PENDING or ASSIGNED, it remains as is (newStatus is already order.status)
       } else if (totalDeliveredQuantity > 0) {
@@ -627,7 +627,7 @@ exports.recordDelivery = async (req, res, next) => {
         // Mark as DELIVERED even when partial quantity is delivered
         newStatus = OrderStatus.DELIVERED;
       }
-      
+
       // 3. Update the VendorOrder itself
       const finalUpdatedOrder = await tx.vendorOrder.update({
         where: { id: orderId },
@@ -650,7 +650,7 @@ exports.recordDelivery = async (req, res, next) => {
 
   } catch (error) {
     if (error.statusCode) { // If it's an error created by createError
-        return next(error);
+      return next(error);
     }
     console.error("Error recording delivery:", error);
     next(createError(500, 'Failed to record delivery. ' + error.message));
@@ -710,7 +710,7 @@ exports.recordReceipt = async (req, res, next) => {
         }
 
         if (orderItemToUpdate.deliveredQuantity == null) {
-            throw createError(400, `Cannot record receipt for item ${orderItemToUpdate.productId} as it has no delivered quantity recorded.`);
+          throw createError(400, `Cannot record receipt for item ${orderItemToUpdate.productId} as it has no delivered quantity recorded.`);
         }
 
         if (receiptItem.receivedQuantity > orderItemToUpdate.deliveredQuantity) {
@@ -728,7 +728,7 @@ exports.recordReceipt = async (req, res, next) => {
       let newStatus = OrderStatus.RECEIVED;
       let receivedAtTime = new Date();
       let receivedByIdUser = req.user?.id; // Assuming req.user.id is available
-      
+
       // 3. Update the VendorOrder itself
       const finalUpdatedOrder = await tx.vendorOrder.update({
         where: { id: orderId },
@@ -751,7 +751,7 @@ exports.recordReceipt = async (req, res, next) => {
 
   } catch (error) {
     if (error.statusCode) { // If it's an error created by createError
-        return next(error);
+      return next(error);
     }
     console.error("Error recording receipt:", error);
     next(createError(500, 'Failed to record receipt. ' + error.message));
@@ -859,7 +859,7 @@ exports.getMyAgencyOrders = async (req, res, next) => {
         order.items.forEach(item => {
           // Assuming 'receivedQuantity' being non-null indicates recording by the item's agency
           // and item.agencyId is the ID of the agency responsible for that item.
-          if (item.agencyId && item.receivedQuantity !== null) { 
+          if (item.agencyId && item.receivedQuantity !== null) {
             agenciesThatRecorded.add(String(item.agencyId));
           }
         });
@@ -887,9 +887,9 @@ exports.deleteVendorOrder = async (req, res, next) => {
   const orderId = parseInt(req.params.id);
 
   try {
-    const order = await prisma.vendorOrder.findUnique({ 
-        where: { id: orderId },
-        include: { items: true }
+    const order = await prisma.vendorOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true }
     });
 
     if (!order) {
@@ -898,12 +898,54 @@ exports.deleteVendorOrder = async (req, res, next) => {
 
     // IMPORTANT: Handle product quantity restoration if order is cancelled/deleted
     await prisma.$transaction(async (tx) => {
-        await tx.vendorOrder.delete({ where: { id: orderId } });
+      await tx.vendorOrder.delete({ where: { id: orderId } });
     });
 
     res.status(200).json({ message: 'Vendor order and associated items deleted, product quantities restored.' });
   } catch (error) {
     console.error("Error deleting order:", error);
     next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor orders for a specific date (with details)
+ * @route   GET /api/vendor-orders/details?date=YYYY-MM-DD
+ * @access  Private (ADMIN, AGENCY, VENDOR)
+ */
+exports.getOrderDetailsByDate = async (req, res, next) => {
+  try {
+    // Route: GET /api/vendor-orders/details?date=YYYY-MM-DD
+    // Controller: getOrderDetailsByDate
+    // Usage: router.get('/details', vendorOrderController.getOrderDetailsByDate);
+    const { date } = req.query;
+
+    if (!date) {
+      return next(createError(400, 'Date parameter is required.'));
+    }
+
+    const deliveryDate = new Date(date);
+
+    // Fetch all order items for the given delivery date, grouped by productId, and include product details
+    const deliverySchedule = await prisma.$queryRaw`
+      SELECT 
+        s.agencyId,
+        d.productId,
+        SUM(d.quantity) as totalQty,
+        p.name,
+        p.price
+      FROM delivery_schedule d
+      JOIN subscriptions s ON d.subscriptionId = s.id      
+      JOIN products p ON d.productId = p.id
+      WHERE 
+        s.paymentStatus = 'PAID'
+        AND d.deliveryDate = ${deliveryDate}
+      GROUP BY s.agencyId, d.productId
+      `;
+
+    return res.json(deliverySchedule);
+  } catch (error) {
+    console.error('Error fetching order details:', error);
+    next(createError(500, 'Failed to fetch order details.'));
   }
 };
