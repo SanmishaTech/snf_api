@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 // Get all delivery schedule entries for a specific agency on a given date
 const getAgencyDeliveriesByDate = async (req, res) => {
-  const { date } = req.query;
+  const { date, paymentStatus } = req.query;
   let agencyIdToQuery;
 
   if (req.user.role === 'ADMIN') {
@@ -39,13 +39,21 @@ const getAgencyDeliveriesByDate = async (req, res) => {
     // Prisma stores DateTime in UTC. If deliveryDate is @db.Date, it's stored as YYYY-MM-DD 00:00:00 UTC.
     // So, a direct comparison with targetDate (which will also be YYYY-MM-DD 00:00:00 UTC if created from string) should work.
 
-    const deliveries = await prisma.deliveryScheduleEntry.findMany({
-      where: {
-        deliveryDate: targetDate,
-        subscription: {
-          agencyId: parseInt(agencyIdToQuery, 10),
-        },
+    // Create the where clause with subscription filter
+    const whereClause = {
+      deliveryDate: targetDate,
+      subscription: {
+        agencyId: parseInt(agencyIdToQuery, 10),
       },
+    };
+
+    // Add payment status filter if specified
+    if (paymentStatus === 'PAID') {
+      whereClause.subscription.paymentStatus = 'PAID';
+    }
+
+    const deliveries = await prisma.deliveryScheduleEntry.findMany({
+      where: whereClause,
       include: {
         product: {
           select: {

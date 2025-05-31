@@ -31,7 +31,7 @@ router.post('/', authMiddleware, productUploadMiddleware, createProduct);
 router.get('/', authMiddleware, getAllProducts);
 
 // GET /api/products/:id - Get a single product by ID
-router.get('/:id', authMiddleware, getProductById);
+router.get('/:id', getProductById);
 
 // PUT /api/products/:id - Update a product
 router.put('/:id', authMiddleware, productUploadMiddleware, updateProduct);
