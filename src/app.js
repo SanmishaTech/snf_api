@@ -15,6 +15,11 @@ const productRoutes = require("./routes/productRoutes");
 const swaggerRouter = require("./swagger");
 const vendorOrderRoutes = require("./routes/vendorOrderRoutes");
 const userRoutes = require("./routes/users");
+const deliveryAddressRoutes = require("./routes/deliveryAddressRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const adminRoutes = require("./routes/adminRoutes"); // Added for admin routes
+const deliveryScheduleRoutes = require("./routes/deliveryScheduleRoutes");
+
 const app = express();
 
 app.use(morgan("dev"));
@@ -31,7 +36,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://13.126.180.52"];
+  : ["http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -67,6 +72,10 @@ app.use("/api/vendors", vendorRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/vendor-orders", vendorOrderRoutes);
+app.use("/api/delivery-addresses", deliveryAddressRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/admin", adminRoutes); // Added for admin routes
+app.use("/api/delivery-schedules", deliveryScheduleRoutes);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {

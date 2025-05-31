@@ -89,33 +89,34 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
 
   // --- Helper Function for Cleanup (Cleans *this request's* uploads across all relevant field directories) ---
   async function cleanupRequestUploads(req) {
-    // Use the request-specific UUID and moduleName to target cleanup
-    const requestUUID = req.uploadUUID;
-    const requestModuleName = req.uploadModuleName; // Get moduleName attached to req
-
-    if (!requestUUID || !requestModuleName) {
-      console.warn(
-        `[Cleanup] Cannot proceed: Missing requestUUID (${requestUUID}) or requestModuleName (${requestModuleName}) on req.`,
-      );
-      return;
-    }
+    // Use moduleName and uploadDir from the closure of createUploadMiddleware.
+    // req.fileUUID is populated by the storage engine or initialized by the setup middleware.
+    const fileUUIDsMap = req.fileUUID || {};
 
     console.log(
-      `[Cleanup:${requestUUID}] Attempting cleanup for module '${requestModuleName}' and UUID '${requestUUID}'.`,
+      `[Cleanup] Attempting cleanup for module '${moduleName}'. UUIDs found: ${JSON.stringify(fileUUIDsMap)}`,
     );
 
     let cleanupFailed = false;
 
-    // Need to potentially clean up multiple directories (<uploadDir>/<module>/<fieldname>/<uuid>)
     // Iterate through the fields defined for *this* middleware instance
     for (const field of fields) {
       const fieldname = field.name;
-      // Construct the specific directory path for this field and this request's UUID
+      const uuidForThisField = fileUUIDsMap[fieldname];
+
+      if (!uuidForThisField) {
+        // No file was uploaded for this field in this request, or UUID not recorded.
+        // So, no specific UUID-based directory to clean for this field.
+        console.log(`[Cleanup] No UUID found for field '${fieldname}'. Skipping its specific path cleanup.`);
+        continue;
+      }
+
+      // Construct the specific directory path for this field and its UUID for this request
       const targetDir = path.join(
-        uploadDir,
-        requestModuleName,
+        uploadDir,       // From closure
+        moduleName,      // From closure (sanitized version)
         fieldname,
-        requestUUID,
+        uuidForThisField // The UUID specific to this field for this request
       );
 
       try {
@@ -127,12 +128,12 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
         // Use fs.rm with recursive option to remove the UUID directory and its contents for this field
         await fsPromises.rm(targetDir, { recursive: true, force: true }); // force:true suppresses ENOENT errors
         console.log(
-          `[Cleanup:${requestUUID}] Successfully checked/removed directory: ${targetDir}`,
+          `[Cleanup] Successfully checked/removed directory: ${targetDir}`,
         );
       } catch (err) {
         // Even with force:true, other errors (like permissions) might occur.
         console.error(
-          `[Cleanup:${requestUUID}] Failed to remove directory ${targetDir}:`,
+          `[Cleanup] Failed to remove directory ${targetDir}:`,
           err,
         );
         cleanupFailed = true;
@@ -156,9 +157,24 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
 
     // Clear related properties on req (optional, depends on downstream needs)
     // req.files = null;
-    // req.uploadUUID = null; // Keep for logging?
-    // req.uploadModuleName = null;
+    // req.fileUUID = null; // Keep for logging?
   }
+
+  // This middleware function is added to the chain. It ensures req.fileUUID exists
+  // and attaches the cleanupUpload function to the request.
+  const setupCleanup = (req, res, next) => {
+    const logPrefix = `[SetupCleanup:${req.fileUUID && Object.keys(req.fileUUID).length > 0 ? 'UUIDsPresent' : 'NoUUIDs'}]`;
+    console.log(`${logPrefix} Start setup. Initial req.fileUUID:`, req.fileUUID);
+    req.fileUUID = req.fileUUID || {}; // Ensure req.fileUUID is initialized
+
+    // Attach the cleanup function to the request
+    req.cleanupUpload = async () => {
+      console.log(`${logPrefix} cleanupUpload() called.`);
+      await cleanupRequestUploads(req);
+    };
+    console.log(`${logPrefix} cleanupUpload attached. Calling next().`);
+    next();
+  };
 
   // --- Multer Instance ---
   const upload = multer({
@@ -168,19 +184,10 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
 
   // --- Validation Middleware (Async Ready - No changes needed here) ---
   const validateFiles = async (req, res, next) => {
+    const logPrefix = `[ValidateFiles:${req.fileUUID && Object.keys(req.fileUUID).length > 0 ? 'UUIDsPresent' : 'NoUUIDs'}]`;
+    console.log(`${logPrefix} Start validation. req.files:`, req.files);
+
     req.uploadErrors = req.uploadErrors || {};
-
-    if (
-      !req.files ||
-      typeof req.files !== "object" ||
-      Object.keys(req.files).length === 0
-    ) {
-      // If no files were uploaded (even if fields were expected), just proceed.
-      // Multer handles cases like missing fields if they were required by .fields()
-      // This validation focuses on files *actually* uploaded.
-      return next();
-    }
-
     let hasValidationErrors = false;
 
     // Validate files against the configuration for expected fields
@@ -267,39 +274,21 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
 
     // --- Cleanup Logic (within validation) ---
     if (hasValidationErrors) {
-      console.log(
-        `[Validation:${req.uploadUUID}] Validation errors detected. Triggering cleanup.`,
-      );
-      try {
-        // Use await here as cleanupRequestUploads is async
-        await req.cleanupUpload(req); // Call the cleanup function attached to the request
-      } catch (cleanupErr) {
-        console.error(
-          `[Validation:${req.uploadUUID}] Error during post-validation cleanup:`,
-          cleanupErr,
-        );
-        req.uploadErrors["general"] = req.uploadErrors["general"] || [];
-        if (
-          !req.uploadErrors["general"].some((e) => e.type === "cleanup_error")
-        ) {
-          req.uploadErrors["general"].push({
-            type: "cleanup_error",
-            message:
-              "Failed to cleanup temporary upload files after validation error.",
-          });
-        }
-      }
-      // Optionally clear req.files after cleanup on validation error
-      // req.files = {}; // Be cautious if error handlers need this info
+      console.log(`${logPrefix} Validation errors detected. Errors:`, req.uploadErrors);
+      // Potentially trigger cleanup earlier if validation fails and files were partially processed by multer
+      // However, cleanup is also handled in controller if DB ops fail.
+      // For now, just log. Controller will handle response.
+    } else {
+      console.log(`${logPrefix} No validation errors found.`);
     }
-
+    console.log(`${logPrefix} Calling next().`);
     next();
   };
 
   // --- Multer Error Handler Middleware (No changes needed here conceptually) ---
   const handleMulterErrors = (err, req, res, next) => {
     req.uploadErrors = req.uploadErrors || {};
-    const requestUUID = req.uploadUUID || "N/A"; // Use UUID for logging if available
+    const requestUUID = "N/A"; // Use UUID for logging if available
 
     if (err instanceof multer.MulterError) {
       console.error(`[Multer Error:${requestUUID}]`, err);
@@ -395,24 +384,11 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
 
   return [
     // 1. Initial Setup Middleware (Synchronous)
-    (req, res, next) => {
-      req.uploadUUID = uuidv4(); // Unique ID for this request's uploads
-      req.uploadModuleName = moduleName; // Store moduleName for destination/cleanup
-      // Base path is no longer a single directory, cleanup targets based on module/field/uuid
-      // req.uploadBasePath = path.join(uploadDir, req.uploadUUID); // REMOVED
-      req.uploadErrors = {}; // Initialize errors object
-      // Attach the cleanup function
-      req.cleanupUpload = cleanupRequestUploads;
-
-      console.log(
-        `[Request Init:${req.uploadUUID}] Setup complete for module '${req.uploadModuleName}'.`,
-      );
-      next();
-    },
+    // Removed
 
     // 2. Multer Middleware (Handles actual upload based on storage config)
     (req, res, next) => {
-      const requestUUID = req.uploadUUID; // Grab for logging context
+      const requestUUID = "N/A"; // Grab for logging context
       console.log(
         `[Multer Start:${requestUUID}] Applying Multer middleware...`,
       );
@@ -454,6 +430,9 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
     // to catch errors from `validateFiles` *as well*, which might be confusing.
     // It's better placed where it is, invoked directly by the multer callback.
     // We might add a final *general* error handler for the route later if needed.
+
+    // Added setupCleanup middleware
+    setupCleanup,
   ];
 };
 

@@ -135,6 +135,62 @@ const getUserById = async (req, res, next) => {
   }
 };
 
+const getCurrentUserProfile = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ errors: { message: 'User ID missing from token payload' } });
+    }
+
+    const userId = parseInt(String(req.user.id), 10);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ errors: { message: 'Invalid User ID format in token payload.' } });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { // Include agency details if there's a relation
+        agency: true, // Assuming your Prisma schema has an 'agency' relation on the User model
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ errors: { message: 'User not found' } });
+    }
+
+    // Remove password from the user object before sending
+    const { password, ...userWithoutPassword } = user;
+
+    let userProfile = {
+      id: userWithoutPassword.id,
+      role: userWithoutPassword.role,
+      email: userWithoutPassword.email,
+      fullName: userWithoutPassword.fullName,
+      // Add other fields from userWithoutPassword as needed
+    };
+
+    if (userWithoutPassword.role === 'AGENCY') {
+      if (userWithoutPassword.agency) { // If agency relation is loaded
+        userProfile.agencyId = userWithoutPassword.agency.id; 
+        // You can add more agency details from userWithoutPassword.agency if needed
+        // userProfile.agencyName = userWithoutPassword.agency.name;
+      } else if (userWithoutPassword.agencyId) { // Fallback if agencyId is a direct field and relation not used/loaded
+        userProfile.agencyId = userWithoutPassword.agencyId;
+      } else {
+        console.warn(`User ${userId} has role AGENCY but no agencyId or agency relation found.`);
+        userProfile.agencyId = null;
+      }
+    }
+
+    res.json(userProfile);
+
+  } catch (error) {
+    console.error('Error in getCurrentUserProfile:', error.message, error.stack);
+    // Pass error to the centralized error handler if you have one, or send 500
+    next(error); // or res.status(500).json({ errors: { message: 'Server Error while fetching user profile' } });
+  }
+};
+
 const createUser = async (req, res, next) => {
   // Define Zod schema for user creation
   const schema = z.object({
@@ -304,6 +360,7 @@ const changePassword = async (req, res, next) => {
 module.exports = {
   getUsers,
   getUserById,
+  getCurrentUserProfile,
   createUser,
   updateUser,
   deleteUser,

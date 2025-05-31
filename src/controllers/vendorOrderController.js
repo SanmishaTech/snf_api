@@ -767,7 +767,7 @@ exports.recordReceipt = async (req, res, next) => {
 exports.getMyAgencyOrders = async (req, res, next) => {
   try {
     if (!req.user || req.user.role !== 'AGENCY') {
-      return next(createError(403, 'Forbidden: Access restricted to AGENCY role.'));
+      return next(createError(403, 'Forbidden: User is not an agency or not authenticated.'));
     }
 
     const agencyUser = await prisma.user.findUnique({
@@ -784,7 +784,7 @@ exports.getMyAgencyOrders = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { search, status, date } = req.query;
+    const { search, status: statusFilter, date, excludeStatus } = req.query; // Added excludeStatus
 
     let whereClause = {
       items: {
@@ -794,12 +794,18 @@ exports.getMyAgencyOrders = async (req, res, next) => {
       },
     };
 
-    if (status) {
-      if (Object.values(OrderStatus).includes(status.toUpperCase())) {
-        whereClause.status = status.toUpperCase();
+    // Handle explicit status filter first
+    if (statusFilter) {
+      if (Object.values(OrderStatus).includes(statusFilter.toUpperCase())) {
+        whereClause.status = statusFilter.toUpperCase();
       } else {
         return next(createError(400, `Invalid status filter. Valid statuses are: ${Object.values(OrderStatus).join(', ')}`));
       }
+    } else if (excludeStatus && excludeStatus.toUpperCase() === 'PENDING') {
+      // If no specific status is requested, but PENDING should be excluded
+      whereClause.status = {
+        not: OrderStatus.PENDING // Use OrderStatus enum value
+      };
     }
 
     if (date) {
@@ -817,8 +823,8 @@ exports.getMyAgencyOrders = async (req, res, next) => {
       whereClause.OR = [
         { poNumber: { contains: search } },
         { vendor: { name: { contains: search } } },
-        { items: { some: { product: { name: { contains: search } } } } }
-        // No need to search by agency name here as orders are already for a specific agency
+        { items: { some: { product: { name: { contains: search } } } } },
+        { items: { some: { agency: { name: { contains: search } } } } }
       ];
     }
 
@@ -846,8 +852,26 @@ exports.getMyAgencyOrders = async (req, res, next) => {
 
     const totalPages = Math.ceil(totalOrders / limit);
 
+    // Add recordedByAgencies to each order
+    const ordersWithReceiptStatus = orders.map(order => {
+      const agenciesThatRecorded = new Set();
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach(item => {
+          // Assuming 'receivedQuantity' being non-null indicates recording by the item's agency
+          // and item.agencyId is the ID of the agency responsible for that item.
+          if (item.agencyId && item.receivedQuantity !== null) { 
+            agenciesThatRecorded.add(String(item.agencyId));
+          }
+        });
+      }
+      return {
+        ...order,
+        recordedByAgencies: Array.from(agenciesThatRecorded),
+      };
+    });
+
     res.json({
-      data: orders,
+      data: ordersWithReceiptStatus, // Use the modified array
       page,
       totalPages,
       totalItems: totalOrders,

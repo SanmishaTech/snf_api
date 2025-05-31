@@ -27,6 +27,22 @@ module.exports = async (req, res, next) => {
       return next(createError(401, "Unauthorized: User not found"));
     }
 
+    // If user is an agency, try to find their agencyId
+    if (user.role === 'AGENCY') {
+      const agency = await prisma.agency.findUnique({
+        where: { userId: user.id },
+        select: { id: true } // Only select the agency's ID
+      });
+      if (agency) {
+        user.agencyId = agency.id; // Attach agencyId to the user object
+        console.log(`[AuthMiddleware] Agency user. Agency ID: ${user.agencyId} attached to req.user.`);
+      } else {
+        console.warn(`[AuthMiddleware] User role is AGENCY but no corresponding agency record found for userId: ${user.id}`);
+        // Depending on policy, you might want to deny access here if an agency user MUST have an agency record
+        // For now, we'll let it pass, and the authorize middleware will catch if agencyId is missing.
+      }
+    }
+
     req.user = user;
     console.log('[AuthMiddleware] Authentication successful. User set on req.user.');
     next();

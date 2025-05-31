@@ -12,7 +12,9 @@ const productSchema = z.object({
   name: z.string().min(1, { message: "Product name is required" }),
   url: z.string().url({ message: 'Invalid URL format' }).optional().nullable(),
   price: z.string().min(1, { message: 'Price is required' }),
+  rate: z.string().min(1, { message: 'Rate is required' }), // Added rate
   unit: z.string().optional().nullable(), // Added unit field
+  description: z.string().optional().nullable(), // Added description field
 });
 
 /**
@@ -21,26 +23,81 @@ const productSchema = z.object({
  * @access  Private/Admin (PRODUCT_CREATE) // Assuming similar access control
  */
 const createProduct = asyncHandler(async (req, res, next) => {
-  // const validationResult = productSchema.safeParse(req.body);
-  const validationerrors = Validate(productSchema, req.body, res)
- 
-
-  const { name, url, price, unit } = req.body; // Added unit
-
+  console.log('[ProductController:createProduct] Reached. Body:', req.body, 'Files:', req.files, 'FileUUIDs:', req.fileUUID, 'UploadErrors:', req.uploadErrors);
   try {
+    console.log('[ProductController:createProduct] Validating req.body with Zod productSchema.safeParse...');
+    const validationResult = productSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      console.error('[ProductController:createProduct] Zod validation failed for req.body:', validationResult.error.flatten());
+      if (typeof req.cleanupUpload === 'function') {
+        console.log('[ProductController:createProduct] Triggering cleanup due to Zod validation error.');
+        await req.cleanupUpload();
+      }
+      return res.status(400).json({ 
+        message: "Validation failed for request body", 
+        errors: validationResult.error.flatten().fieldErrors 
+      })
+    }
+    console.log('[ProductController:createProduct] Zod validation for req.body successful. Validated Data:', validationResult.data);
+
+    console.log('[ProductController:createProduct] Checking for req.uploadErrors...');
+    if (req.uploadErrors && Object.keys(req.uploadErrors).length > 0) {
+      console.error('[ProductController:createProduct] Upload errors detected from middleware:', req.uploadErrors);
+      // Middleware should have handled cleanup if it set req.uploadErrors
+      return res.status(400).json({
+        message: "File upload error detected by middleware",
+        errors: req.uploadErrors,
+      });
+    }
+    console.log('[ProductController:createProduct] No req.uploadErrors found.');
+
+    let attachmentUrl = null;
+    console.log('[ProductController:createProduct] Checking for uploaded files (req.files)...');
+    if (req.files && req.files.productAttachment && req.files.productAttachment[0]) {
+      const file = req.files.productAttachment[0];
+      const fileUUID = req.fileUUID && req.fileUUID.productAttachment;
+      if (fileUUID) {
+        attachmentUrl = `/uploads/products/productAttachment/${fileUUID}/${file.filename}`;
+      }
+    } else {
+      console.log('[ProductController:createProduct] No new file uploaded for productAttachment.');
+    }
+
+    const { name, url, price, unit, rate, description } = validationResult.data; 
+
+    const productData = {
+      name,
+      url,
+      attachmentUrl, 
+      price: parseFloat(price),
+      unit, 
+      rate: parseFloat(rate), 
+      description, // Added description
+    };
+
+    console.log('[ProductController:createProduct] Attempting to create product with data:', productData);
     const newProduct = await prisma.product.create({
-      data: {
-        name,
-        url,
-        price,
-        unit, // Ensure unit is included
-      },
+      data: productData,
     });
+    console.log('[ProductController:createProduct] Product created successfully:', newProduct);
+
     res.status(201).json(newProduct);
+
   } catch (error) {
-    console.error('Error creating product:', error);
-    // Check for specific Prisma errors if needed, e.g., unique constraint violations
-    next(createError(500, 'Failed to create product.'));
+    console.error("[ProductController:createProduct] Error during product creation:", error);
+    // If an error occurs after files have been processed by Multer but before DB commit,
+    // and it's not an error caught by middleware's own cleanup (like validation error there),
+    // we should attempt cleanup.
+    if (typeof req.cleanupUpload === 'function') {
+      console.log('[ProductController:createProduct] Triggering cleanup due to error during product creation.');
+      await req.cleanupUpload(); 
+    }
+    // Determine error type for appropriate status code
+    if (error.code === 'P2002') { // Prisma unique constraint violation
+      return res.status(409).json({ message: 'Product with this name already exists or unique constraint failed.', details: error.meta });
+    }
+    res.status(500).json({ message: error.message || "Internal Server Error" });
   }
 });
 
@@ -77,7 +134,7 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     ];
   }
 
-  const validSortByFields = ['name', 'url', 'price', 'unit', 'createdAt', 'updatedAt']; // Added 'unit'
+  const validSortByFields = ['name', 'url', 'price', 'unit', 'rate', 'createdAt', 'updatedAt']; // Added 'unit' and 'rate'
   const orderByField = validSortByFields.includes(sortBy) ? sortBy : 'createdAt';
   const orderByDirection = sortOrder === 'desc' ? 'desc' : 'asc';
 
@@ -110,6 +167,34 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Get a limited list of products for public display (e.g., landing page)
+ * @route   GET /api/products/public
+ * @access  Public
+ */
+const getPublicProducts = asyncHandler(async (req, res, next) => {
+  try {
+    const products = await prisma.product.findMany({
+      take: 10, // Limit to 10 products for the landing page
+      orderBy: {
+        createdAt: 'desc', // Get the latest products
+      },
+      select: {
+        id: true,
+        name: true,
+        rate: true,
+        attachmentUrl: true,
+        url: true, // Using 'url' as a proxy for image or product detail link
+        unit: true,
+      },
+    });
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching public products:', error);
+    next(createError(500, 'Failed to fetch products for public display'));
+  }
+});
+
+/**
  * @desc    Get a single product by ID
  * @route   GET /api/products/:id
  * @access  Private (PRODUCT_READ) // Assuming similar access control
@@ -137,36 +222,71 @@ const getProductById = asyncHandler(async (req, res, next) => {
  * @access  Private (PRODUCT_UPDATE) // Assuming similar access control
  */
 const updateProduct = asyncHandler(async (req, res, next) => {
-  const productId = parseInt(req.params.id, 10);
+  const { id } = req.params;
+  console.log(`[ProductController:updateProduct ${id}] Reached. Body:`, req.body, 'Files:', req.files, 'FileUUIDs:', req.fileUUID, 'UploadErrors:', req.uploadErrors);
+
+  const productId = parseInt(id, 10);
   if (isNaN(productId)) {
+    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
     return next(createError(400, 'Invalid product ID format'));
   }
 
-   const validationResult = validateRequest(productSchema, req.body, res)
-    if(validationResult.errors){
-      return res.status(401).send(validationResult)
-    }
+  const validationResult = validateRequest(productSchema, req.body, res)
+  if(validationResult.errors){
+    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
+    return res.status(401).send(validationResult)
+  }
+  
+  // Check for upload errors from middleware
+  if (req.uploadErrors && Object.keys(req.uploadErrors).length > 0) {
+    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
+    return res.status(400).json({ message: 'File upload error.', errors: req.uploadErrors });
+  }
 
-  const { name, url, price, unit } = req.body; // Added unit
+  const { name, url, price, unit, rate, description } = req.body; // Added description
+  const dataToUpdate = {
+    name,
+    url,
+    price: parseFloat(price),
+    unit,
+    rate: parseFloat(rate),
+    description, // Added description
+  };
+
+  if (req.files && req.files.productAttachment && req.files.productAttachment[0]) {
+    const file = req.files.productAttachment[0];
+    const fileUUID = req.fileUUID && req.fileUUID.productAttachment;
+    if (fileUUID) {
+      // TODO: Consider deleting old attachment if a new one is uploaded
+      dataToUpdate.attachmentUrl = `/uploads/products/productAttachment/${fileUUID}/${file.filename}`;
+    } else {
+        // This case should ideally not happen if middleware ran correctly and file is present
+        console.warn('File uploaded but UUID missing for productAttachment');
+    }
+  } else if (req.body.attachmentUrl === '' || req.body.attachmentUrl === null) {
+    // If attachmentUrl is explicitly set to empty or null in the form (not a file upload field)
+    // This allows removing an existing attachment without uploading a new one.
+    // This part might need adjustment based on how frontend handles 'remove attachment'.
+    // For now, we assume if no new file, existing attachmentUrl is unchanged unless explicitly cleared.
+    // If you add a 'remove attachment' checkbox or similar, handle it here.
+    // dataToUpdate.attachmentUrl = null; // Example: if a checkbox `removeAttachment` is true
+  }
 
   try {
     const existingProduct = await prisma.product.findUnique({ where: { id: productId } });
     if (!existingProduct) {
+      if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
       return next(createError(404, `Product with ID ${productId} not found`));
     }
 
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
-      data: {
-        name,
-        url,
-        price,
-        unit, // Ensure unit is included
-      },
+      data: dataToUpdate,
     });
     res.status(200).json(updatedProduct);
   } catch (error) {
     console.error('Error updating product:', error);
+    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
     // Handle potential Prisma errors like P2025 (Record to update not found)
     if (error.code === 'P2025') {
         return next(createError(404, `Product with ID ${productId} not found during update.`));
@@ -221,6 +341,7 @@ const deleteProduct = asyncHandler(async (req, res, next) => {
 module.exports = {
   createProduct,
   getAllProducts,
+  getPublicProducts,
   getProductById,
   updateProduct,
   deleteProduct,

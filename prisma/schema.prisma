@@ -24,6 +24,7 @@ model User {
   deliveredOrders   VendorOrder[] @relation("DeliveredBy")
   receivedOrders    VendorOrder[] @relation("ReceivedBy")
   vendor            Vendor?
+  member            Member?
 
   @@map("users")
 }
@@ -64,6 +65,7 @@ model Agency {
   updatedAt         DateTime    @updatedAt
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
+  subscriptions Subscription[]
 
   @@map("agencies")
 }
@@ -72,12 +74,17 @@ model Product {
   id                Int         @id @default(autoincrement())
   name              String
   url               String?
+  attachmentUrl     String?
   price             Float
+  rate              Float
   deliveredQuantity Int?
+  description       String?     @db.Text // New field for product description
+  unit              String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-  unit              String?
   orderItems        OrderItem[]
+  subscriptions Subscription[]
+  deliveryScheduleEntries DeliveryScheduleEntry[]
 
   @@map("products")
 }
@@ -130,6 +137,20 @@ model OrderItem {
   @@map("vendor_order_items")
 }
 
+model Member {
+  id        Int      @id @default(autoincrement())
+  name      String
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  addresses DeliveryAddress[]
+  subscriptions Subscription[]
+  deliveryScheduleEntries DeliveryScheduleEntry[]
+
+  @@map("members")
+}
+
 enum Role {
   VENDOR
   AGENCY
@@ -141,4 +162,116 @@ enum OrderStatus {
   PENDING
   DELIVERED
   RECEIVED
+}
+
+model DeliveryAddress {
+  id            Int      @id @default(autoincrement())
+  memberId      Int
+  recipientName String
+  mobile        String
+  plotBuilding  String
+  streetArea    String
+  landmark      String?
+  pincode       String
+  city          String
+  state         String
+  label         String?
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  deliveryScheduleEntries DeliveryScheduleEntry[]
+
+  @@map("delivery_addresses")
+  @@index([memberId], map: "delivery_addresses_memberId_fkey")
+}
+
+// Enums for Subscriptions
+enum DeliverySchedule {
+  DAILY
+  WEEKDAYS // maps to SELECT_DAYS in controller logic if weekdays are provided
+  ALTERNATE_DAYS
+}
+
+enum PaymentMode {
+  ONLINE
+  CASH
+  UPI
+  BANK
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  NOT_DELIVERED
+  CANCELLED
+}
+
+model DeliveryScheduleEntry {
+  id                String         @id @default(cuid())
+  subscription      Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
+  subscriptionId    Int            // Changed to Int
+  member            Member         @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
+  memberId          Int            // Changed to Int
+  deliveryAddress   DeliveryAddress @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
+  deliveryAddressId Int            // Changed to Int
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
+  productId         Int
+  deliveryDate      DateTime       @db.Date
+  quantity          Int            @default(1) // Quantity for this specific delivery, default to 1
+  status            DeliveryStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("delivery_schedule")
+  @@index([subscriptionId])
+  @@index([memberId])
+  @@index([deliveryAddressId])
+  @@index([productId])
+  @@index([deliveryDate])
+}
+
+// Model for Subscriptions
+model Subscription {
+  id                  Int                @id @default(autoincrement())
+  memberId            Int
+  deliveryAddressId   Int
+  productId           Int
+  startDate           DateTime           @default(now()) // Date when the subscription effectively starts
+  period              Int
+  expiryDate          DateTime
+  deliverySchedule    DeliverySchedule
+  weekdays            String?            // To store JSON array of weekdays, e.g., ["MONDAY", "TUESDAY"] if schedule is WEEKDAYS
+  qty                 Int
+  altQty              Int?               // Optional: for alternate day deliveries if different quantity
+  rate                Float              // Per unit price at the time of subscription
+  totalQty            Int                // Calculated by application logic
+  amount              Float              // Calculated by application logic: rate * totalQty
+  paymentMode         PaymentMode?
+  paymentReferenceNo  String?
+  paymentDate         DateTime?
+  paymentStatus       PaymentStatus      @default(PENDING)
+  agencyId            Int?               // Optional: if subscription is linked to a specific agency for fulfillment
+  createdAt           DateTime           @default(now()) // Date when the record was created
+  updatedAt           DateTime           @updatedAt
+
+  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  deliveryAddress   DeliveryAddress   @relation(fields: [deliveryAddressId], references: [id], onDelete: Restrict)
+  product           Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  agency            Agency?           @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  deliveryScheduleEntries DeliveryScheduleEntry[]
+
+  @@index([memberId])
+  @@index([deliveryAddressId])
+  @@index([productId])
+  @@index([agencyId])
+  @@map("subscriptions")
 }

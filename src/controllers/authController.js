@@ -45,7 +45,18 @@ const register = async (req, res, next) => {
         .string()
         .min(6, "Password must be at least 6 characters long.")
         .nonempty("Password is required."),
+      role: z.enum(["VENDOR", "AGENCY", "ADMIN", "MEMBER"]).optional(), // Added optional role
       agreedToPolicy: z.boolean().optional(), // Add agreedToPolicy to schema
+      mobile: z.preprocess((val) => {
+        if (typeof val === 'string' && val.trim() !== '') {
+          const num = parseInt(val, 10);
+          return isNaN(num) ? undefined : num;
+        }
+        if (typeof val === 'number') {
+          return val;
+        }
+        return undefined;
+      }, z.number().int().optional()), // Mobile is optional, ensure it's an integer
     })
     .superRefine(async (data, ctx) => {
       // Check if a user with the same email already exists
@@ -64,16 +75,34 @@ const register = async (req, res, next) => {
   try {
     // Use the reusable validation function
     const validationErrors = await validateRequest(schema, req.body, res);
-    const { name, email, password } = req.body;
+    const { name, email, password, role: requestedRole, mobile } = req.body; // Destructure requestedRole and mobile
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Determine user role, ensuring it's uppercase for Prisma enum compatibility
+    const userRole = (requestedRole && ["VENDOR", "AGENCY", "ADMIN", "MEMBER"].includes(requestedRole.toUpperCase()))
+                     ? requestedRole.toUpperCase()
+                     : config.defaultUserRole.toUpperCase();
+
+    const userData = {
+      name,
+      email,
+      password: hashedPassword,
+      role: userRole,
+      ...(mobile !== undefined && { mobile }), // Add mobile if provided
+    };
+
+    // If the user is a member, create a related Member record
+    if (userRole === 'MEMBER') {
+      userData.member = {
+        create: {
+          name: name, // Use the registration name for Member.name
+        },
+      };
+    }
+    // TODO: Add similar blocks if VENDOR or AGENCY roles need linked records created upon registration
+
     const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: config.defaultUserRole,
-      },
+      data: userData,
     });
 
     res.status(201).json(user);
