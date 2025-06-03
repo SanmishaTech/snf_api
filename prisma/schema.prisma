@@ -215,7 +215,7 @@ enum DeliveryStatus {
 }
 
 model DeliveryScheduleEntry {
-  id                String         @id @default(cuid())
+  id                Int         @id @default(autoincrement())
   subscription      Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
   subscriptionId    Int            // Changed to Int
   member            Member         @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete

@@ -11,26 +11,26 @@ const vendorBaseSchema = z.object({
   contactPersonName: z.string().min(1, "Contact person's name is required").optional().nullable(), 
   address1: z.string().nonempty('Address line 1 is required'),
   address2: z.string().optional().nullable(),
-  city: z.string().nonempty('City is required'),
+  city: z.string().optional().nullable(),
   pincode: z.number().int('Pincode must be an integer'),
   mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: z.string().regex(/^\d{10}$/, 'Alternate mobile must be 10 digits').optional().nullable(), 
-  email: z.union([z.literal(''), z.string().email('Invalid email format for vendor contact')]).optional().nullable(),
+  email: z.string().optional().nullable(),
 });
 
 // Zod schema for incoming data when creating a vendor with a new user
 const createUserAndVendorSchema = z.object({
   userFullName: z.string().nonempty("User's full name is required"),
-  userLoginEmail: z.string().email("Invalid login email for user").nonempty("User's login email is required"),
+  userLoginEmail: z.string().optional().nullable(),
   userPassword: z.string().min(6, "User password must be at least 6 characters"),
   vendorName: z.string().nonempty('Vendor name is required'),
   contactPersonName: z.string().min(1, "Contact person's name is required").optional().nullable(), 
-  vendorContactEmail: z.union([z.literal(''), z.string().email('Invalid email format for vendor contact')]).optional().nullable(),
+  vendorContactEmail: z.string().optional().nullable(),
   mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: z.string().regex(/^\d{10}$/, 'Alternate mobile must be 10 digits').optional().nullable(), 
   address1: z.string().nonempty('Address line 1 is required'),
   address2: z.string().optional().nullable(),
-  city: z.string().nonempty('City is required'),
+  city: z.string().optional().nullable(),
   pincode: z.number().int('Pincode must be an integer'),
 });
 

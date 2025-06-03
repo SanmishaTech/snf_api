@@ -14,17 +14,17 @@ const agencyBaseSchema = z.object({
   contactPersonName: z.string().optional(),
   address1: z.string().min(5, { message: 'Address line 1 must be at least 5 characters long' }),
   address2: z.any().optional(),
-  city: z.string().min(2, { message: 'City is required' }),
+  city: z.string().optional().nullable(),
   pincode: z.string().regex(/^\d{6}$/, { message: 'Pincode must be 6 digits' }).transform(Number).or(z.number()),
   mobile: z.string().regex(/^\d{10}$/, { message: 'Mobile number must be 10 digits' }),
   alternateMobile: z.any().optional().nullable(),
-  email: z.string().email({ message: 'Invalid email address for agency contact' }).optional().or(z.literal('')) // Agency's own contact email, optional
+  email: z.string().optional().nullable(),
 });
 
 // Schema for creating a new agency, including user details for the agency's primary user
 const createAgencySchema = agencyBaseSchema.extend({
   userFullName: z.string().min(2, { message: 'User full name must be at least 2 characters long' }),
-  userLoginEmail: z.string().email({ message: 'Invalid login email address for user' }),
+  userLoginEmail: z.string().optional().nullable(),
   userPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' })
 });
 // --- End Zod Schemas Definition ---

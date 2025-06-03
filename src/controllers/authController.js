@@ -91,6 +91,15 @@ const register = async (req, res, next) => {
       ...(mobile !== undefined && { mobile }), // Add mobile if provided
     };
 
+    // Check if user with this email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: 'User with this email already exists' });
+    }
+
     // If the user is a member, create a related Member record
     if (userRole === 'MEMBER') {
       userData.member = {

@@ -1,5 +1,18 @@
 const { PrismaClient, OrderStatus } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+// Helper function to transform order items for API response
+const transformOrderItems = (items) => {
+  if (!items) return [];
+  return items.map(item => ({
+    ...item,
+    productId: item.product.id, // Ensure productId is the direct ID
+    productName: item.product.name,
+    unit: item.product.unit,
+    // Remove the nested product object to avoid redundancy if not needed further by frontend for this specific view
+    // product: undefined, // Or selectively pick fields if the full product object is sometimes needed
+  }));
+};
 const createError = require('http-errors');
 
 // Helper function to generate new PO Number
@@ -140,6 +153,9 @@ exports.createVendorOrder = async (req, res, next) => {
       return createdOrder;
     });
 
+    if (newOrder && newOrder.items) {
+      newOrder.items = transformOrderItems(newOrder.items);
+    }
     res.status(201).json(newOrder);
   } catch (error) {
     console.error("Error creating vendor order:", error);
@@ -192,8 +208,12 @@ exports.getAllVendorOrders = async (req, res, next) => {
       },
     });
     const totalOrders = await prisma.vendorOrder.count({ where });
+    const transformedOrders = orders.map(order => ({
+      ...order,
+      items: transformOrderItems(order.items),
+    }));
     res.json({
-      data: orders,
+      data: transformedOrders,
       totalPages: Math.ceil(totalOrders / parseInt(limit)),
       currentPage: parseInt(page),
       totalOrders,
@@ -250,8 +270,12 @@ exports.getMyVendorOrders = async (req, res, next) => {
       },
     });
     const totalOrders = await prisma.vendorOrder.count({ where });
+    const transformedOrders = orders.map(order => ({
+      ...order,
+      items: transformOrderItems(order.items),
+    }));
     res.json({
-      data: orders,
+      data: transformedOrders,
       totalPages: Math.ceil(totalOrders / parseInt(limit)),
       currentPage: parseInt(page),
       totalOrders,
@@ -291,6 +315,9 @@ exports.getVendorOrderById = async (req, res, next) => {
     // Removed specific role-based access control as per user request.
     // Frontend lists are expected to filter orders appropriately.
 
+    if (order && order.items) {
+      order.items = transformOrderItems(order.items);
+    }
     res.json(order);
   } catch (error) {
     next(error);
@@ -399,6 +426,9 @@ exports.updateVendorOrder = async (req, res, next) => {
       });
     }); // End of transaction
 
+    if (updatedOrderInTransaction && updatedOrderInTransaction.items) {
+      updatedOrderInTransaction.items = transformOrderItems(updatedOrderInTransaction.items);
+    }
     res.json(updatedOrderInTransaction);
 
   } catch (error) {
@@ -442,6 +472,9 @@ exports.updateVendorOrderStatus = async (req, res, next) => {
         items: { include: { product: true, agency: true } },
       },
     });
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
     res.json(updatedOrder);
   } catch (error) {
     next(error);
@@ -484,6 +517,9 @@ exports.markOrderDelivered = async (req, res, next) => {
         deliveredBy: { select: { id: true, name: true, email: true } },
       },
     });
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
     res.json(updatedOrder);
   } catch (error) {
     next(error);
@@ -529,9 +565,13 @@ exports.markOrderReceived = async (req, res, next) => {
       include: {
         vendor: true,
         items: { include: { product: true, agency: true } },
+        deliveredBy: { select: { id: true, name: true, email: true } },
         receivedBy: { select: { id: true, name: true, email: true } },
       },
     });
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
     res.json(updatedOrder);
   } catch (error) {
     next(error);
@@ -646,6 +686,9 @@ exports.recordDelivery = async (req, res, next) => {
       return finalUpdatedOrder;
     });
 
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
     res.json(updatedOrder);
 
   } catch (error) {
@@ -747,6 +790,9 @@ exports.recordReceipt = async (req, res, next) => {
       return finalUpdatedOrder;
     });
 
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
     res.json(updatedOrder);
 
   } catch (error) {
@@ -852,8 +898,13 @@ exports.getMyAgencyOrders = async (req, res, next) => {
 
     const totalPages = Math.ceil(totalOrders / limit);
 
+    const transformedOrdersInitial = orders.map(order => ({
+      ...order,
+      items: transformOrderItems(order.items),
+    }));
+
     // Add recordedByAgencies to each order
-    const ordersWithReceiptStatus = orders.map(order => {
+    const ordersWithReceiptStatus = transformedOrdersInitial.map(order => {
       const agenciesThatRecorded = new Set();
       if (order.items && Array.isArray(order.items)) {
         order.items.forEach(item => {
@@ -871,7 +922,7 @@ exports.getMyAgencyOrders = async (req, res, next) => {
     });
 
     res.json({
-      data: ordersWithReceiptStatus, // Use the modified array
+      data: ordersWithReceiptStatus, 
       page,
       totalPages,
       totalItems: totalOrders,
