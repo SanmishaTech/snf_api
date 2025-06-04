@@ -114,8 +114,13 @@ const getAgencyDeliveriesByDate = async (req, res) => {
 
 // Update the status of a delivery schedule entry
 const updateDeliveryStatus = async (req, res) => {
-  const { id } = req.params;
+  const { id: idString } = req.params;
   const { status } = req.body;
+  const id = parseInt(idString, 10);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ID format. ID must be an integer.' });
+  }
 
   if (req.user.role === 'ADMIN') {
     return res.status(403).json({ error: 'Forbidden: Admin users cannot update delivery status.' });
@@ -131,11 +136,12 @@ const updateDeliveryStatus = async (req, res) => {
     return res.status(400).json({ error: `Invalid status. Must be one of: ${Object.values(DeliveryStatus).join(', ')}` });
   }
 
+  console
   try {
-    // The ID is a CUID string, no need to parse as Int
+    // The ID is an integer, parsed from req.params
     // First, verify the delivery entry belongs to the agency
     const deliveryEntry = await prisma.deliveryScheduleEntry.findUnique({
-      where: { id: id }, // Use the id string directly
+      where: { id: id }, // Use the parsed integer id
       include: {
         subscription: {
           select: { agencyId: true },
@@ -153,8 +159,8 @@ const updateDeliveryStatus = async (req, res) => {
 
     // Update the status
     const updatedDeliveryEntry = await prisma.deliveryScheduleEntry.update({
-      where: { id: id }, // Use the id string directly
-      data: { status: status }, 
+      where: { id: id }, // Use the parsed integer id
+      data: { status: status },
       include: {
         product: {
           select: {

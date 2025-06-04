@@ -287,9 +287,17 @@ const deleteAgency = asyncHandler(async (req, res, next) => {
     return next(createError(404, `Agency with ID ${agencyId} not found`));
   }
 
-  await prisma.agency.delete({ where: { id: agencyId } });
-
-  res.status(200).json({ message: `Agency with ID ${agencyId} deleted successfully` });
+  try {
+    await prisma.agency.delete({ where: { id: agencyId } });
+    res.status(200).json({ message: `Agency with ID ${agencyId} deleted successfully` });
+  } catch (error) {
+    if (error.code === 'P2003') {
+      // P2003 is the Prisma error code for foreign key constraint violation
+      return next(createError(409, `Cannot delete agency with ID ${agencyId}: It is associated with existing records (e.g., order items, subscriptions). Please remove these associations before attempting to delete the agency.`));
+    }
+    // For other errors, pass them to the default error handler
+    return next(error);
+  }
 });
 
 module.exports = {

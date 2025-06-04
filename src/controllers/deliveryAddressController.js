@@ -234,28 +234,43 @@ const deleteDeliveryAddress = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: "Not authorized to delete this address" });
   }
 
-  // Delete the address
-  await prisma.deliveryAddress.delete({
-    where: { id: addressId }
-  });
-
-  // If the deleted address was the default one, set a new default
-  if (address.isDefault) {
-    const remainingAddresses = await prisma.deliveryAddress.findMany({
-      where: { memberId: member.id },
-      orderBy: { createdAt: 'desc' },
-      take: 1
+  try {
+    // Attempt to delete the address
+    await prisma.deliveryAddress.delete({
+      where: { id: addressId }
     });
 
-    if (remainingAddresses.length > 0) {
-      await prisma.deliveryAddress.update({
-        where: { id: remainingAddresses[0].id },
-        data: { isDefault: true }
+    // If the deleted address was the default one, set a new default
+    if (address.isDefault) {
+      const remainingAddresses = await prisma.deliveryAddress.findMany({
+        where: { memberId: member.id }, // Consider only active addresses if soft delete is implemented later
+        orderBy: { createdAt: 'desc' }, // Or some other logic to pick the next default
+        take: 1
+      });
+
+      if (remainingAddresses.length > 0) {
+        await prisma.deliveryAddress.update({
+          where: { id: remainingAddresses[0].id },
+          data: { isDefault: true }
+        });
+      }
+    }
+
+    res.status(200).json({ message: "Address deleted successfully" });
+
+  } catch (error) {
+    if (error.code === 'P2003') { // Prisma foreign key constraint violation
+      // You can check error.meta.field_name to see which foreign key was violated if needed for more specific messages
+      return res.status(400).json({
+        message: "Cannot delete this address because it is currently in use (e.g., by an active subscription or delivery schedule). Please update or remove those references before deleting the address."
       });
     }
+    // For other errors, pass to the default error handler
+    // Make sure your asyncHandler or a global error handler can process this 'next(error)' call.
+    // If not, you might want to return a generic 500 error here.
+    console.error('Error deleting delivery address:', error); // Log the actual error for debugging
+    return res.status(500).json({ message: "Failed to delete address. " + error.message });
   }
-
-  res.status(200).json({ message: "Address deleted successfully" });
 });
 
 // @desc    Set an address as default

@@ -112,9 +112,7 @@ const acl = require("../middleware/acl");
  */
 router.get("/", auth, userController.getUsers);
 
-// New route: GET /api/users/me
-// @desc    Get current logged-in user's profile
-// @access  Private
+// GET /api/users/me - Get current logged-in user's profile
 router.get('/me', auth, userController.getCurrentUserProfile);
 
 /**

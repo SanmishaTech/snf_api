@@ -168,8 +168,8 @@ const createSubscription = asyncHandler(async (req, res) => {
   });
 
   if (!product) {
-    res.status(404);
-    throw new Error('Product not found');
+    // Explicitly return a 404 response
+    return res.status(404).json({ message: 'Product not found' }); 
   }
 
   // Calculate expiry date based on period
@@ -497,7 +497,17 @@ const updateSubscription = asyncHandler(async (req, res) => {
       // For now, we'll just not set it if it's unrecognized, to prevent Prisma errors.
     }
   }
-  if (agencyId !== undefined) updateData.agencyId = agencyId === null ? null : Number(agencyId);
+  if (agencyId !== undefined) {
+    if (agencyId === null) {
+      updateData.agency = {
+        disconnect: true
+      };
+    } else {
+      updateData.agency = {
+        connect: { id: Number(agencyId) }
+      };
+    }
+  }
   
   // Include other fields if they are part of the payload and intended for update
   if (qty !== undefined) updateData.qty = qty; // If admin can change qty
