@@ -26,6 +26,11 @@ model User {
   vendor            Vendor?
   member            Member?
 
+  // Wallet / Transaction related fields
+  initiatedTransactions Transaction[] @relation("UserTransactions")         // Transactions initiated by this user (member)
+  processedTransactions Transaction[] @relation("AdminProcessedTransactions") // Transactions processed by this user (admin)
+
+  // createdTransactions Transaction[] @relation("AdminTransactions") // This is replaced by the two new relations above
   @@map("users")
 }
 
@@ -148,6 +153,7 @@ model Member {
   subscriptions Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
+  wallet    Wallet? // Relation to Wallet
   @@map("members")
 }
 
@@ -208,11 +214,12 @@ enum PaymentStatus {
 }
 
 enum DeliveryStatus {
-  PENDING
-  DELIVERED
-  NOT_DELIVERED
-  CANCELLED
-}
+  PENDING           // Default for future deliveries, or for today if not yet actioned
+  DELIVERED         // Successfully delivered
+  NOT_DELIVERED     // Attempted delivery but failed (e.g., customer not home, address issue)
+  CANCELLED         // Delivery cancelled (e.g., due to product unavailability, or part of subscription cancellation)
+  SKIPPED           // Skipped by the member
+ }
 
 model DeliveryScheduleEntry {
   id                Int         @id @default(autoincrement())
@@ -255,6 +262,12 @@ model Subscription {
   rate                Float              // Per unit price at the time of subscription
   totalQty            Int                // Calculated by application logic
   amount              Float              // Calculated by application logic: rate * totalQty
+
+ 
+  walletamt           Float              @default(0)
+  payableamt          Float              @default(0)
+  receivedamt         Float              @default(0)
+ 
   paymentMode         PaymentMode?
   paymentReferenceNo  String?
   paymentDate         DateTime?
@@ -274,4 +287,57 @@ model Subscription {
   @@index([productId])
   @@index([agencyId])
   @@map("subscriptions")
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  FAILED // Added FAILED status
+  // Consider adding FAILED, CANCELLED, REFUNDED if needed in the future
+}
+
+model Wallet {
+  id        Int      @id @default(autoincrement())
+  memberId  Int      @unique // Foreign key to Member
+  balance   Float    @default(0.0)
+  currency  String   @default("INR") // Default currency, adjust as needed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member       Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  transactions Transaction[] // A wallet can have many transactions
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id                 Int               @id @default(autoincrement())
+  userId             Int?              // ID of the User (member) initiating the transaction. Made optional.
+  amount             Float
+  status             TransactionStatus @default(PENDING)
+  type               TransactionType   // e.g., CREDIT for top-up, DEBIT for withdrawal
+  walletId           Int?              // Foreign key to Wallet, set upon approval. Made optional.
+
+  // Optional details from original model, can be kept
+  paymentMethod      String?           // e.g., "Cash", "Bank Transfer", "UPI"
+  referenceNumber    String?           // e.g., Cheque number, UPI transaction ID
+  notes              String?           @db.Text
+
+  processedByAdminId Int?              // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  user               User?             @relation("UserTransactions", fields: [userId], references: [id]) // Relation to User is now optional
+  wallet             Wallet?           @relation(fields: [walletId], references: [id], onDelete: Cascade) // Relation is now optional
+  processedByAdmin   User?             @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id]) // Renamed relation
+
+  @@index([userId])                  // Index on optional field
+  @@index([walletId])                // Existing index, field is now optional
+  @@index([processedByAdminId])      // Index for renamed field
+  @@map("transactions")
 }

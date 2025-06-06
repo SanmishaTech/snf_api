@@ -1,0 +1,95 @@
+// backend/src/controllers/admin/membersController.js
+const asyncHandler = require('express-async-handler');
+const prisma = require('../../config/db'); // Import Prisma client
+
+/**
+ * @desc    Get all members (with role 'MEMBER') with their wallet balances, supporting pagination, search, and sorting.
+ * @route   GET /api/admin/members
+ * @access  Private/Admin
+ */
+const getAllMembersWithWallets = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || "";
+    // Default sort by name, can be overridden by query params e.g. sortBy=email&sortOrder=desc
+    const sortBy = req.query.sortBy || "name"; 
+    const sortOrder = req.query.sortOrder === "desc" ? "desc" : "asc";
+
+    const whereClause = {
+        role: 'MEMBER', // Filter by role MEMBER - Case-sensitive, ensure 'MEMBER' is correct.
+        AND: search ? [ // Apply search if search term exists
+            {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } }, // Case-insensitive search for name
+                    { email: { contains: search, mode: 'insensitive' } }, // Case-insensitive search for email
+                ],
+            },
+        ] : [],
+    };
+
+    const totalRecords = await prisma.user.count({
+        where: whereClause,
+    });
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    if (totalRecords === 0) {
+        return res.status(200).json({
+            members: [],
+            page,
+            totalPages,
+            totalRecords,
+            message: 'No members found matching your criteria.'
+        });
+    }
+
+    const membersData = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            active: true,
+            member: {      // User has a relation to Member model named 'member'
+                select: {
+                    id: true,    // Select the Member table's ID
+                    wallet: {  // Member model has a relation to Wallet model named 'wallet'
+                        select: {
+                            balance: true
+                        }
+                    }
+                }
+            }
+        },
+        skip: skip,
+        take: limit,
+        orderBy: {
+            [sortBy]: sortOrder,
+        },
+    });
+
+    const membersWithWallets = membersData.map(user => ({
+        _id: user.member?.id, // Use the ID from the Member table for _id
+        id: user.member?.id,  // Use the ID from the Member table for id
+        userId: user.id,      // Keep user.id as userId if needed elsewhere
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        active: user.active,
+        walletBalance: user.member?.wallet?.balance ?? 0, // Access balance via user.member.wallet
+        // It's crucial that every User with role 'MEMBER' has an associated Member record
+        // If user.member or user.member.id could be null/undefined, the frontend link might break or need adjustment.
+    }));
+
+    res.status(200).json({
+        members: membersWithWallets,
+        page,
+        totalPages,
+        totalRecords,
+    });
+});
+
+module.exports = {
+    getAllMembersWithWallets,
+};

@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const createError = require("http-errors");
 const { secret } = require("../config/jwt");
-const prisma = require("../config/db");
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 module.exports = async (req, res, next) => {
   console.log('[AuthMiddleware] Attempting to authenticate for URL:', req.originalUrl);
   const authHeader = req.headers.authorization;

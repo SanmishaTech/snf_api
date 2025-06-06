@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { isAfter, startOfDay } = require('date-fns');
 
 // Helper function to get day key from day index (0 for Sunday, 1 for Monday, etc.)
 const getDayKey = (dayIndex) => {
@@ -60,7 +61,7 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
       // VARYING schedule type from frontend with a valid altQty.
       // Delivery every day, quantity alternates between qty and altQty.
       shouldAddDelivery = true;
-      currentQuantity = (i % 2 === 0) ? qty : altQty;
+      currentQuantity = (i % 2 === 0) ? qty : altQty; // Start with qty on day 0
     } else if (effectiveScheduleType === 'SELECT_DAYS') {
       const currentDayKey = getDayKey(currentDate.getUTCDay()); // Use getUTCDay() for UTC-based day index
       console.log(`[SELECT_DAYS_DEBUG] Date: ${currentDate.toISOString().split('T')[0]}, DayKey: ${currentDayKey}, Selected: ${JSON.stringify(lowerSelectedWeekdays)}, Includes: ${lowerSelectedWeekdays.includes(currentDayKey)}`);
@@ -85,12 +86,11 @@ const createSubscription = asyncHandler(async (req, res) => {
     productId,
     deliveryAddressId,
     period,
-    deliverySchedule: rawDeliverySchedule, // Renamed to map to backend format
-    weekdays, // This should be an array like ["mon", "tue"]
+    deliverySchedule: rawDeliverySchedule,
+    weekdays,
     qty,
     altQty,
-    startDate // Add startDate here
-    // paymentMode, paymentReferenceNo removed
+    startDate
   } = req.body;
 
   let deliverySchedule;
@@ -126,7 +126,8 @@ const createSubscription = asyncHandler(async (req, res) => {
 
   // Get current user's member ID
   const member = await prisma.member.findUnique({
-    where: { userId: req.user.id }
+    where: { userId: req.user.id },
+    include: { wallet: true } // IMPORTANT: Include the wallet in the query
   });
 
   if (!member) {
@@ -134,206 +135,199 @@ const createSubscription = asyncHandler(async (req, res) => {
     throw new Error('Member profile not found');
   }
 
-  // Parse IDs and validate they are actual numbers
-  console.log('Raw product ID:', productId, 'type:', typeof productId);
-  console.log('Raw delivery address ID from req.body:', req.body.deliveryAddressId, 'type:', typeof req.body.deliveryAddressId); // More specific logging
-  console.log('Raw startDate from req.body:', req.body.startDate, 'type:', typeof req.body.startDate);
-  
-  let parsedProductId;
-  let parsedDeliveryAddressId;
-  
-  try {
-    parsedProductId = Number(productId);
-    parsedDeliveryAddressId = Number(deliveryAddressId);
-  } catch (e) {
-    console.error('Error parsing IDs:', e);
-    res.status(400);
-    throw new Error(`Error parsing IDs: ${e.message}`);
-  }
-  
-  // Validate IDs
-  if (isNaN(parsedProductId)) {
-    res.status(400);
-    throw new Error('Invalid product ID');
-  }
-  
-  if (isNaN(parsedDeliveryAddressId)) {
-    res.status(400);
-    throw new Error('Invalid delivery address ID: ' + deliveryAddressId);
-  }
-  
-  // Get product details for price calculation
-  const product = await prisma.product.findUnique({
-    where: { id: parsedProductId }
-  });
+  const parsedProductId = Number(productId);
+  const parsedDeliveryAddressId = Number(deliveryAddressId);
+  const parsedPeriod = Number(period);
+  const parsedQty = Number(qty);
+  const parsedAltQty = altQty ? Number(altQty) : null;
 
+  if (isNaN(parsedProductId) || isNaN(parsedDeliveryAddressId) || isNaN(parsedPeriod) || isNaN(parsedQty)) {
+    res.status(400);
+    throw new Error('Invalid input types for IDs, period, or quantity.');
+  }
+  if (parsedAltQty !== null && isNaN(parsedAltQty)) {
+    res.status(400);
+    throw new Error('Invalid input type for alternate quantity.');
+  }
+
+  const product = await prisma.product.findUnique({ where: { id: parsedProductId } });
   if (!product) {
-    // Explicitly return a 404 response
-    return res.status(404).json({ message: 'Product not found' }); 
+    return res.status(404).json({ message: 'Product not found' });
   }
 
-  // Calculate expiry date based on period
-  // Use startDate from request if provided and valid, otherwise use current date
-  let baseDate = new Date(); // Default to now
-  if (startDate) {
-    const parsedStartDate = new Date(startDate);
-    if (!isNaN(parsedStartDate.getTime())) {
-      baseDate = parsedStartDate;
-      console.log('Using provided startDate for expiry calculation:', baseDate);
-    } else {
-      console.warn('Invalid startDate received, defaulting to current date for expiry calculation.');
-    }
-  } else {
-    console.log('No startDate provided, using current date for expiry calculation.');
+  let baseDate = startDate ? new Date(startDate) : new Date();
+  if (isNaN(baseDate.getTime())) {
+    res.status(400);
+    throw new Error('Invalid start date provided.');
   }
-
   let expiryDate = new Date(baseDate);
-  
-  // Frontend now sends 'period' as a number of days.
-  if (typeof period === 'number' && period > 0) {
-    expiryDate.setDate(expiryDate.getDate() + period - 1);
-  } else {
-    console.error(`Invalid period value: ${period}. Must be a positive number.`);
-    return res.status(400).json({ message: 'Invalid subscription period provided. Must be a positive number of days.' });
-  }
+  expiryDate.setDate(expiryDate.getDate() + parsedPeriod - 1);
 
-  console.log('Calculated expiryDate:', expiryDate);
+  // Map deliverySchedule string to Prisma enum
+  let internalScheduleLogicType; // For generateDeliveryDates logic
+  let dbDeliveryScheduleEnum;    // For Prisma DB storage
 
-  // Calculate total quantity and amount
-  let totalQty = 0;
-  
-  if (deliverySchedule === 'DAILY') {
-    totalQty = qty * period;
-  } else if (deliverySchedule === 'ALTERNATE_DAYS') {
-    // For alternate days, quantity is delivered roughly every other day.
-    // If altQty is provided, it means qty on day 1, altQty on day 3, qty on day 5 etc.
-    // If no altQty, then qty on day 1, qty on day 3 etc.
-    const primaryDeliveries = Math.ceil(period / 2);
-    const secondaryDeliveries = Math.floor(period / 2);
-    if (altQty) {
-      totalQty = (primaryDeliveries * qty) + (secondaryDeliveries * altQty);
-    } else {
-      totalQty = primaryDeliveries * qty; // Or simply qty * period / 2 if it's always the same qty
-                                        // Assuming 'qty' is for the days it IS delivered.
-    }
-  } else if (deliverySchedule === 'VARYING') {
-    if (altQty && typeof altQty === 'number' && altQty > 0) {
-      const primaryDeliveries = Math.ceil(period / 2);
-      const secondaryDeliveries = Math.floor(period / 2);
-      totalQty = (primaryDeliveries * qty) + (secondaryDeliveries * altQty);
-    } else {
-      // If no valid altQty, assume 'qty' is delivered daily for the 'varying' period
-      totalQty = qty * period;
-    }
-  } else if ((deliverySchedule === 'SELECT_DAYS' || deliverySchedule === 'SELECT-DAYS') && Array.isArray(weekdays) && weekdays.length > 0) {
-    console.log('[SELECT_DAYS] Processing with weekdays:', weekdays);
-    const selectedWeekdays = weekdays.map(day => day.toLowerCase()); // Ensure consistent casing, e.g., ["mon", "tue"]
-    let count = 0;
-    for (let i = 0; i < period; i++) {
-      const currentDate = new Date(baseDate); // Use baseDate consistent with expiryDate calculation
-      currentDate.setDate(currentDate.getDate() + i);
-      // Get day index (0 for Sunday, 1 for Monday, etc.) and convert to our day key format
-      const dayIndex = currentDate.getDay();
-      const dayKey = getDayKey(dayIndex);
-      console.log(`[SELECT_DAYS] Day ${i}: ${currentDate.toISOString().split('T')[0]}, dayKey: ${dayKey}, selected: ${selectedWeekdays.includes(dayKey)}`);
-      if (selectedWeekdays.includes(dayKey)) {
-        count++;
+  let effectiveRawSchedule = typeof rawDeliverySchedule === 'string' ? rawDeliverySchedule.toUpperCase() : '';
+
+  switch (effectiveRawSchedule) {
+    case 'DAILY':
+      internalScheduleLogicType = 'DAILY';
+      dbDeliveryScheduleEnum = 'DAILY';
+      break;
+    case 'WEEKDAYS': 
+    case 'SELECT-DAYS':
+      internalScheduleLogicType = 'SELECT_DAYS'; 
+      dbDeliveryScheduleEnum = 'WEEKDAYS'; // Prisma enum is WEEKDAYS for this logic
+      if (!weekdays || !Array.isArray(weekdays) || weekdays.length === 0) {
+        res.status(400);
+        throw new Error('Weekdays must be provided for this schedule type.');
       }
-    }
-    totalQty = count * qty;
-    console.log(`[SELECT_DAYS] Total delivery days: ${count}, totalQty: ${totalQty}`);
-  } else if (deliverySchedule === 'WEEKDAYS') { // Handle cases where weekdays might be empty or not an array for WEEKDAYS schedule
-    totalQty = 0; // Default to 0 if no valid weekdays are provided for WEEKDAYS schedule
+      break;
+    case 'ALTERNATE_DAYS':
+    case 'ALTERNATE-DAYS': 
+      // User wants "Alternate Days" input to mean DAILY delivery with VARYING quantity.
+      // This mirrors the behavior of the "VARYING" input.
+      console.log('[SubscriptionController] Frontend sent deliverySchedule: "ALTERNATE_DAYS". Interpreting as DAILY pattern with varying quantities as per user request.');
+      internalScheduleLogicType = 'VARYING'; // Use 'VARYING' logic for daily delivery with alternating qty
+      dbDeliveryScheduleEnum = 'DAILY';    // Store as DAILY in DB
+      break;
+    case 'VARYING':
+      // VARYING from frontend implies daily deliveries with potentially different quantities (using altQty).
+      // generateDeliveryDates handles the daily delivery with alternating quantity logic when type is 'VARYING'.
+      // For DB storage, this pattern is essentially DAILY deliveries.
+      console.log('[SubscriptionController] Frontend sent deliverySchedule: "VARYING". Interpreting as DAILY pattern with varying quantities, but storing as ALTERNATE_DAYS in DB as per user request.');
+      internalScheduleLogicType = 'VARYING'; 
+      dbDeliveryScheduleEnum = 'ALTERNATE_DAYS'; // Store as ALTERNATE_DAYS in DB
+      break;
+    default:
+      res.status(400);
+      throw new Error(`Invalid delivery schedule type: ${rawDeliverySchedule}`);
   }
 
+  // Calculate totalQty and amount using the helper function
+  const deliveryScheduleDetails = generateDeliveryDates(
+    baseDate,
+    parsedPeriod,
+    internalScheduleLogicType, // Use the type for internal logic
+    parsedQty,
+    parsedAltQty,
+    weekdays
+  );
+
+  if (!deliveryScheduleDetails || deliveryScheduleDetails.length === 0) {
+    // This case might indicate an issue with generateDeliveryDates or invalid parameters leading to no schedule
+    console.error('generateDeliveryDates returned no schedule details for:', { baseDate, parsedPeriod, prismaDeliveryScheduleEnum, parsedQty, parsedAltQty, weekdays });
+    res.status(400);
+    throw new Error('Could not generate a delivery schedule based on the provided inputs.');
+  }
+
+  const totalQty = deliveryScheduleDetails.reduce((sum, item) => sum + item.quantity, 0);
   const amount = totalQty * product.rate;
 
-  // Create subscription with proper relationsf
-  // Map deliverySchedule to Prisma enum values
-  console.log(`[SubscriptionController] Mapping to Prisma Enum: deliverySchedule is '${deliverySchedule}' (type: ${typeof deliverySchedule})`);
-  let prismaDeliveryScheduleEnum;
-  const effectiveDeliverySchedule = typeof deliverySchedule === 'string' ? deliverySchedule.trim() : deliverySchedule;
+  // --- New Wallet Logic ---
+  const wallet = member.wallet; // Wallet was included in the member query
+  let walletamt = 0;
+  let payableamt = amount;
+  let newWalletBalance = wallet ? wallet.balance : 0;
+  let paymentStatus = 'PENDING'; // Default payment status
 
-  if (effectiveDeliverySchedule === 'SELECT_DAYS') {
-    prismaDeliveryScheduleEnum = 'WEEKDAYS';
-  } else if (effectiveDeliverySchedule === 'DAILY') {
-    prismaDeliveryScheduleEnum = 'DAILY';
-  } else if (effectiveDeliverySchedule === 'ALTERNATE_DAYS') {
-    prismaDeliveryScheduleEnum = 'ALTERNATE_DAYS';
-  } else if (effectiveDeliverySchedule === 'VARYING') {
-    // VARYING needs to be mapped to DAILY or ALTERNATE_DAYS for Prisma enum
-    const hasValidAltQty = altQty && typeof altQty === 'number' && altQty > 0;
-    prismaDeliveryScheduleEnum = hasValidAltQty ? 'ALTERNATE_DAYS' : 'DAILY';
-    console.log(`[SubscriptionController] Mapped VARYING to ${prismaDeliveryScheduleEnum} for Prisma (altQty: ${altQty}, valid: ${hasValidAltQty}).`);
-  } else {
-    // Fallback for unexpected values or if deliverySchedule was not a string initially.
-    console.warn(`[SubscriptionController] Unexpected/unhandled effectiveDeliverySchedule value '${effectiveDeliverySchedule}' (original: '${deliverySchedule}') received. Attempting to use as is for Prisma.`);
-    prismaDeliveryScheduleEnum = effectiveDeliverySchedule; // This will likely error if not a valid Prisma enum member.
+  if (wallet && wallet.balance > 0) {
+    if (wallet.balance >= amount) {
+      walletamt = amount;
+      payableamt = 0;
+      newWalletBalance = wallet.balance - amount;
+      paymentStatus = 'PAID'; // Fully paid from wallet
+    } else {
+      walletamt = wallet.balance;
+      payableamt = amount - wallet.balance;
+      newWalletBalance = 0;
+      // paymentStatus remains 'PENDING' as there's a balance to be paid
+    }
   }
-
-  const subscription = await prisma.subscription.create({
-    data: {
-      period,
-      expiryDate,
-      startDate: baseDate, // Added startDate from baseDate
-      deliverySchedule: prismaDeliveryScheduleEnum, // Use mapped value
-      weekdays: (Array.isArray(weekdays) && weekdays.length > 0) ? JSON.stringify(weekdays) : null,
-      qty,
-      altQty, // Prisma handles undefined as optional field not set
-      rate: product.rate, // Ensure 'product' is fetched and contains 'rate'
-      totalQty,
-      amount,
-      member: {
-        connect: { id: member.id }, // Ensure 'memberId' is correctly defined (e.g., req.user.id)
-      },
-      deliveryAddress: {
-        connect: { id: parsedDeliveryAddressId }, // Ensure 'deliveryAddressId' is from req.body
-      },
-      product: {
-        connect: { id: parsedProductId } // Ensure 'productId' is from req.body
-      }
-    }
-  });
-
-  if (subscription) {
-    // Generate and store delivery schedule
-    // const isValidAltQty = altQty && typeof altQty === 'number' && altQty > 0; // This logic is now inside generateDeliveryDates
-    const deliveryScheduleDetails = generateDeliveryDates(
-      baseDate,         // Effective start date
-      period,           // Duration in days
-      deliverySchedule, // Logical schedule type: 'DAILY', 'ALTERNATE_DAYS', 'SELECT_DAYS', 'VARYING'
-      qty,              // Primary quantity from req.body
-      altQty,           // Alternate quantity from req.body (can be undefined)
-      weekdays          // Array like ["mon", "tue"] for SELECT_DAYS
-    );
-
-    if (deliveryScheduleDetails.length > 0) {
-      const deliveryScheduleEntries = deliveryScheduleDetails.map(detail => ({
-        subscriptionId: subscription.id,
-        memberId: member.id, // Ensure member.id is correctly sourced
-        deliveryAddressId: parsedDeliveryAddressId,
-        productId: parsedProductId,
-        deliveryDate: detail.date,
-        quantity: detail.quantity, // Set the quantity for this specific delivery
-        status: 'PENDING',       // Default status for new schedule entries
-      }));
-
-      try {
-        await prisma.deliveryScheduleEntry.createMany({
-          data: deliveryScheduleEntries,
+  
+  // --- Transactional Database Update ---
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Update Wallet Balance (if an amount was used from it)
+      if (wallet && walletamt > 0) {
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { balance: newWalletBalance },
         });
-        console.log(`Successfully created ${deliveryScheduleEntries.length} delivery schedule entries for subscription ${subscription.id}`);
-      } catch (error) {
-        console.error(`Error creating delivery schedule entries for subscription ${subscription.id}:`, error);
-        // Depending on business logic, you might want to handle this error more explicitly,
-        // e.g., by setting a flag on the subscription or notifying an admin.
-        // For now, the subscription creation will still be considered successful.
       }
+
+      // 2. Create the Subscription record with new fields
+      const newSubscription = await tx.subscription.create({
+        data: {
+          memberId: member.id,
+          deliveryAddressId: parsedDeliveryAddressId,
+          productId: parsedProductId,
+          startDate: baseDate,
+          period: parsedPeriod,
+          expiryDate,
+          deliverySchedule: dbDeliveryScheduleEnum, // Use the DB-specific enum value
+          weekdays: dbDeliveryScheduleEnum === 'WEEKDAYS' ? JSON.stringify(weekdays) : null, // Store weekdays if DB enum is WEEKDAYS
+          qty: parsedQty,
+          altQty: parsedAltQty,
+          rate: product.rate,
+          totalQty, 
+          amount, // Total cost before deductions
+          walletamt, // Amount deducted from wallet
+          payableamt, // Remaining amount to be paid
+          receivedamt: 0, // Initially 0, to be updated upon actual payment if not fully from wallet
+          paymentStatus: paymentStatus, // 'PAID' or 'PENDING'
+        },
+      });
+
+      // 3. Create a Transaction record if wallet funds were used
+      if (wallet && walletamt > 0) {
+        await tx.transaction.create({
+          data: {
+            userId: req.user.id,
+            walletId: wallet.id,
+            amount: walletamt,
+            type: 'DEBIT', // Assuming 'DEBIT' is a value in your TransactionType enum
+            status: 'PAID',  // Assuming 'PAID' is a value in your TransactionStatus enum
+            notes: `Subscription payment for ID: ${newSubscription.id}`,
+            referenceNumber: `SUB-${newSubscription.id}`,
+            paymentMethod: 'TOPUP' // Optional: if you want to specify this
+          },
+        });
+      }
+
+      // 4. Generate and create DeliveryScheduleEntry records
+      // (deliveryScheduleDetails already calculated outside transaction)
+      const deliveryScheduleEntries = deliveryScheduleDetails.map(detail => ({
+          subscriptionId: newSubscription.id, 
+          memberId: member.id,
+          deliveryAddressId: parsedDeliveryAddressId,
+          productId: parsedProductId,
+          deliveryDate: detail.date,
+          quantity: detail.quantity,
+          status: 'PENDING'
+      }));
+      
+      if (deliveryScheduleEntries.length > 0) {
+        await tx.deliveryScheduleEntry.createMany({
+            data: deliveryScheduleEntries,
+        });
+      }
+      
+      return newSubscription;
+    });
+
+    res.status(201).json(result);
+
+  } catch (error) {
+    console.error('Subscription creation transaction failed:', error);
+    // Consider more specific error handling based on Prisma error codes if necessary
+    if (error.code === 'P2002' && error.meta && error.meta.target) {
+        res.status(409).json({ message: `A subscription with similar details might already exist or there's a conflict on field(s): ${error.meta.target.join(', ')}.`, details: error.message });
+    } else if (error.message.includes('foreign key constraint fails')) {
+        res.status(400).json({ message: "Invalid reference to another entity (e.g., product, address, or member). Please check IDs.", details: error.message });
+    } else {
+        res.status(500).json({ message: "Failed to create subscription due to a server error.", details: error.message });
     }
-    res.status(201).json(subscription);
-  } else {
-    // This case should ideally not be reached if prisma.subscription.create throws on failure.
-    res.status(500).json({ message: "Subscription creation failed, delivery schedule not generated." });
   }
 });
 
@@ -400,7 +394,12 @@ const getSubscriptionById = asyncHandler(async (req, res) => {
     },
     include: {
       product: true,
-      deliveryAddress: true
+      deliveryAddress: true,
+      deliveryScheduleEntries: {
+        orderBy: {
+          deliveryDate: 'asc' // Optional: order entries by date
+        }
+      }
     }
   });
 
@@ -472,7 +471,8 @@ const updateSubscription = asyncHandler(async (req, res) => {
     paymentReference, // Frontend sends paymentReference, map to paymentReferenceNo if DB is different
     paymentDate,
     paymentStatus,
-    agencyId
+    agencyId,
+    receivedAmount // <-- Add receivedAmount here
   } = req.body;
 
   const updateData = {
@@ -512,6 +512,18 @@ const updateSubscription = asyncHandler(async (req, res) => {
   // Include other fields if they are part of the payload and intended for update
   if (qty !== undefined) updateData.qty = qty; // If admin can change qty
   if (altQty !== undefined) updateData.altQty = altQty; // If admin can change altQty
+
+  // Add receivedAmount to updateData if provided
+  if (receivedAmount !== undefined && receivedAmount !== null) {
+    const parsedReceivedAmount = parseFloat(receivedAmount);
+    if (!isNaN(parsedReceivedAmount)) {
+      updateData.receivedamt = parsedReceivedAmount;
+    } else {
+      console.warn(`Invalid receivedAmount value received: ${receivedAmount}`);
+      // Optionally, you could throw an error or handle it differently
+      // For now, we'll just not update receivedamt if it's not a valid number
+    }
+  }
   // if (deliverySchedule !== undefined) updateData.deliverySchedule = deliverySchedule;
   // if (weekdays !== undefined) updateData.weekdays = weekdays ? JSON.stringify(weekdays) : undefined;
 
@@ -814,6 +826,163 @@ const getDeliveryScheduleByDate = asyncHandler(async (req, res) => {
   }
 });
 
+const skipMemberDelivery = asyncHandler(async (req, res) => {
+  const { deliveryEntryId } = req.params;
+  const userId = req.user.id; // Authenticated user's ID
+
+  if (!deliveryEntryId || isNaN(parseInt(deliveryEntryId))) {
+    res.status(400);
+    throw new Error('Valid Delivery Entry ID is required.');
+  }
+  const entryId = parseInt(deliveryEntryId);
+
+  // Fetch the delivery entry and essential related data for validation and refund
+  const deliveryEntry = await prisma.deliveryScheduleEntry.findUnique({
+    where: { id: entryId },
+    include: {
+      subscription: {
+        select: { // Select only necessary fields from subscription
+          memberId: true,
+          member: { // To verify ownership via user ID
+            select: { userId: true }
+          }
+        }
+      },
+      product: { // Include product directly to get its price
+        select: { id: true, price: true, name: true, unit: true, rate:true } // Ensure price is selected
+      }
+    },
+  });
+
+  if (!deliveryEntry) {
+    res.status(404);
+    throw new Error('Delivery entry not found.');
+  }
+
+  // Authorization check
+  if (!deliveryEntry.subscription || !deliveryEntry.subscription.member || deliveryEntry.subscription.member.userId !== userId) {
+    res.status(403);
+    throw new Error('You are not authorized to modify this delivery entry.');
+  }
+
+  // Date validation: Delivery can only be skipped if its date is strictly after today's date.
+  const deliveryDateForComparison = startOfDay(deliveryEntry.deliveryDate);
+  const today = startOfDay(new Date());
+  if (!isAfter(deliveryDateForComparison, today)) {
+    res.status(400);
+    throw new Error('Deliveries can only be skipped if they are scheduled for a date strictly after today.');
+  }
+
+  // Status validation: Only PENDING deliveries can be skipped.
+  if (deliveryEntry.status !== 'PENDING') {
+    res.status(400);
+    throw new Error(`This delivery cannot be skipped. Current status: ${deliveryEntry.status}. Only PENDING deliveries can be skipped.`);
+  }
+
+  let updatedDeliveryEntryResult;
+  let refundMessage = '';
+  let finalMessage = 'Delivery skipped successfully.';
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1. Update Delivery Schedule Entry status
+      updatedDeliveryEntryResult = await tx.deliveryScheduleEntry.update({
+        where: { id: entryId },
+        data: {
+          status: 'SKIPPED', // Using 'SKIPPED' as per previous logs, adjust if SKIPPED_BY_MEMBER is preferred and an enum value
+          updatedAt: new Date(),
+        },
+        include: { // Keep the include for the response, but product details are already in deliveryEntry
+          product: {
+            select: { name: true, unit: true }
+          }
+        }
+      });
+      console.log('Updated Delivery Entry in backend:', updatedDeliveryEntryResult);
+
+      // 2. Process Refund
+
+      const productPrice = deliveryEntry.product?.rate; // Price from the initially fetched deliveryEntry
+      const deliveryQuantity = deliveryEntry.quantity;
+      const memberIdForWallet = deliveryEntry.subscription.memberId;
+
+      if (typeof productPrice !== 'number' || productPrice < 0) {
+        console.warn(`Product price not found or invalid for productId: ${deliveryEntry.productId}. Cannot process refund.`);
+        refundMessage = ' Product details for refund are missing or invalid.';
+        // Do not throw error here, skip was successful.
+      } else {
+        const refundAmount = productPrice * deliveryQuantity;
+
+        if (refundAmount > 0) {
+          if (!memberIdForWallet) {
+            console.warn('Member ID not found on delivery entry subscription, cannot process refund.');
+            refundMessage = ' Member information for refund is missing.';
+          } else {
+            const wallet = await tx.wallet.findUnique({
+              where: { memberId: memberIdForWallet },
+            });
+
+            if (!wallet) {
+              console.warn(`Wallet not found for memberId: ${memberIdForWallet}. Cannot process refund.`);
+              refundMessage = ' Wallet not found for refund processing.';
+            } else {
+              // Create Wallet Transaction
+              await tx.transaction.create({ // <--- CORRECTED HERE
+                data: {
+                  wallet: { 
+                    connect: { id: wallet.id }
+                  },
+                  user: { 
+                    connect: { id: deliveryEntry.subscription.member.userId }
+                  },
+                  type: 'CREDIT',
+                  amount: refundAmount,
+                  status: 'PAID',
+                  paymentMethod: 'TOPUP',
+                  notes: `Refund for skipped delivery (Entry ID: ${entryId})`,
+                 },
+              });
+
+              // Update Wallet Balance
+              await tx.wallet.update({
+                where: { id: wallet.id },
+                data: {
+                  balance: {
+                    increment: refundAmount,
+                  },
+                },
+              });
+              refundMessage = ` ₹${refundAmount.toFixed(2)} has been refunded to your wallet.`;
+              console.log(`Refund of ${refundAmount.toFixed(2)} processed for member ${memberIdForWallet}, delivery entry ${entryId}`);
+            }
+          }
+        } else {
+          refundMessage = ' No refund was applicable for this skipped delivery (amount is zero or less).';
+          console.log(`Refund amount is ${refundAmount} for delivery entry ${entryId}. No refund processed.`);
+        }
+      }
+    }); // End of Prisma transaction
+
+    finalMessage += refundMessage;
+
+  } catch (error) {
+    console.error(`CRITICAL: Error during skip/refund transaction for deliveryEntryId ${entryId}:`, error);
+    // If the transaction fails, Prisma rolls it back.
+    // The deliveryEntry might not have been updated, or refund failed.
+    // It's important to let the user know something went wrong.
+    return res.status(500).json({
+      message: 'An error occurred while processing your request. Please try again or contact support.',
+      // Optionally, provide more specific error details in a non-production environment
+      // error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+
+  res.status(200).json({
+    message: finalMessage,
+    deliveryEntry: updatedDeliveryEntryResult, // Send the updated entry from the transaction
+  });
+});
+
 module.exports = {
   createSubscription,
   getSubscriptions,
@@ -821,5 +990,6 @@ module.exports = {
   updateSubscription,
   cancelSubscription,
   renewSubscription,
-  getDeliveryScheduleByDate
+  getDeliveryScheduleByDate,
+  skipMemberDelivery
 };

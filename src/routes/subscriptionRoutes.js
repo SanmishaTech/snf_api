@@ -383,6 +383,70 @@
  *         message:
  *           type: string
  *           example: "Internal Server Error."
+ *
+ *     DeliveryStatusEnum:
+ *       type: string
+ *       enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED_BY_MEMBER, SKIPPED_BY_ADMIN]
+ *       description: Status of a specific delivery entry.
+ *       example: PENDING
+ *     DeliveryScheduleEntry:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         subscriptionId:
+ *           type: integer
+ *           example: 123
+ *         memberId:
+ *           type: integer
+ *           example: 401
+ *         deliveryAddressId:
+ *           type: integer
+ *           example: 201
+ *         productId:
+ *           type: integer
+ *           example: 101
+ *         deliveryDate:
+ *           type: string
+ *           format: date
+ *           example: "2024-07-15"
+ *         quantity:
+ *           type: integer
+ *           example: 1
+ *         status:
+ *           $ref: '#/components/schemas/DeliveryStatusEnum'
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         # Optional expanded relations if needed by response, adjust as per actual controller response
+ *         # product:
+ *         #   $ref: '#/components/schemas/SimpleProductInfo'
+ *         # deliveryAddress:
+ *         #   $ref: '#/components/schemas/SimpleDeliveryAddressInfo'
+ *         # member:
+ *         #   $ref: '#/components/schemas/SimpleMemberInfo'
+ *         # subscription:
+ *         #   $ref: '#/components/schemas/SubscriptionCore'
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         message:
+ *           type: string
+ *           example: "An error occurred"
+ *         error:
+ *           type: object
+ *           additionalProperties: true
+ *           example: { "details": "Specific error information" }
+ *
+ * securitySchemes:
+ *   bearerAuth:
+ *     type: http
+ *     scheme: bearer
+ *     bearerFormat: JWT
  */
 
 /**
@@ -401,7 +465,8 @@ const {
   updateSubscription,
   cancelSubscription,
   renewSubscription,
-  getDeliveryScheduleByDate
+  getDeliveryScheduleByDate,
+  skipMemberDelivery
 } = require('../controllers/subscriptionController');
 const authMiddleware = require('../middleware/auth');
 
@@ -652,6 +717,68 @@ router.route('/:id')
  *               $ref: '#/components/schemas/ErrorResponse500'
  */
 router.patch('/:id/cancel', authMiddleware, cancelSubscription);
+
+/**
+ * @swagger
+ * /subscriptions/member/deliveries/{deliveryEntryId}/skip:
+ *   patch:
+ *     summary: Skip a specific delivery for the authenticated member
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: deliveryEntryId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the delivery schedule entry to skip.
+ *     responses:
+ *       200:
+ *         description: Delivery successfully marked as skipped.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Delivery skipped successfully.
+ *                 deliveryEntry:
+ *                   $ref: '#/components/schemas/DeliveryScheduleEntry'
+ *       400:
+ *         description: Bad request (e.g., delivery already past, not skippable).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden (e.g., user does not own this delivery entry or subscription).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Delivery entry not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.patch('/member/deliveries/:deliveryEntryId/skip', authMiddleware, skipMemberDelivery);
+
 /**
  * @swagger
  * /subscriptions/{id}/renew:
