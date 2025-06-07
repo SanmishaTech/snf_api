@@ -5,3 +5,5 @@ prisma/migrations
 /bun.lockb
 bun.lockb
 .env.production
+/uploads/categories
+/uploads/products

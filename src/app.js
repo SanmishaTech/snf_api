@@ -47,8 +47,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 const frontendDistPath =
   process.env.NODE_ENV === "production"
@@ -63,8 +63,8 @@ app.use(express.static(frontendDistPath));
 
 const uploadsPath =
   process.env.NODE_ENV === "production"
-    ? process.env.UPLOADS_PATH || path.resolve(__dirname, "..", "uploads")
-    : path.resolve(__dirname, "..", "uploads");
+    ? process.env.UPLOADS_PATH || path.resolve(__dirname, "uploads")
+    : path.resolve(__dirname, "uploads");
 
 console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));

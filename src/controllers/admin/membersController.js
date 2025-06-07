@@ -21,8 +21,8 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         AND: search ? [ // Apply search if search term exists
             {
                 OR: [
-                    { name: { contains: search, mode: 'insensitive' } }, // Case-insensitive search for name
-                    { email: { contains: search, mode: 'insensitive' } }, // Case-insensitive search for email
+                    { name: { contains: search } }, // Search for name (case-sensitive by default now)
+                    { email: { contains: search } }, // Search for email (case-sensitive by default now)
                 ],
             },
         ] : [],
