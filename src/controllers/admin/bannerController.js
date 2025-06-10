@@ -80,6 +80,11 @@ const createBanner = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 const getAllBanners = asyncHandler(async (req, res) => {
+  if (!prisma || !prisma.banner) {
+    res.status(500);
+    throw new Error('Prisma client or Banner model is not available.');
+  }
+
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
