@@ -18,10 +18,10 @@ const userRoutes = require("./routes/users");
 const deliveryAddressRoutes = require("./routes/deliveryAddressRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const adminRoutes = require("./routes/adminRoutes"); // Added for admin routes
-const adminWalletRoutes = require('./routes/admin/wallets');
-const adminMembersRouter = require('./routes/admin/members'); // Added for admin members route
+const adminWalletRoutes = require("./routes/admin/wallets");
+const adminMembersRouter = require("./routes/admin/members"); // Added for admin members route
 const deliveryScheduleRoutes = require("./routes/deliveryScheduleRoutes");
-const memberwalletRoutes = require('./routes/wallet')
+const memberwalletRoutes = require("./routes/wallet");
 
 const app = express();
 
@@ -47,8 +47,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 const frontendDistPath =
   process.env.NODE_ENV === "production"
@@ -63,8 +63,8 @@ app.use(express.static(frontendDistPath));
 
 const uploadsPath =
   process.env.NODE_ENV === "production"
-    ? process.env.UPLOADS_PATH || path.resolve(__dirname, "uploads")
-    : path.resolve(__dirname, "uploads");
+    ? process.env.UPLOADS_PATH || path.resolve(__dirname, "..", "uploads") // Corrected path
+    : path.resolve(__dirname, "..", "uploads"); // Corrected path
 
 console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
@@ -78,10 +78,10 @@ app.use("/api/vendor-orders", vendorOrderRoutes);
 app.use("/api/delivery-addresses", deliveryAddressRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/admin", adminRoutes); // Added for admin routes
-app.use('/api/admin/wallets', adminWalletRoutes);
+app.use("/api/admin/wallets", adminWalletRoutes);
 app.use("/api/admin/members", adminMembersRouter); // Added for admin members route
 app.use("/api/delivery-schedules", deliveryScheduleRoutes);
-app.use("/api/wallet", memberwalletRoutes)
+app.use("/api/wallet", memberwalletRoutes);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {

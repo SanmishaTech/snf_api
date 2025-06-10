@@ -70,7 +70,7 @@ A simple Node.js REST API project built with Express, Prisma, and JWT.
     npx prisma migrate dev --name init
     ```
 
-7.  Generate the Prisma client: 
+7.  Generate the Prisma client:
 
     ```bash
     npx prisma generate

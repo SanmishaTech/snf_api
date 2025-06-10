@@ -216,6 +216,7 @@ router.get("/policy-text", authController.getPolicyText);
  */
 // router.patch("/accept-policy", auth, authController.acceptPolicy);
 
+router.patch("/change-password", auth, authController.changePassword);
 router.post("/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });

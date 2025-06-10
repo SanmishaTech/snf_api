@@ -36,6 +36,7 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
       req.fileUUID[fieldName] = uuid;
       // Construct the full path: uploads/members/profilePicture/UUID/
       const fullPath = path.join(uploadDir, moduleName, fieldName, uuid);
+      console.log(`[UploadMiddleware] Destination for module '${moduleName}', field '${fieldName}': ${fullPath}`); // DEBUG LINE
 
       // Create directory if it doesn't exist
       fs.mkdirSync(fullPath, { recursive: true });

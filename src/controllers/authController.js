@@ -79,15 +79,30 @@ const register = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Determine user role, ensuring it's uppercase for Prisma enum compatibility
-    const userRole = (requestedRole && ["VENDOR", "AGENCY", "ADMIN", "MEMBER"].includes(requestedRole.toUpperCase()))
-                     ? requestedRole.toUpperCase()
-                     : config.defaultUserRole.toUpperCase();
+    // and maps to a valid Prisma Role enum value.
+    let resolvedUserRole;
+    const validPrismaRoles = ["VENDOR", "AGENCY", "ADMIN", "MEMBER"]; // Assumed valid roles from your schema
+
+    if (requestedRole && validPrismaRoles.includes(requestedRole.toUpperCase())) {
+      resolvedUserRole = requestedRole.toUpperCase();
+    } else {
+      const defaultRoleFromConfig = config.defaultUserRole.toUpperCase();
+      if (defaultRoleFromConfig === "USER") { // If default was 'user' (common mistake) or 'USER'
+        resolvedUserRole = "MEMBER"; // Map to a valid role like MEMBER
+      } else if (validPrismaRoles.includes(defaultRoleFromConfig)) {
+        resolvedUserRole = defaultRoleFromConfig;
+      } else {
+        // Fallback if the default role from config is not in validPrismaRoles and not 'USER'
+        console.warn(`Unrecognized default role '${config.defaultUserRole}' from config, defaulting to MEMBER.`);
+        resolvedUserRole = "MEMBER"; 
+      }
+    }
 
     const userData = {
       name,
       email,
       password: hashedPassword,
-      role: userRole,
+      role: resolvedUserRole, // Use the sanitized and validated role
       ...(mobile !== undefined && { mobile }), // Add mobile if provided
     };
 
@@ -101,7 +116,7 @@ const register = async (req, res, next) => {
     }
 
     // If the user is a member, create a related Member record
-    if (userRole === 'MEMBER') {
+    if (resolvedUserRole === 'MEMBER') {
       userData.member = {
         create: {
           name: name, // Use the registration name for Member.name
@@ -385,6 +400,66 @@ const acceptPolicy = async (req, res, next) => {
   }
 };
 
+const changePassword = async (req, res, next) => {
+  const userId = req.user?.id; // Assuming isAuthenticated middleware adds user to req
+
+  if (!userId) {
+    return next(createError(401, "Unauthorized: User not authenticated."));
+  }
+
+  const schema = z
+    .object({
+      currentPassword: z.string().min(1, "Current password is required."),
+      newPassword: z
+        .string()
+        .min(6, "New password must be at least 6 characters long."),
+    })
+    // We don't need to check if newPassword and confirmPassword match here,
+    // as the frontend dialog already does that. The backend only needs newPassword.
+
+  try {
+    // Validate request body
+    const validationResult = await validateRequest(schema, req.body, res);
+    if (validationResult && validationResult.errors) {
+      // If validateRequest sends a response, it returns an object with errors
+      // If it doesn't send a response (e.g. on success), it might return undefined or the data
+      // This check ensures we don't proceed if validation failed and response was sent.
+      return; 
+    }
+    
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      // This case should ideally not happen if user is authenticated
+      return next(createError(404, "User not found."));
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return next(createError(400, "Incorrect current password."));
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedNewPassword },
+    });
+
+    res.status(200).json({ message: "Password changed successfully." });
+
+  } catch (error) {
+    console.error("Error changing password:", error);
+    // Pass to global error handler, which might send a 500 error
+    // Or, if it's a validation error from http-errors, it will use that status
+    next(error); 
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -392,4 +467,5 @@ module.exports = {
   resetPassword,
     getPolicyText,
   acceptPolicy,
+  changePassword,
 };

@@ -42,8 +42,16 @@ const getAllAreaMasters = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
   const search = req.query.search || "";
-  const sortBy = req.query.sortBy || 'name';
+  const sortBy = req.query.sortBy || 'name'; // Default sort by 'name'
   const sortOrder = req.query.sortOrder === 'desc' ? 'desc' : 'asc';
+
+  let orderByClause = {};
+  if (sortBy === 'depot.name') {
+    orderByClause = { depot: { name: sortOrder } };
+  } else {
+    // For direct fields on AreaMaster like 'name', 'deliveryType', 'pincodes', 'createdAt'
+    orderByClause = { [sortBy]: sortOrder };
+  }
 
   const whereClause = search
     ? {
@@ -79,9 +87,7 @@ const getAllAreaMasters = asyncHandler(async (req, res) => {
         },
       },
     },
-    orderBy: {
-      [sortBy]: sortOrder,
-    },
+    orderBy: orderByClause,
   });
 
   res.status(200).json({

@@ -35,6 +35,7 @@ const upload = multer({
 });
 
 const { getAllSubscriptions } = require('../controllers/adminSubscriptionController');
+const { adminGetUserById, adminUpdateUserById, adminToggleMemberStatus } = require('../controllers/adminUserController'); // Added for admin user management
 const {
   createAreaMaster,
   getAllAreaMasters,
@@ -57,42 +58,84 @@ const {
   deleteDepot,
   getAllDepotsList, // Added for the new list endpoint
 } = require('../controllers/admin/depotController');
-// const { protect, authorize } = require('../middleware/authMiddleware'); // Assuming you have auth middleware
+const {
+  createBanner,
+  getAllBanners,
+  getBannerById,
+  updateBanner,
+  deleteBanner,
+} = require('../controllers/admin/bannerController');
+const authMiddleware = require('../middleware/auth'); // Corrected path to auth middleware
+const createUploadMiddleware = require('../middleware/uploadMiddleware');
+
+// Banner image upload configuration
+const bannerImageField = 'bannerImage'; // This will be the field name in the form
+const bannerUploadConfig = [
+  {
+    name: bannerImageField,
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxSize: 5 * 1024 * 1024, // 5MB
+  },
+];
+const bannerUploadMiddleware = createUploadMiddleware('banners', bannerUploadConfig); // Corrected path to auth middleware
 
 // Route to get all subscriptions (Admin only)
-// router.get('/subscriptions', protect, authorize(['ADMIN']), getAllSubscriptions);
+// router.get('/subscriptions', protect, getAllSubscriptions);
 // For now, removing auth middleware for easier testing. Add it back as needed.
-router.get('/subscriptions', getAllSubscriptions);
+router.get('/subscriptions', authMiddleware, getAllSubscriptions);
 
 // AreaMaster Routes
 router.route('/areamasters')
-  .post(createAreaMaster) // Add protect, authorize(['ADMIN']) as needed
-  .get(getAllAreaMasters);   // Add protect, authorize(['ADMIN']) as needed
+  .post(authMiddleware, createAreaMaster)
+  .get(authMiddleware, getAllAreaMasters);
 
 router.route('/areamasters/:id')
-  .get(getAreaMasterById)    // Add protect, authorize(['ADMIN']) as needed
-  .put(updateAreaMaster)     // Add protect, authorize(['ADMIN']) as needed
-  .delete(deleteAreaMaster); // Add protect, authorize(['ADMIN']) as needed
+  .get(authMiddleware, getAreaMasterById)
+  .put(authMiddleware, updateAreaMaster)
+  .delete(authMiddleware, deleteAreaMaster);
 
 // CategoryMaster Routes
 router.route('/categories')
-  .post(upload.single('attachment'), createCategory) // Apply multer middleware for single file upload with field name 'attachment'
-  .get(getAllCategories);  // Add protect, authorize(['ADMIN']) as needed
+  .post(authMiddleware, upload.single('attachment'), createCategory)
+  .get(authMiddleware, getAllCategories);
 
 router.route('/categories/:id')
-  .get(getCategoryById)     // Add protect, authorize(['ADMIN']) as needed
-  .put(upload.single('attachment'), updateCategory) // Apply multer for update
-  .delete(deleteCategory);  // Add protect, authorize(['ADMIN']) as needed
+  .get(authMiddleware, getCategoryById)
+  .put(authMiddleware, upload.single('attachment'), updateCategory)
+  .delete(authMiddleware, deleteCategory);
 
 // DepotMaster Routes
-router.get('/depots/all-list', getAllDepotsList); // Route for fetching all depots (id and name)
+router.get('/depots/all-list', authMiddleware, getAllDepotsList);
 router.route('/depots')
-  .post(createDepot)    // Add protect, authorize(['ADMIN']) as needed
-  .get(getAllDepots);  // Add protect, authorize(['ADMIN']) as needed
+  .post(authMiddleware, createDepot)
+  .get(authMiddleware, getAllDepots);
 
 router.route('/depots/:id')
-  .get(getDepotById)     // Add protect, authorize(['ADMIN']) as needed
-  .put(updateDepot)      // Add protect, authorize(['ADMIN']) as needed
-  .delete(deleteDepot);  // Add protect, authorize(['ADMIN']) as needed
+  .get(authMiddleware, getDepotById)
+  .put(authMiddleware, updateDepot)
+  .delete(authMiddleware, deleteDepot);
+
+// Public Banner Route (NO AUTHENTICATION)
+// This should ideally be in a separate publicRoutes.js file
+// but adding here for simplicity of this exercise.
+router.get('/public/banners', getAllBanners);
+
+// Banner Routes
+router.route('/banners')
+  .post(authMiddleware, ...bannerUploadMiddleware, createBanner)
+  .get(authMiddleware, getAllBanners);
+
+router.route('/banners/:id')
+  .get(authMiddleware, getBannerById)
+  .put(authMiddleware, ...bannerUploadMiddleware, updateBanner)
+  .delete(authMiddleware, deleteBanner);
+
+// Admin User Management Routes
+router.route('/users/:userId')
+  .get(authMiddleware, adminGetUserById)
+  .put(authMiddleware, adminUpdateUserById);
+
+// Admin Member Status Toggle Route
+router.patch('/members/:memberId/status', authMiddleware, adminToggleMemberStatus);
 
 module.exports = router;

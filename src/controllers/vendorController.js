@@ -16,6 +16,7 @@ const vendorBaseSchema = z.object({
   mobile: z.string().nonempty('Mobile number is required').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: z.string().regex(/^\d{10}$/, 'Alternate mobile must be 10 digits').optional().nullable(), 
   email: z.string().optional().nullable(),
+  isDairySupplier: z.boolean().optional(),
 });
 
 // Zod schema for incoming data when creating a vendor with a new user
@@ -32,6 +33,7 @@ const createUserAndVendorSchema = z.object({
   address2: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   pincode: z.number().int('Pincode must be an integer'),
+  isDairySupplier: z.boolean().optional(),
 });
 
 const createVendor = asyncHandler(async (req, res, next) => {
@@ -53,7 +55,8 @@ const createVendor = asyncHandler(async (req, res, next) => {
     address1,
     address2,
     city,
-    pincode
+    pincode,
+    isDairySupplier
   } = req.body;
 
   const existingUserByLoginEmail = await prisma.user.findUnique({ where: { email: userLoginEmail } });
@@ -93,6 +96,7 @@ const createVendor = asyncHandler(async (req, res, next) => {
         address2,
         city,
         pincode,
+        isDairySupplier,
         user: {
           connect: { id: newUser.id },
         },
@@ -116,7 +120,8 @@ const getAllVendors = asyncHandler(async (req, res, next) => {
     sortBy = 'name', 
     sortOrder = 'asc', 
     search = '', 
-    active = 'all' // 'all', 'true', 'false'
+    active = 'all', // 'all', 'true', 'false'
+    dairyOnly = 'false' // New parameter, defaults to 'false'
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -144,9 +149,14 @@ const getAllVendors = asyncHandler(async (req, res, next) => {
   }
 
   if (active !== 'all') {
-    whereConditions.user = {
+    whereConditions.user = { // This targets the user associated with the vendor
       active: active === 'true'
     };
+  }
+
+  // Check for dairyOnly query parameter
+  if (req.query.dairyOnly === 'true') {
+    whereConditions.isDairySupplier = true;
   }
 
   const orderByClause = {};
@@ -231,7 +241,8 @@ const updateVendor = asyncHandler(async (req, res, next) => {
     pincode,
     mobile,
     alternateMobile,
-    email
+    email,
+    isDairySupplier
   } = validationResult.data;
 
   const vendorDataToUpdate = {
@@ -243,7 +254,8 @@ const updateVendor = asyncHandler(async (req, res, next) => {
     pincode,
     mobile,
     alternateMobile,
-    email
+    email,
+    isDairySupplier
   };
 
   const existingVendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
