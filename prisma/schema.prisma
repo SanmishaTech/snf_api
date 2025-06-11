@@ -13,8 +13,9 @@ model User {
   email             String        @unique
   password          String
   role              Role
-  mobile            Int?
+  mobile            String?
   active            Boolean       @default(true)
+  joiningDate       DateTime?
   lastLogin         DateTime?
   resetToken        String?
   resetTokenExpires DateTime?
@@ -25,12 +26,21 @@ model User {
   receivedOrders    VendorOrder[] @relation("ReceivedBy")
   vendor            Vendor?
   member            Member?
+  depot             Depot?        @relation(fields: [depotId], references: [id])
+  depotId           Int?
 
   // Wallet / Transaction related fields
-  initiatedTransactions Transaction[] @relation("UserTransactions")         // Transactions initiated by this user (member)
+  initiatedTransactions Transaction[] @relation("UserTransactions") // Transactions initiated by this user (member)
   processedTransactions Transaction[] @relation("AdminProcessedTransactions") // Transactions processed by this user (admin)
 
-  // createdTransactions Transaction[] @relation("AdminTransactions") // This is replaced by the two new relations above
+  // Purchases relations
+  purchasesCreated Purchase[] @relation("PurchaseCreatedBy")
+  purchasesUpdated Purchase[] @relation("PurchaseUpdatedBy")
+
+  // Wastage relations
+  wastagesCreated Wastage[] @relation("WastageCreatedBy")
+  wastagesUpdated Wastage[] @relation("WastageUpdatedBy")
+
   @@map("users")
 }
 
@@ -45,64 +55,95 @@ model Vendor {
   mobile            String
   alternateMobile   String?       @map("alternate_mobile")
   email             String?       @unique
-  isDairySupplier Boolean       @default(false)
+  isDairySupplier   Boolean       @default(false)
   userId            Int           @unique
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   orders            VendorOrder[]
+  purchases         Purchase[]
+  wastages          Wastage[]
   user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("vendors")
 }
 
 model Agency {
-  id                Int         @id @default(autoincrement())
+  id                Int            @id @default(autoincrement())
   name              String
-  contactPersonName String?     @map("contact_person_name")
+  contactPersonName String?        @map("contact_person_name")
   mobile            String
   address1          String
   address2          String?
   city              String
   pincode           Int
-  alternateMobile   String?     @map("alternate_mobile")
-  email             String?     @unique
-  userId            Int         @unique
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alternateMobile   String?        @map("alternate_mobile")
+  email             String?        @unique
+  userId            Int            @unique
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
-  subscriptions Subscription[]
+  subscriptions     Subscription[]
 
   @@map("agencies")
 }
 
 model Product {
-  id                Int         @id @default(autoincrement())
-  name              String
-  url               String?
-  attachmentUrl     String?
-  price             Float
-  rate              Float
-  deliveredQuantity Int?
-  description       String?     @db.Text // New field for product description
-  unit              String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  orderItems        OrderItem[]
-  subscriptions Subscription[]
+  id                      Int                     @id @default(autoincrement())
+  name                    String
+  url                     String?
+  attachmentUrl           String?
+  price                   Float
+  rate                    Float
+  deliveredQuantity       Int?
+  description             String?                 @db.Text // New field for product description
+  unit                    String?
+  isDairyProduct          Boolean                 @default(false)
+  categoryId              Int?
+  category                Category?               @relation(fields: [categoryId], references: [id])
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  orderItems              OrderItem[]
+  subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
+  variants                ProductVariant[]
+  variantStocks           VariantStock[]
+  purchaseDetails         PurchaseDetail[]
+  stockLedgers            StockLedger[]
+  wastageDetails          WastageDetail[]
 
   @@map("products")
 }
 
+model ProductVariant {
+  id              Int              @id @default(autoincrement())
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId       Int
+  hsnCode         String?
+  mrp             Decimal          @db.Decimal(10, 2)
+  sellingPrice    Decimal          @db.Decimal(10, 2)
+  name            String
+  purchasePrice   Decimal          @db.Decimal(10, 2)
+  gstRate         Decimal          @db.Decimal(5, 2)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  variantStocks   VariantStock[]
+  purchaseDetails PurchaseDetail[]
+  stockLedgers    StockLedger[]
+  wastageDetails  WastageDetail[]
+
+  @@index([productId])
+}
+
 model Category {
-  id             Int      @id @default(autoincrement())
-  name           String   @unique
-  isPerishable   Boolean  @default(false)
-  isDairy        Boolean  @default(false)
-  imageUrl       String?  // Optional: URL or path to the category image
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  isPerishable Boolean   @default(false)
+  isDairy      Boolean   @default(false)
+  imageUrl     String? // Optional: URL or path to the category image
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  products     Product[]
 
   @@map("categories")
 }
@@ -156,22 +197,23 @@ model OrderItem {
 }
 
 model Member {
-  id        Int      @id @default(autoincrement())
-  name      String
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  addresses DeliveryAddress[]
-  subscriptions Subscription[]
+  id                      Int                     @id @default(autoincrement())
+  name                    String
+  userId                  Int                     @unique
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  addresses               DeliveryAddress[]
+  subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
-  wallet    Wallet? // Relation to Wallet
+  wallet Wallet? // Relation to Wallet
+
   @@map("members")
 }
 
 model Banner {
-  id          String   @id @default(cuid())
+  id          Int      @id @default(autoincrement())
   caption     String?
   description String?
   imagePath   String
@@ -181,21 +223,29 @@ model Banner {
 }
 
 model Depot {
-  id            String   @id @default(cuid())
-  name          String   @unique
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
   address       String
   contactPerson String?
   contactNumber String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   areas         AreaMaster[] // Relation to AreaMaster
+  members       User[]
+  variantStocks VariantStock[]
+  purchases     Purchase[]
+  stockLedgers  StockLedger[]
+  wastages      Wastage[]
+
+  @@map("depots")
 }
 
 enum Role {
-  VENDOR
-  AGENCY
   ADMIN
+  AGENCY
   MEMBER
+  VENDOR
+  DepotAdmin
 }
 
 enum OrderStatus {
@@ -205,26 +255,26 @@ enum OrderStatus {
 }
 
 model DeliveryAddress {
-  id            Int      @id @default(autoincrement())
-  memberId      Int
-  recipientName String
-  mobile        String
-  plotBuilding  String
-  streetArea    String
-  landmark      String?
-  pincode       String
-  city          String
-  state         String
-  label         String?
-  isDefault     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  subscriptions Subscription[]
+  id                      Int                     @id @default(autoincrement())
+  memberId                Int
+  recipientName           String
+  mobile                  String
+  plotBuilding            String
+  streetArea              String
+  landmark                String?
+  pincode                 String
+  city                    String
+  state                   String
+  label                   String?
+  isDefault               Boolean                 @default(false)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  member                  Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
-  @@map("delivery_addresses")
   @@index([memberId], map: "delivery_addresses_memberId_fkey")
+  @@map("delivery_addresses")
 }
 
 // Enums for Subscriptions
@@ -239,18 +289,18 @@ enum DeliveryType {
   Courier
 }
 
- model AreaMaster {
-  id           Int      @id @default(autoincrement())
+model AreaMaster {
+  id           Int          @id @default(autoincrement())
   name         String
-  pincodes     String @db.LongText // Comma-separated string of pincodes. Explicitly LongText for MySQL.
+  pincodes     String       @db.LongText // Comma-separated string of pincodes. Explicitly LongText for MySQL.
   deliveryType DeliveryType
-  depotId      String?  // Foreign key to Depot
-  depot        Depot?   @relation(fields: [depotId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  depotId      Int? // Foreign key to Depot
+  depot        Depot?       @relation(fields: [depotId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  @@map("area_masters")
   @@index([depotId])
+  @@map("area_masters")
 }
 
 enum PaymentMode {
@@ -267,72 +317,71 @@ enum PaymentStatus {
 }
 
 enum DeliveryStatus {
-  PENDING           // Default for future deliveries, or for today if not yet actioned
-  DELIVERED         // Successfully delivered
-  NOT_DELIVERED     // Attempted delivery but failed (e.g., customer not home, address issue)
-  CANCELLED         // Delivery cancelled (e.g., due to product unavailability, or part of subscription cancellation)
-  SKIPPED           // Skipped by the member
- }
+  PENDING // Default for future deliveries, or for today if not yet actioned
+  DELIVERED // Successfully delivered
+  NOT_DELIVERED // Attempted delivery but failed (e.g., customer not home, address issue)
+  CANCELLED // Delivery cancelled (e.g., due to product unavailability, or part of subscription cancellation)
+  SKIPPED // Skipped by the member
+}
 
 model DeliveryScheduleEntry {
-  id                Int         @id @default(autoincrement())
-  subscription      Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
-  subscriptionId    Int            // Changed to Int
-  member            Member         @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
-  memberId          Int            // Changed to Int
+  id                Int             @id @default(autoincrement())
+  subscription      Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
+  subscriptionId    Int // Changed to Int
+  member            Member          @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
+  memberId          Int // Changed to Int
   deliveryAddress   DeliveryAddress @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
-  deliveryAddressId Int            // Changed to Int
-  product           Product        @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
+  deliveryAddressId Int // Changed to Int
+  product           Product         @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
   productId         Int
-  deliveryDate      DateTime       @db.Date
-  quantity          Int            @default(1) // Quantity for this specific delivery, default to 1
-  status            DeliveryStatus @default(PENDING)
+  deliveryDate      DateTime        @db.Date
+  quantity          Int             @default(1) // Quantity for this specific delivery, default to 1
+  status            DeliveryStatus  @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("delivery_schedule")
   @@index([subscriptionId])
   @@index([memberId])
   @@index([deliveryAddressId])
   @@index([productId])
   @@index([deliveryDate])
+  @@map("delivery_schedule")
 }
 
 // Model for Subscriptions
 model Subscription {
-  id                  Int                @id @default(autoincrement())
-  memberId            Int
-  deliveryAddressId   Int
-  productId           Int
-  startDate           DateTime           @default(now()) // Date when the subscription effectively starts
-  period              Int
-  expiryDate          DateTime
-  deliverySchedule    DeliverySchedule
-  weekdays            String?            // To store JSON array of weekdays, e.g., ["MONDAY", "TUESDAY"] if schedule is WEEKDAYS
-  qty                 Int
-  altQty              Int?               // Optional: for alternate day deliveries if different quantity
-  rate                Float              // Per unit price at the time of subscription
-  totalQty            Int                // Calculated by application logic
-  amount              Float              // Calculated by application logic: rate * totalQty
+  id                Int              @id @default(autoincrement())
+  memberId          Int
+  deliveryAddressId Int
+  productId         Int
+  startDate         DateTime         @default(now()) // Date when the subscription effectively starts
+  period            Int
+  expiryDate        DateTime
+  deliverySchedule  DeliverySchedule
+  weekdays          String? // To store JSON array of weekdays, e.g., ["MONDAY", "TUESDAY"] if schedule is WEEKDAYS
+  qty               Int
+  altQty            Int? // Optional: for alternate day deliveries if different quantity
+  rate              Float // Per unit price at the time of subscription
+  totalQty          Int // Calculated by application logic
+  amount            Float // Calculated by application logic: rate * totalQty
 
- 
-  walletamt           Float              @default(0)
-  payableamt          Float              @default(0)
-  receivedamt         Float              @default(0)
- 
-  paymentMode         PaymentMode?
-  paymentReferenceNo  String?
-  paymentDate         DateTime?
-  paymentStatus       PaymentStatus      @default(PENDING)
-  agencyId            Int?               // Optional: if subscription is linked to a specific agency for fulfillment
-  createdAt           DateTime           @default(now()) // Date when the record was created
-  updatedAt           DateTime           @updatedAt
+  walletamt   Float @default(0)
+  payableamt  Float @default(0)
+  receivedamt Float @default(0)
 
-  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  deliveryAddress   DeliveryAddress   @relation(fields: [deliveryAddressId], references: [id], onDelete: Restrict)
-  product           Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
-  agency            Agency?           @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  paymentMode        PaymentMode?
+  paymentReferenceNo String?
+  paymentDate        DateTime?
+  paymentStatus      PaymentStatus @default(PENDING)
+  agencyId           Int? // Optional: if subscription is linked to a specific agency for fulfillment
+  createdAt          DateTime      @default(now()) // Date when the record was created
+  updatedAt          DateTime      @updatedAt
+
+  member                  Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  deliveryAddress         DeliveryAddress         @relation(fields: [deliveryAddressId], references: [id], onDelete: Restrict)
+  product                 Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  agency                  Agency?                 @relation(fields: [agencyId], references: [id], onDelete: SetNull)
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
   @@index([memberId])
@@ -369,28 +418,157 @@ model Wallet {
 }
 
 model Transaction {
-  id                 Int               @id @default(autoincrement())
-  userId             Int?              // ID of the User (member) initiating the transaction. Made optional.
-  amount             Float
-  status             TransactionStatus @default(PENDING)
-  type               TransactionType   // e.g., CREDIT for top-up, DEBIT for withdrawal
-  walletId           Int?              // Foreign key to Wallet, set upon approval. Made optional.
+  id       Int               @id @default(autoincrement())
+  userId   Int? // ID of the User (member) initiating the transaction. Made optional.
+  amount   Float
+  status   TransactionStatus @default(PENDING)
+  type     TransactionType // e.g., CREDIT for top-up, DEBIT for withdrawal
+  walletId Int? // Foreign key to Wallet, set upon approval. Made optional.
 
   // Optional details from original model, can be kept
-  paymentMethod      String?           // e.g., "Cash", "Bank Transfer", "UPI"
-  referenceNumber    String?           // e.g., Cheque number, UPI transaction ID
-  notes              String?           @db.Text
+  paymentMethod   String? // e.g., "Cash", "Bank Transfer", "UPI"
+  referenceNumber String? // e.g., Cheque number, UPI transaction ID
+  notes           String? @db.Text
 
-  processedByAdminId Int?              // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  processedByAdminId Int? // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  user               User?             @relation("UserTransactions", fields: [userId], references: [id]) // Relation to User is now optional
-  wallet             Wallet?           @relation(fields: [walletId], references: [id], onDelete: Cascade) // Relation is now optional
-  processedByAdmin   User?             @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id]) // Renamed relation
+  user             User?   @relation("UserTransactions", fields: [userId], references: [id]) // Relation to User is now optional
+  wallet           Wallet? @relation(fields: [walletId], references: [id], onDelete: Cascade) // Relation is now optional
+  processedByAdmin User?   @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id]) // Renamed relation
 
-  @@index([userId])                  // Index on optional field
-  @@index([walletId])                // Existing index, field is now optional
-  @@index([processedByAdminId])      // Index for renamed field
+  @@index([userId]) // Index on optional field
+  @@index([walletId]) // Existing index, field is now optional
+  @@index([processedByAdminId]) // Index for renamed field
   @@map("transactions")
+}
+
+// Variant Stock model for tracking stock per variant per depot
+model VariantStock {
+  id         Int    @id @default(autoincrement())
+  productId  Int
+  variantId  Int
+  depotId    Int
+  closingQty String
+
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  depot   Depot          @relation(fields: [depotId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([variantId])
+  @@index([depotId])
+}
+
+model Purchase {
+  id           Int       @id @default(autoincrement())
+  purchaseNo   String    @unique // Auto–generated reference e.g., 2526-00001
+  purchaseDate DateTime  @db.Date
+  invoiceNo    String?
+  invoiceDate  DateTime? @db.Date
+  vendorId     Int
+  depotId      Int?
+  createdById  Int?
+  updatedById  Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  vendor    Vendor @relation(fields: [vendorId], references: [id])
+  depot     Depot? @relation(fields: [depotId], references: [id])
+  createdBy User?  @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  updatedBy User?  @relation("PurchaseUpdatedBy", fields: [updatedById], references: [id])
+
+  details PurchaseDetail[]
+
+  @@index([vendorId])
+  @@index([depotId])
+}
+
+model PurchaseDetail {
+  id           Int      @id @default(autoincrement())
+  purchaseId   Int
+  productId    Int
+  variantId    Int
+  quantity     Int
+  purchaseRate Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  purchase Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product        @relation(fields: [productId], references: [id])
+  variant  ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model Wastage {
+  id          Int       @id @default(autoincrement())
+  wastageNo   String    @unique
+  wastageDate DateTime
+  invoiceNo   String?
+  invoiceDate DateTime? @db.Date
+  vendorId    Int?
+  depotId     Int?
+  depot       Depot?    @relation(fields: [depotId], references: [id])
+  vendor      Vendor?   @relation(fields: [vendorId], references: [id])
+  createdById Int?
+  updatedById Int?
+  createdBy   User?     @relation("WastageCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User?     @relation("WastageUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  details WastageDetail[]
+
+  @@index([vendorId])
+  @@index([depotId])
+  @@map("wastages")
+}
+
+model WastageDetail {
+  id        Int     @id @default(autoincrement())
+  wastageId Int
+  wastage   Wastage @relation(fields: [wastageId], references: [id])
+
+  productId Int
+  product   Product        @relation(fields: [productId], references: [id])
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  quantity Int
+
+  @@map("wastage_details")
+}
+
+// Ledger to record every stock movement per variant per depot
+model StockLedger {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  variantId       Int
+  depotId         Int
+  transactionDate DateTime @db.Date
+  receivedQty     Int      @default(0)
+  issuedQty       Int      @default(0)
+  module          String // Source module e.g. "purchase", "sale"
+  foreignKey      Int // Reference record id from the source module
+
+  // Relations
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  depot   Depot          @relation(fields: [depotId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([variantId])
+  @@index([depotId])
 }

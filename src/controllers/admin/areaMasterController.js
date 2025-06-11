@@ -8,7 +8,7 @@ const { DeliveryType } = require('@prisma/client'); // Import DeliveryType enum
  * @access  Private/Admin
  */
 const createAreaMaster = asyncHandler(async (req, res) => {
-  const { name, pincodes, depotId, deliveryType } = req.body; // depotId is now a string CUID
+  const { name, pincodes, depotId, deliveryType } = req.body;
 
   if (!name || !pincodes || !deliveryType) {
     res.status(400);
@@ -20,13 +20,25 @@ const createAreaMaster = asyncHandler(async (req, res) => {
     throw new Error(`Invalid deliveryType. Must be one of: ${Object.values(DeliveryType).join(', ')}`);
   }
 
+  const data = {
+    name,
+    pincodes,
+    deliveryType,
+  };
+
+  if (depotId) {
+    const parsedDepotId = parseInt(depotId, 10);
+    if (isNaN(parsedDepotId)) {
+      res.status(400);
+      throw new Error('Invalid Depot ID. Must be an integer.');
+    }
+    data.depotId = parsedDepotId;
+  } else {
+    data.depotId = null;
+  }
+
   const areaMaster = await prisma.areaMaster.create({
-    data: {
-      name,
-      pincodes, // Stored as a comma-separated string
-      depotId: depotId || null, // Pass string depotId directly, or null if empty/not provided
-      deliveryType,
-    },
+    data,
   });
 
   res.status(201).json(areaMaster);
@@ -139,15 +151,29 @@ const updateAreaMaster = asyncHandler(async (req, res) => {
     throw new Error(`Invalid deliveryType. Must be one of: ${Object.values(DeliveryType).join(', ')}`);
   }
 
+  const dataToUpdate = {};
+
+  if (name !== undefined) dataToUpdate.name = name;
+  if (pincodes !== undefined) dataToUpdate.pincodes = pincodes;
+  if (deliveryType !== undefined) dataToUpdate.deliveryType = deliveryType;
+
+  if (depotId !== undefined) {
+    if (depotId === null || depotId === '') {
+      dataToUpdate.depotId = null;
+    } else {
+      const parsedDepotId = parseInt(depotId, 10);
+      if (isNaN(parsedDepotId)) {
+        res.status(400);
+        throw new Error('Invalid Depot ID. Must be an integer.');
+      }
+      dataToUpdate.depotId = parsedDepotId;
+    }
+  }
+
   try {
     const updatedAreaMaster = await prisma.areaMaster.update({
       where: { id: parseInt(id) },
-      data: {
-        name,
-        pincodes,
-        depotId: depotId !== undefined ? (depotId || null) : undefined, // Pass string depotId or null, or undefined if not updating
-        deliveryType,
-      },
+      data: dataToUpdate,
     });
     res.status(200).json(updatedAreaMaster);
   } catch (error) {

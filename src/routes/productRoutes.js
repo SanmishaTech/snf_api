@@ -107,6 +107,7 @@ const {
   updateProduct,
   deleteProduct,
   getPublicProducts, // Import the new controller function
+  bulkUpdateVariants,
 } = require('../controllers/productController');
 const authMiddleware = require('../middleware/auth'); // Assuming auth middleware is in the same location
 const aclMiddleware = require('../middleware/acl');   // Assuming acl middleware is in the same location
@@ -404,5 +405,71 @@ router.put('/:id', authMiddleware, productUploadMiddleware, updateProduct);
  *         description: Internal server error.
  */
 router.delete('/:id', authMiddleware, deleteProduct);
+
+// POST /api/products/:productId/variants/bulk - Bulk update variants for a product
+/**
+ * @swagger
+ * /products/{productId}/variants/bulk:
+ *   post:
+ *     summary: Bulk create, update, or delete variants for a product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the product whose variants are being updated.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               variants:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: The ID of the variant if it exists. Omit for new variants.
+ *                     hsnCode:
+ *                       type: string
+ *                     mrp:
+ *                       type: number
+ *                     sellingPrice:
+ *                       type: number
+ *                     purchasePrice:
+ *                       type: number
+ *                     gstRate:
+ *                       type: number
+ *                     productCategory:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Variants updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Bulk update completed successfully."
+ *       400:
+ *         description: Bad request (e.g., invalid product ID, missing variants data).
+ *       401:
+ *         description: Unauthorized.
+ *       404:
+ *         description: Product not found.
+ *       500:
+ *         description: Internal server error.
+ */
+router.post('/:productId/variants/bulk', authMiddleware, bulkUpdateVariants);
 
 module.exports = router;

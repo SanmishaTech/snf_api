@@ -15,6 +15,11 @@ const productSchema = z.object({
   rate: z.string().min(1, { message: 'Rate is required' }), // Added rate
   unit: z.string().optional().nullable(), // Added unit field
   description: z.string().optional().nullable(), // Added description field
+  isDairyProduct: z.string().optional().transform(val => val === 'true'), // Added isDairyProduct
+  categoryId: z.preprocess(
+    (val) => (val ? parseInt(String(val), 10) : null),
+    z.number().int().positive().nullable().optional()
+  ), // Changed to categoryId
 });
 
 /**
@@ -64,16 +69,18 @@ const createProduct = asyncHandler(async (req, res, next) => {
       console.log('[ProductController:createProduct] No new file uploaded for productAttachment.');
     }
 
-    const { name, url, price, unit, rate, description } = validationResult.data; 
+    const { name, url, price, unit, rate, description, isDairyProduct, categoryId } = validationResult.data;
 
     const productData = {
       name,
       url,
-      attachmentUrl, 
+      attachmentUrl,
       price: parseFloat(price),
-      unit, 
-      rate: parseFloat(rate), 
-      description, // Added description
+      unit,
+      rate: parseFloat(rate),
+      description, 
+      isDairyProduct,
+      categoryId,
     };
 
     console.log('[ProductController:createProduct] Attempting to create product with data:', productData);
@@ -146,6 +153,9 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
       orderBy: {
         [orderByField]: orderByDirection,
       },
+      include: {
+        category: true, // Include category data
+      },
     });
 
     const totalRecords = await prisma.product.count({
@@ -207,6 +217,10 @@ const getProductById = asyncHandler(async (req, res, next) => {
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
+    include: {
+      variants: true, // Include related variants
+      category: true, // Also include the category information
+    },
   });
 
   if (!product) {
@@ -223,7 +237,7 @@ const getProductById = asyncHandler(async (req, res, next) => {
  */
 const updateProduct = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  console.log(`[ProductController:updateProduct ${id}] Reached. Body:`, req.body, 'Files:', req.files, 'FileUUIDs:', req.fileUUID, 'UploadErrors:', req.uploadErrors);
+  console.log(`[ProductController:updateProduct ${id}] Reached. Body:`, req.body, 'Files:', req.files);
 
   const productId = parseInt(id, 10);
   if (isNaN(productId)) {
@@ -231,65 +245,66 @@ const updateProduct = asyncHandler(async (req, res, next) => {
     return next(createError(400, 'Invalid product ID format'));
   }
 
-  const validationResult = validateRequest(productSchema, req.body, res)
-  if(validationResult.errors){
-    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
-    return res.status(401).send(validationResult)
-  }
-  
-  // Check for upload errors from middleware
-  if (req.uploadErrors && Object.keys(req.uploadErrors).length > 0) {
-    if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
-    return res.status(400).json({ message: 'File upload error.', errors: req.uploadErrors });
-  }
-
-  const { name, url, price, unit, rate, description } = req.body; // Added description
-  const dataToUpdate = {
-    name,
-    url,
-    price: parseFloat(price),
-    unit,
-    rate: parseFloat(rate),
-    description, // Added description
-  };
-
-  if (req.files && req.files.productAttachment && req.files.productAttachment[0]) {
-    const file = req.files.productAttachment[0];
-    const fileUUID = req.fileUUID && req.fileUUID.productAttachment;
-    if (fileUUID) {
-      // TODO: Consider deleting old attachment if a new one is uploaded
-      dataToUpdate.attachmentUrl = `/uploads/products/productAttachment/${fileUUID}/${file.filename}`;
-    } else {
-        // This case should ideally not happen if middleware ran correctly and file is present
-        console.warn('File uploaded but UUID missing for productAttachment');
-    }
-  } else if (req.body.attachmentUrl === '' || req.body.attachmentUrl === null) {
-    // If attachmentUrl is explicitly set to empty or null in the form (not a file upload field)
-    // This allows removing an existing attachment without uploading a new one.
-    // This part might need adjustment based on how frontend handles 'remove attachment'.
-    // For now, we assume if no new file, existing attachmentUrl is unchanged unless explicitly cleared.
-    // If you add a 'remove attachment' checkbox or similar, handle it here.
-    // dataToUpdate.attachmentUrl = null; // Example: if a checkbox `removeAttachment` is true
-  }
-
   try {
+    const validationResult = productSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: validationResult.error.flatten().fieldErrors,
+      });
+    }
+
+    if (req.uploadErrors && Object.keys(req.uploadErrors).length > 0) {
+      return res.status(400).json({
+        message: "File upload error",
+        errors: req.uploadErrors,
+      });
+    }
+
+    const { name, url, price, unit, rate, description, isDairyProduct, categoryId } = validationResult.data;
+
+    const updateData = {
+      name,
+      url,
+      price: parseFloat(price),
+      unit,
+      rate: parseFloat(rate),
+      description,
+      isDairyProduct,
+      categoryId,
+    };
+
+    console.log(`[ProductController:updateProduct ${id}] Attempting to update product with data:`, updateData);
+
+    if (req.files && req.files.productAttachment && req.files.productAttachment[0]) {
+      const file = req.files.productAttachment[0];
+      const fileUUID = req.fileUUID && req.fileUUID.productAttachment;
+      if (fileUUID) {
+        updateData.attachmentUrl = `/uploads/products/productAttachment/${fileUUID}/${file.filename}`;
+      }
+    } else if (req.body.attachmentUrl === '') {
+      // This indicates a request to remove the attachment
+      updateData.attachmentUrl = null;
+    }
+
     const existingProduct = await prisma.product.findUnique({ where: { id: productId } });
     if (!existingProduct) {
       if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
-      return next(createError(404, `Product with ID ${productId} not found`));
+      return next(createError(404, `Product not found`));
     }
 
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
-      data: dataToUpdate,
+      data: updateData,
     });
+
     res.status(200).json(updatedProduct);
   } catch (error) {
-    console.error('Error updating product:', error);
+    console.error(`[ProductController:updateProduct ${id}] Error:`, error);
     if (typeof req.cleanupUpload === 'function') await req.cleanupUpload();
-    // Handle potential Prisma errors like P2025 (Record to update not found)
     if (error.code === 'P2025') {
-        return next(createError(404, `Product with ID ${productId} not found during update.`));
+      return next(createError(404, `Product not found during update.`));
     }
     next(createError(500, 'Failed to update product.'));
   }
@@ -338,6 +353,83 @@ const deleteProduct = asyncHandler(async (req, res, next) => {
   }
 });
 
+// Controller to handle bulk update of product variants
+const bulkUpdateVariants = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  const { variants } = req.body; // Expect an array of variant objects
+
+  if (!variants) {
+    return res.status(400).json({ message: 'Variants data is required.' });
+  }
+
+  const productIdInt = parseInt(productId, 10);
+  if (isNaN(productIdInt)) {
+    return res.status(400).json({ message: 'Invalid Product ID.' });
+  }
+
+  // Use a transaction to ensure atomicity
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    // Get existing variants from the database for this product
+    const existingVariants = await tx.productVariant.findMany({
+      where: { productId: productIdInt },
+    });
+
+    const existingVariantIds = existingVariants.map(v => v.id);
+    const incomingVariantIds = variants.map(v => v.id).filter(id => id != null);
+
+    // 1. Identify variants to delete
+    const variantsToDelete = existingVariantIds.filter(id => !incomingVariantIds.includes(id));
+    if (variantsToDelete.length > 0) {
+      await tx.productVariant.deleteMany({
+        where: { id: { in: variantsToDelete } },
+      });
+    }
+
+    // 2. Identify variants to update and create
+    const variantsToUpdate = variants.filter(v => v.id != null && existingVariantIds.includes(v.id));
+    const variantsToCreate = variants.filter(v => v.id == null);
+
+    // 3. Perform update operations
+    for (const variantData of variantsToUpdate) {
+      await tx.productVariant.update({
+        where: { id: variantData.id },
+        data: {
+          name: variantData.name,
+          hsnCode: variantData.hsnCode,
+          mrp: variantData.mrp,
+          sellingPrice: variantData.sellingPrice,
+          purchasePrice: variantData.purchasePrice,
+          gstRate: variantData.gstRate,
+        },
+      });
+    }
+
+    // 4. Perform create operations
+    if (variantsToCreate.length > 0) {
+      await tx.productVariant.createMany({
+        data: variantsToCreate.map(variantData => ({
+          productId: productIdInt,
+          name: variantData.name,
+          hsnCode: variantData.hsnCode,
+          mrp: variantData.mrp,
+          sellingPrice: variantData.sellingPrice,
+          purchasePrice: variantData.purchasePrice,
+          gstRate: variantData.gstRate,
+          hsnCode: variantData.hsnCode,
+          mrp: variantData.mrp,
+          sellingPrice: variantData.sellingPrice,
+          purchasePrice: variantData.purchasePrice,
+          gstRate: variantData.gstRate,
+        })),
+      });
+    }
+
+    return { message: 'Variants updated successfully.' };
+  });
+
+  res.status(200).json(transactionResult);
+});
+
 module.exports = {
   createProduct,
   getAllProducts,
@@ -345,4 +437,6 @@ module.exports = {
   getProductById,
   updateProduct,
   deleteProduct,
+  bulkUpdateVariants,
 };
+

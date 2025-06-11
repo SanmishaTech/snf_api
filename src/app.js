@@ -12,8 +12,11 @@ const authRoutes = require("./routes/auth");
 const vendorRoutes = require("./routes/vendorRoutes");
 const agencyRoutes = require("./routes/agencyRoutes");
 const productRoutes = require("./routes/productRoutes");
+const productVariantRoutes = require("./routes/productVariantRoutes");
 const swaggerRouter = require("./swagger");
 const vendorOrderRoutes = require("./routes/vendorOrderRoutes");
+const purchaseRoutes = require("./routes/purchaseRoutes");
+const wastageRoutes = require("./routes/wastageRoutes");
 const userRoutes = require("./routes/users");
 const deliveryAddressRoutes = require("./routes/deliveryAddressRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
@@ -22,6 +25,10 @@ const adminWalletRoutes = require("./routes/admin/wallets");
 const adminMembersRouter = require("./routes/admin/members"); // Added for admin members route
 const deliveryScheduleRoutes = require("./routes/deliveryScheduleRoutes");
 const memberwalletRoutes = require("./routes/wallet");
+const teamRoutes = require("./routes/teamRoutes");
+const variantStockRoutes = require("./routes/variantStockRoutes");
+const depotRoutes = require("./routes/depotRoutes");
+const stockLedgerRoutes = require("./routes/stockLedgerRoutes");
 
 const app = express();
 
@@ -39,7 +46,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://13.126.180.52"];
+  : ["http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -74,7 +81,10 @@ app.use("/api/users", userRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/product-variants", productVariantRoutes);
 app.use("/api/vendor-orders", vendorOrderRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/wastages", wastageRoutes);
 app.use("/api/delivery-addresses", deliveryAddressRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/admin", adminRoutes); // Added for admin routes
@@ -82,6 +92,10 @@ app.use("/api/admin/wallets", adminWalletRoutes);
 app.use("/api/admin/members", adminMembersRouter); // Added for admin members route
 app.use("/api/delivery-schedules", deliveryScheduleRoutes);
 app.use("/api/wallet", memberwalletRoutes);
+app.use("/api/teams", teamRoutes);
+app.use("/api/variant-stocks", variantStockRoutes);
+app.use("/api/depots", depotRoutes);
+app.use("/api/stock-ledgers", stockLedgerRoutes);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {

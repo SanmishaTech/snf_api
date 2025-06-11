@@ -47,6 +47,7 @@ async function main() {
       role: "ADMIN",
       active: true,
       lastLogin: new Date(),
+      joiningDate: new Date(),
     },
   });
 

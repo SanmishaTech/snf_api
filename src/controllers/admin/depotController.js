@@ -1,87 +1,80 @@
+const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// Zod schema for depot creation and update
+const depotSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255),
+  address: z.string().min(1, 'Address is required'),
+  contactPerson: z.string().max(255).optional().nullable(),
+  contactNumber: z.string().max(20).optional().nullable(),
+});
+
 // Create a new Depot
-exports.createDepot = async (req, res) => {
-    const { name, address, contactPerson, contactNumber } = req.body;
-    try {
-        if (!name || !address) {
-            return res.status(400).json({ error: 'Name and Address are required fields.' });
-        }
+exports.createDepot = async (req, res, next) => {
+  try {
+    const validatedData = await depotSchema.parseAsync(req.body);
 
-        const existingDepot = await prisma.depot.findUnique({
-            where: { name },
-        });
+    const existingDepot = await prisma.depot.findUnique({
+      where: { name: validatedData.name },
+    });
 
-        if (existingDepot) {
-            return res.status(400).json({ error: 'A depot with this name already exists.' });
-        }
-
-        const newDepot = await prisma.depot.create({
-            data: {
-                name,
-                address,
-                contactPerson,
-                contactNumber,
-            },
-        });
-        res.status(201).json(newDepot);
-    } catch (error) {
-        console.error('Error creating depot:', error);
-        res.status(500).json({ error: 'Failed to create depot', details: error.message });
+    if (existingDepot) {
+      return res.status(409).json({ error: 'A depot with this name already exists.' });
     }
+
+    const newDepot = await prisma.depot.create({
+      data: validatedData,
+    });
+    res.status(201).json(newDepot);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.errors });
+    }
+    next(error);
+  }
 };
 
-// Get all Depots with pagination, search, and sort
-exports.getAllDepots = async (req, res) => {
+// Get all Depots
+exports.getAllDepots = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const search = req.query.search || "";
-    const sortBy = req.query.sortBy || 'name'; // Default sort by name
+    const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder === 'desc' ? 'desc' : 'asc';
 
-    const whereClause = {
-        AND: search ? [
-            {
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' } },
-                    { address: { contains: search, mode: 'insensitive' } },
-                ],
-            },
-        ] : [],
-    };
+    const whereClause = search ? {
+        OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { address: { contains: search, mode: 'insensitive' } },
+        ],
+    } : {};
 
     try {
-        const depots = await prisma.depot.findMany({
-            where: whereClause,
-            skip: skip,
-            take: limit,
-            orderBy: {
-                [sortBy]: sortOrder,
-            },
-        });
-
-        const totalRecords = await prisma.depot.count({
-            where: whereClause,
-        });
-
-        const totalPages = Math.ceil(totalRecords / limit);
+        const [depots, totalRecords] = await prisma.$transaction([
+            prisma.depot.findMany({
+                where: whereClause,
+                skip,
+                take: limit,
+                orderBy: { [sortBy]: sortOrder },
+            }),
+            prisma.depot.count({ where: whereClause }),
+        ]);
 
         res.status(200).json({
             depots,
             page,
-            totalPages,
+            totalPages: Math.ceil(totalRecords / limit),
             totalRecords,
         });
     } catch (error) {
-        console.error('Error fetching depots:', error);
-        res.status(500).json({ error: 'Failed to fetch depots', details: error.message });
+        next(error);
     }
 };
 
-// Get all Depots for a list (ID and Name only)
-exports.getAllDepotsList = async (req, res) => {
+// Get all Depots for a list
+exports.getAllDepotsList = async (req, res, next) => {
     try {
         const depots = await prisma.depot.findMany({
             select: {
@@ -94,83 +87,70 @@ exports.getAllDepotsList = async (req, res) => {
         });
         res.status(200).json(depots);
     } catch (error) {
-        console.error('Error fetching depots list:', error);
-        res.status(500).json({ error: 'Failed to fetch depots list', details: error.message });
+        next(error);
     }
 };
 
 // Get a single Depot by ID
-exports.getDepotById = async (req, res) => {
-    const { id } = req.params;
+exports.getDepotById = async (req, res, next) => {
     try {
         const depot = await prisma.depot.findUnique({
-            where: { id },
+            where: { id: parseInt(req.params.id) },
         });
         if (!depot) {
             return res.status(404).json({ error: 'Depot not found' });
         }
         res.status(200).json(depot);
     } catch (error) {
-        console.error(`Error fetching depot with ID ${id}:`, error);
-        res.status(500).json({ error: 'Failed to fetch depot', details: error.message });
+        next(error);
     }
 };
 
 // Update a Depot by ID
-exports.updateDepot = async (req, res) => {
+exports.updateDepot = async (req, res, next) => {
+  try {
     const { id } = req.params;
-    const { name, address, contactPerson, contactNumber } = req.body;
+    const validatedData = await depotSchema.parseAsync(req.body);
 
-    try {
-        if (!name || !address) {
-            return res.status(400).json({ error: 'Name and Address are required fields.' });
-        }
-
-        // Check if another depot with the new name already exists (if name is being changed)
-        if (name) {
-            const existingDepot = await prisma.depot.findFirst({
-                where: {
-                    name: name,
-                    id: { not: id }
-                }
-            });
-            if (existingDepot) {
-                return res.status(400).json({ error: 'Another depot with this name already exists.' });
-            }
-        }
-
-        const updatedDepot = await prisma.depot.update({
-            where: { id },
-            data: {
-                name,
-                address,
-                contactPerson,
-                contactNumber,
-            },
-        });
-        res.status(200).json(updatedDepot);
-    } catch (error) {
-        console.error(`Error updating depot with ID ${id}:`, error);
-        if (error.code === 'P2025') { // Prisma error code for record not found
-            return res.status(404).json({ error: 'Depot not found' });
-        }
-        res.status(500).json({ error: 'Failed to update depot', details: error.message });
+    if (validatedData.name) {
+      const existingDepot = await prisma.depot.findFirst({
+        where: {
+          name: validatedData.name,
+          id: { not: parseInt(id) },
+        },
+      });
+      if (existingDepot) {
+        return res.status(409).json({ error: 'Another depot with this name already exists.' });
+      }
     }
+
+    const updatedDepot = await prisma.depot.update({
+      where: { id: parseInt(id) },
+      data: validatedData,
+    });
+    res.status(200).json(updatedDepot);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.errors });
+    }
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Depot not found' });
+    }
+    next(error);
+  }
 };
 
 // Delete a Depot by ID
-exports.deleteDepot = async (req, res) => {
-    const { id } = req.params;
+exports.deleteDepot = async (req, res, next) => {
     try {
         await prisma.depot.delete({
-            where: { id },
+            where: { id: parseInt(req.params.id) },
         });
-        res.status(204).send(); // No content, successful deletion
+        res.status(204).send();
     } catch (error) {
-        console.error(`Error deleting depot with ID ${id}:`, error);
-        if (error.code === 'P2025') { // Prisma error code for record not found
+        if (error.code === 'P2025') {
             return res.status(404).json({ error: 'Depot not found' });
         }
-        res.status(500).json({ error: 'Failed to delete depot', details: error.message });
+        next(error);
     }
 };
