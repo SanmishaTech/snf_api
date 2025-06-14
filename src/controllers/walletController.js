@@ -1,5 +1,5 @@
 const asyncHandler = require('../middleware/asyncHandler');
-const { PrismaClient, TransactionType, TransactionStatus } = require('@prisma/client'); // Added TransactionType and TransactionStatus
+const { PrismaClient, TransactionType, TransactionStatus } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 /**
@@ -35,47 +35,16 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
     return res.status(404).json({ success: false, message: 'Member profile not found for the authenticated user.' });
   }
 
-  // 2. Find or create the Wallet for the Member.id
-  let wallet;
-  try {
-    console.log(`Looking for wallet for memberId: ${member.id}`);
-    wallet = await prisma.wallet.findUnique({
-      where: { memberId: member.id },
-    });
-    console.log('Wallet findUnique result:', wallet); // Log wallet find result
-  } catch (dbError) {
-    console.error('Error finding wallet:', dbError);
-    return res.status(500).json({ success: false, message: 'Error finding wallet data.'});
-  }
-
-
-  if (!wallet) {
-    console.log(`Wallet not found for memberId: ${member.id}. Creating new wallet.`);
-    try {
-      wallet = await prisma.wallet.create({
-        data: {
-          memberId: member.id,
-          balance: 0.0,
-          currency: 'INR', // Or your default currency
-        },
-      });
-      console.log('New wallet created:', wallet); // Log new wallet creation
-    } catch (dbError) {
-      console.error('Error creating wallet:', dbError);
-      return res.status(500).json({ success: false, message: 'Error creating wallet.'});
-    }
-  }
-
-  // 3. Find transactions for this wallet
+  // 2. Fetch PAID walletTransactions for this member
   let transactions;
   try {
-    transactions = await prisma.transaction.findMany({
-      where: { walletId: wallet.id, status: TransactionStatus.PAID },
+    transactions = await prisma.walletTransaction.findMany({
+      where: { memberId: member.id, status: TransactionStatus.PAID },
       orderBy: { createdAt: 'desc' },
     });
-    console.log(`Found ${transactions.length} PAID transactions for walletId: ${wallet.id}`);
+    console.log(`Found ${transactions.length} PAID transactions for memberId: ${member.id}`);
   } catch (dbError) {
-    console.error('Error fetching transactions:', dbError);
+    console.error('Error fetching wallet transactions:', dbError);
     return res.status(500).json({ success: false, message: 'Error fetching transactions.'});
   }
 
@@ -83,9 +52,8 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: {
-      walletId: wallet.id,
-      balance: wallet.balance,
-      currency: wallet.currency,
+      balance: member.walletBalance,
+      currency: 'INR',
       transactions: transactions.map(tx => ({
         id: tx.id,
         type: tx.type,
@@ -127,13 +95,12 @@ exports.createTopUpRequest = asyncHandler(async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Member profile not found for this user.' });
     }
 
-    const transaction = await prisma.transaction.create({
+    const transaction = await prisma.walletTransaction.create({
       data: {
-        userId: userId, // This is the User's ID
+        memberId: member.id,
         amount: parseFloat(amount),
         status: TransactionStatus.PENDING,
         type: TransactionType.CREDIT,
-        // walletId will be null until an admin approves and links it to the member's wallet
       },
     });
 
@@ -162,7 +129,7 @@ exports.getCurrentBalance = asyncHandler(async (req, res, next) => {
   try {
     const member = await prisma.member.findUnique({
       where: { userId: userId },
-      include: { wallet: true }, // Include the wallet details
+      select: { walletBalance: true },
     });
 
     if (!member) {
@@ -170,9 +137,8 @@ exports.getCurrentBalance = asyncHandler(async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Member profile not found.' });
     }
 
-    // If wallet doesn't exist, balance is 0. The wallet's balance should reflect only PAID transactions.
-    const balance = member.wallet ? member.wallet.balance : 0.0;
-    const currency = member.wallet ? member.wallet.currency : 'INR'; // Default currency
+    const balance = member.walletBalance;
+    const currency = 'INR'; // Default currency
 
     res.status(200).json({
       success: true,

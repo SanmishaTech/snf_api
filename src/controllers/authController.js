@@ -40,35 +40,44 @@ const register = async (req, res, next) => {
       email: z
         .string()
         .email("Email must be a valid email address.")
-        .nonempty("Email is required."),
+        .optional(),
       password: z
         .string()
         .min(6, "Password must be at least 6 characters long.")
         .nonempty("Password is required."),
       role: z.enum(["VENDOR", "AGENCY", "ADMIN", "MEMBER"]).optional(), // Added optional role
       agreedToPolicy: z.boolean().optional(), // Add agreedToPolicy to schema
-      mobile: z.preprocess((val) => {
-        if (typeof val === 'string' && val.trim() !== '') {
-          const num = parseInt(val, 10);
-          return isNaN(num) ? undefined : num;
-        }
-        if (typeof val === 'number') {
-          return val;
-        }
-        return undefined;
-      }, z.number().int().optional()), // Mobile is optional, ensure it's an integer
+      mobile: z
+        .string()
+        .regex(/^\d{10}$/ , "Mobile must be a 10 digit number.")
+        .optional(),
+    })
+    .refine((data) => data.email || data.mobile, {
+      message: "Either email or mobile number is required.",
+      path: ["email"],
     })
     .superRefine(async (data, ctx) => {
-      // Check if a user with the same email already exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email: data.email },
-      });
-
-      if (existingUser) {
-        ctx.addIssue({
-          path: ["email"],
-          message: `User with email ${data.email} already exists.`,
+      if (data.email) {
+        const existingUserByEmail = await prisma.user.findUnique({
+          where: { email: data.email },
         });
+        if (existingUserByEmail) {
+          ctx.addIssue({
+            path: ["email"],
+            message: `User with email ${data.email} already exists.`,
+          });
+        }
+      }
+      if (data.mobile) {
+        const existingUserByMobile = await prisma.user.findFirst({
+          where: { mobile: data.mobile },
+        });
+        if (existingUserByMobile) {
+          ctx.addIssue({
+            path: ["mobile"],
+            message: `User with mobile ${data.mobile} already exists.`,
+          });
+        }
       }
     });
 
@@ -100,19 +109,25 @@ const register = async (req, res, next) => {
 
     const userData = {
       name,
-      email,
       password: hashedPassword,
       role: resolvedUserRole, // Use the sanitized and validated role
-      ...(mobile !== undefined && { mobile }), // Add mobile if provided
+      ...(email && { email }),
+      ...(mobile && { mobile }),
     };
 
     // Check if user with this email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
-
     if (existingUser) {
       return res.status(409).json({ message: 'User with this email already exists' });
+    }
+    // Check if mobile number is already in use
+    if (mobile) {
+      const existingMobile = await prisma.user.findUnique({ where: { mobile } });
+      if (existingMobile) {
+        return res.status(409).json({ message: 'User with this mobile number already exists' });
+      }
     }
 
     // If the user is a member, create a related Member record
@@ -138,7 +153,7 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   console.log("[LOGIN_TRACE] Attempting login...");
   const schema = z.object({
-    email: z.string().email("Invalid Email format"),
+    identifier: z.string().nonempty("Email or phone is required"),
     password: z.string().nonempty("Password is required"),
   });
 
@@ -154,13 +169,15 @@ const login = async (req, res, next) => {
 
     // Access the actual validated data from the .data property
     // const validatedData = validationResult.data; 
-    const { email, password } = req.body; // Now email and password should be correctly destructured
+    const { identifier, password } = req.body; // Now email and password should be correctly destructured
 
-    console.log(`[LOGIN_TRACE] Attempting to fetch user: ${email}`);
-    const user = await prisma.user.findUnique({
-      where: { email },
-       
-    });
+    console.log(`[LOGIN_TRACE] Attempting to fetch user: ${identifier}`);
+    let user;
+    if (identifier.includes("@")) {
+      user = await prisma.user.findUnique({ where: { email: identifier } });
+    } else {
+      user = await prisma.user.findFirst({ where: { mobile: identifier } });
+    }
     console.log(`[LOGIN_TRACE] User fetched: ${user ? user.id : 'null'}`);
 
     if (!user) {

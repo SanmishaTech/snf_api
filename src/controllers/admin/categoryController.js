@@ -8,7 +8,7 @@ const prisma = require('../../config/db'); // Prisma Client
  */
 const createCategory = asyncHandler(async (req, res) => {
   // multer populates req.body with text fields and req.file with the uploaded file
-  const { name, isPerishable, isDairy } = req.body;
+  const { name, isDairy } = req.body;
   const imageFile = req.file; // Contains file info if uploaded
 
   // Log to see what we're getting
@@ -21,7 +21,6 @@ const createCategory = asyncHandler(async (req, res) => {
   }
 
   // Convert boolean fields (they come as strings from FormData)
-  const isPerishableBool = typeof isPerishable === 'string' ? isPerishable.toLowerCase() === 'true' : !!isPerishable;
   const isDairyBool = typeof isDairy === 'string' ? isDairy.toLowerCase() === 'true' : !!isDairy;
 
   // Placeholder for image URL - in a real app, save file and get URL
@@ -36,7 +35,6 @@ const createCategory = asyncHandler(async (req, res) => {
     const category = await prisma.category.create({
       data: {
         name: name.trim(),
-        isPerishable: isPerishableBool,
         isDairy: isDairyBool,
         imageUrl: imageUrl, // This will be null if no image was uploaded
       },
@@ -122,7 +120,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
 const updateCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
   // Text fields from FormData are in req.body, file in req.file
-  const { name, isPerishable, isDairy, removeImage } = req.body;
+  const { name, isDairy, removeImage } = req.body;
   const imageFile = req.file;
 
   console.log('Update - Received body:', req.body);
@@ -140,9 +138,6 @@ const updateCategory = asyncHandler(async (req, res) => {
   }
 
   // Handle boolean fields if provided
-  if (isPerishable !== undefined) {
-    updateData.isPerishable = typeof isPerishable === 'string' ? isPerishable.toLowerCase() === 'true' : !!isPerishable;
-  }
   if (isDairy !== undefined) {
     updateData.isDairy = typeof isDairy === 'string' ? isDairy.toLowerCase() === 'true' : !!isDairy;
   }

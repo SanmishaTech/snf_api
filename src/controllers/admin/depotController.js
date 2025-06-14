@@ -143,9 +143,31 @@ exports.updateDepot = async (req, res, next) => {
 // Delete a Depot by ID
 exports.deleteDepot = async (req, res, next) => {
     try {
-        await prisma.depot.delete({
-            where: { id: parseInt(req.params.id) },
-        });
+        const depotId = parseInt(req.params.id);
+
+        // Check if depot is referenced in other modules
+        const [purchaseCount, wastageCount, stockLedgerCount, variantStockCount, areaCount] = await prisma.$transaction([
+            prisma.purchase.count({ where: { depotId } }),
+            prisma.wastage.count({ where: { depotId } }),
+            prisma.stockLedger.count({ where: { depotId } }),
+            prisma.variantStock.count({ where: { depotId } }),
+            prisma.areaMaster.count({ where: { depotId } }),
+        ]);
+
+        if (
+            purchaseCount > 0 ||
+            wastageCount > 0 ||
+            stockLedgerCount > 0 ||
+            variantStockCount > 0 ||
+            areaCount > 0
+        ) {
+            return res.status(400).json({
+                message:
+                    'Depot cannot be deleted because it is associated with other records (purchase, wastage, stock, variant, or area). Please remove these associations first.',
+            });
+        }
+
+        await prisma.depot.delete({ where: { id: depotId } });
         res.status(204).send();
     } catch (error) {
         if (error.code === 'P2025') {

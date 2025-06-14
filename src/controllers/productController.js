@@ -9,6 +9,10 @@ const prisma = new PrismaClient();
 
 // Zod schema for product validation
 const productSchema = z.object({
+  maintainStock: z.preprocess(
+    (val) => typeof val === 'string' ? val === 'true' : Boolean(val),
+    z.boolean().default(false)
+  ),
   name: z.string().min(1, { message: "Product name is required" }),
   url: z.string().url({ message: 'Invalid URL format' }).optional().nullable(),
   price: z.string().min(1, { message: 'Price is required' }),
@@ -69,7 +73,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       console.log('[ProductController:createProduct] No new file uploaded for productAttachment.');
     }
 
-    const { name, url, price, unit, rate, description, isDairyProduct, categoryId } = validationResult.data;
+    const { name, url, price, unit, rate, description, isDairyProduct, categoryId, maintainStock } = validationResult.data;
 
     const productData = {
       name,
@@ -81,6 +85,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       description, 
       isDairyProduct,
       categoryId,
+      maintainStock,
     };
 
     console.log('[ProductController:createProduct] Attempting to create product with data:', productData);
@@ -262,7 +267,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       });
     }
 
-    const { name, url, price, unit, rate, description, isDairyProduct, categoryId } = validationResult.data;
+    const { name, url, price, unit, rate, description, isDairyProduct, categoryId, maintainStock } = validationResult.data;
 
     const updateData = {
       name,
@@ -273,6 +278,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       description,
       isDairyProduct,
       categoryId,
+      maintainStock,
     };
 
     console.log(`[ProductController:updateProduct ${id}] Attempting to update product with data:`, updateData);

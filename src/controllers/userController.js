@@ -149,8 +149,13 @@ const getCurrentUserProfile = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { // Include agency details if there's a relation
-        agency: true, // Assuming your Prisma schema has an 'agency' relation on the User model
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        name: true,
+        mobile: true, // Include mobile number
+        agency: true,
       },
     });
 
@@ -165,7 +170,8 @@ const getCurrentUserProfile = async (req, res, next) => {
       id: userWithoutPassword.id,
       role: userWithoutPassword.role,
       email: userWithoutPassword.email,
-      fullName: userWithoutPassword.fullName,
+      name: userWithoutPassword.name,
+      mobile: userWithoutPassword.mobile,
       // Add other fields from userWithoutPassword as needed
     };
 

@@ -1,5 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, TransactionStatus, TransactionType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { isAfter, startOfDay } = require('date-fns');
 
@@ -127,7 +127,7 @@ const createSubscription = asyncHandler(async (req, res) => {
   // Get current user's member ID
   const member = await prisma.member.findUnique({
     where: { userId: req.user.id },
-    include: { wallet: true } // IMPORTANT: Include the wallet in the query
+    select: { walletBalance: true, id: true, userId: true }
   });
 
   if (!member) {
@@ -225,21 +225,21 @@ const createSubscription = asyncHandler(async (req, res) => {
   const amount = totalQty * product.rate;
 
   // --- New Wallet Logic ---
-  const wallet = member.wallet; // Wallet was included in the member query
+  const walletBalance = member.walletBalance; // Wallet was included in the member query
   let walletamt = 0;
   let payableamt = amount;
-  let newWalletBalance = wallet ? wallet.balance : 0;
+  let newWalletBalance = walletBalance;
   let paymentStatus = 'PENDING'; // Default payment status
 
-  if (wallet && wallet.balance > 0) {
-    if (wallet.balance >= amount) {
+  if (walletBalance > 0) {
+    if (walletBalance >= amount) {
       walletamt = amount;
       payableamt = 0;
-      newWalletBalance = wallet.balance - amount;
+      newWalletBalance = walletBalance - amount;
       paymentStatus = 'PAID'; // Fully paid from wallet
     } else {
-      walletamt = wallet.balance;
-      payableamt = amount - wallet.balance;
+      walletamt = walletBalance;
+      payableamt = amount - walletBalance;
       newWalletBalance = 0;
       // paymentStatus remains 'PENDING' as there's a balance to be paid
     }
@@ -248,11 +248,11 @@ const createSubscription = asyncHandler(async (req, res) => {
   // --- Transactional Database Update ---
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Update Wallet Balance (if an amount was used from it)
-      if (wallet && walletamt > 0) {
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: newWalletBalance },
+      // 1. Update Member WalletBalance (if amount used)
+      if (walletamt > 0) {
+        await tx.member.update({
+          where: { id: member.id },
+          data: { walletBalance: newWalletBalance },
         });
       }
 
@@ -279,18 +279,18 @@ const createSubscription = asyncHandler(async (req, res) => {
         },
       });
 
-      // 3. Create a Transaction record if wallet funds were used
-      if (wallet && walletamt > 0) {
-        await tx.transaction.create({
+      // 3. Create a WalletTransaction record if wallet funds were used
+      if (walletamt > 0) {
+        await tx.walletTransaction.create({
           data: {
-            userId: req.user.id,
-            walletId: wallet.id,
+            memberId: member.id,
             amount: walletamt,
-            type: 'DEBIT', // Assuming 'DEBIT' is a value in your TransactionType enum
-            status: 'PAID',  // Assuming 'PAID' is a value in your TransactionStatus enum
+            type: TransactionType.DEBIT,
+            status: TransactionStatus.PAID,
             notes: `Subscription payment for ID: ${newSubscription.id}`,
             referenceNumber: `SUB-${newSubscription.id}`,
-            paymentMethod: 'TOPUP' // Optional: if you want to specify this
+            paymentMethod: 'TOPUP',
+            processedByAdminId: null,
           },
         });
       }
@@ -347,7 +347,7 @@ const getSubscriptions = asyncHandler(async (req, res) => {
     member: {
       include: {
         user: true,
-      },
+      }
     }
   };
 
@@ -918,43 +918,28 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
             console.warn('Member ID not found on delivery entry subscription, cannot process refund.');
             refundMessage = ' Member information for refund is missing.';
           } else {
-            const wallet = await tx.wallet.findUnique({
-              where: { memberId: memberIdForWallet },
+            // Create WalletTransaction credit
+            await tx.walletTransaction.create({
+              data: {
+                memberId: memberIdForWallet,
+                type: TransactionType.CREDIT,
+                amount: refundAmount,
+                status: TransactionStatus.PAID,
+                paymentMethod: 'TOPUP',
+                notes: `Refund for skipped delivery (Entry ID: ${entryId})`,
+                processedByAdminId: null,
+              },
             });
 
-            if (!wallet) {
-              console.warn(`Wallet not found for memberId: ${memberIdForWallet}. Cannot process refund.`);
-              refundMessage = ' Wallet not found for refund processing.';
-            } else {
-              // Create Wallet Transaction
-              await tx.transaction.create({ // <--- CORRECTED HERE
-                data: {
-                  wallet: { 
-                    connect: { id: wallet.id }
-                  },
-                  user: { 
-                    connect: { id: deliveryEntry.subscription.member.userId }
-                  },
-                  type: 'CREDIT',
-                  amount: refundAmount,
-                  status: 'PAID',
-                  paymentMethod: 'TOPUP',
-                  notes: `Refund for skipped delivery (Entry ID: ${entryId})`,
-                 },
-              });
-
-              // Update Wallet Balance
-              await tx.wallet.update({
-                where: { id: wallet.id },
-                data: {
-                  balance: {
-                    increment: refundAmount,
-                  },
-                },
-              });
-              refundMessage = ` ₹${refundAmount.toFixed(2)} has been refunded to your wallet.`;
-              console.log(`Refund of ${refundAmount.toFixed(2)} processed for member ${memberIdForWallet}, delivery entry ${entryId}`);
-            }
+            // Update member wallet balance
+            await tx.member.update({
+              where: { id: memberIdForWallet },
+              data: {
+                walletBalance: { increment: refundAmount },
+              },
+            });
+            refundMessage = ` ₹${refundAmount.toFixed(2)} has been refunded to your wallet.`;
+            console.log(`Refund of ${refundAmount.toFixed(2)} processed for member ${memberIdForWallet}, delivery entry ${entryId}`);
           }
         } else {
           refundMessage = ' No refund was applicable for this skipped delivery (amount is zero or less).';

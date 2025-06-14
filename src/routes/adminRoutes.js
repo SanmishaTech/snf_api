@@ -4,7 +4,8 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 
-const categoryUploadDir = path.join(__dirname, '..', 'uploads', 'categories');
+// Store category images under the top-level `uploads` folder (sibling of `src`)
+const categoryUploadDir = path.join(__dirname, '..', '..', 'uploads', 'categories');
 
 // Ensure the upload directory exists
 if (!fs.existsSync(categoryUploadDir)) {
@@ -65,6 +66,14 @@ const {
   updateBanner,
   deleteBanner,
 } = require('../controllers/admin/bannerController');
+const {
+  createPurchasePayment,
+  getAllPurchasePayments,
+  getPurchasePaymentById,
+  updatePurchasePayment,
+  deletePurchasePayment,
+  getVendorPurchases
+} = require('../controllers/admin/purchasePaymentController');
 const authMiddleware = require('../middleware/auth'); // Corrected path to auth middleware
 const createUploadMiddleware = require('../middleware/uploadMiddleware');
 
@@ -129,6 +138,19 @@ router.route('/banners/:id')
   .get(authMiddleware, getBannerById)
   .put(authMiddleware, ...bannerUploadMiddleware, updateBanner)
   .delete(authMiddleware, deleteBanner);
+
+// Purchase Payment Routes
+router.route('/purchase-payments')
+  .post(authMiddleware, createPurchasePayment)
+  .get(authMiddleware, getAllPurchasePayments);
+
+router.route('/purchase-payments/:id')
+  .get(authMiddleware, getPurchasePaymentById)
+  .put(authMiddleware, updatePurchasePayment)
+  .delete(authMiddleware, deletePurchasePayment);
+
+// Fetch purchases for vendor to aid payment entry form
+router.get('/vendors/:vendorId/purchases', authMiddleware, getVendorPurchases);
 
 // Admin User Management Routes
 router.route('/users/:userId')

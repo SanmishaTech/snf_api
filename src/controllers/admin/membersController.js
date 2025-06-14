@@ -53,12 +53,8 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
             active: true,
             member: {      // User has a relation to Member model named 'member'
                 select: {
-                    id: true,    // Select the Member table's ID
-                    wallet: {  // Member model has a relation to Wallet model named 'wallet'
-                        select: {
-                            balance: true
-                        }
-                    }
+                    id: true,
+                    walletBalance: true,
                 }
             }
         },
@@ -77,7 +73,7 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         active: user.active,
-        walletBalance: user.member?.wallet?.balance ?? 0, // Access balance via user.member.wallet
+        walletBalance: user.member?.walletBalance ?? 0, // Access balance via user.member.wallet
         // It's crucial that every User with role 'MEMBER' has an associated Member record
         // If user.member or user.member.id could be null/undefined, the frontend link might break or need adjustment.
     }));

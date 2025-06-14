@@ -264,7 +264,7 @@ router.post('/', authMiddleware, productUploadMiddleware, createProduct);
  *       500:
  *         description: Internal server error.
  */
-router.get('/', authMiddleware, getAllProducts);
+router.get('/', getAllProducts);
 
 // GET /api/products/:id - Get a single product by ID
 /**

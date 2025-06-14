@@ -13,7 +13,7 @@ model User {
   email             String        @unique
   password          String
   role              Role
-  mobile            String?
+  mobile            String?        @unique
   active            Boolean       @default(true)
   joiningDate       DateTime?
   lastLogin         DateTime?
@@ -29,9 +29,8 @@ model User {
   depot             Depot?        @relation(fields: [depotId], references: [id])
   depotId           Int?
 
-  // Wallet / Transaction related fields
-  initiatedTransactions Transaction[] @relation("UserTransactions") // Transactions initiated by this user (member)
-  processedTransactions Transaction[] @relation("AdminProcessedTransactions") // Transactions processed by this user (admin)
+  // Wallet Transaction related fields
+  processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions") // Wallet transactions processed by this user (admin)
 
   // Purchases relations
   purchasesCreated Purchase[] @relation("PurchaseCreatedBy")
@@ -45,24 +44,25 @@ model User {
 }
 
 model Vendor {
-  id                Int           @id @default(autoincrement())
+  id                Int               @id @default(autoincrement())
   name              String
-  contactPersonName String?       @map("contact_person_name")
+  contactPersonName String?           @map("contact_person_name")
   address1          String
   address2          String?
   city              String
   pincode           Int
   mobile            String
-  alternateMobile   String?       @map("alternate_mobile")
-  email             String?       @unique
-  isDairySupplier   Boolean       @default(false)
-  userId            Int           @unique
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  alternateMobile   String?           @map("alternate_mobile")
+  email             String?           @unique
+  isDairySupplier   Boolean           @default(false)
+  userId            Int               @unique
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   orders            VendorOrder[]
   purchases         Purchase[]
   wastages          Wastage[]
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  PurchasePayment   PurchasePayment[]
 
   @@map("vendors")
 }
@@ -89,6 +89,7 @@ model Agency {
 }
 
 model Product {
+  maintainStock           Boolean                 @default(false)
   id                      Int                     @id @default(autoincrement())
   name                    String
   url                     String?
@@ -138,7 +139,6 @@ model ProductVariant {
 model Category {
   id           Int       @id @default(autoincrement())
   name         String    @unique
-  isPerishable Boolean   @default(false)
   isDairy      Boolean   @default(false)
   imageUrl     String? // Optional: URL or path to the category image
   createdAt    DateTime  @default(now())
@@ -206,8 +206,8 @@ model Member {
   addresses               DeliveryAddress[]
   subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
-
-  wallet Wallet? // Relation to Wallet
+  walletBalance          Float @default(0)
+  walletTransactions      WalletTransaction[] @relation("MemberTransactions")
 
   @@map("members")
 }
@@ -403,6 +403,28 @@ enum TransactionStatus {
   // Consider adding FAILED, CANCELLED, REFUNDED if needed in the future
 }
 
+model WalletTransaction {
+  id       Int               @id @default(autoincrement())
+  memberId Int
+  amount   Float
+  status   TransactionStatus @default(PENDING)
+  type     TransactionType
+  paymentMethod   String?
+  referenceNumber String?
+  notes           String? @db.Text
+  processedByAdminId Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  member             Member  @relation("MemberTransactions", fields: [memberId], references: [id], onDelete: Cascade)
+  processedByAdmin   User?   @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id])
+
+  @@index([memberId])
+  @@index([processedByAdminId])
+  @@map("wallet_transactions")
+}
+
+/*
 model Wallet {
   id        Int      @id @default(autoincrement())
   memberId  Int      @unique // Foreign key to Member
@@ -443,8 +465,8 @@ model Transaction {
   @@index([processedByAdminId]) // Index for renamed field
   @@map("transactions")
 }
+*/
 
-// Variant Stock model for tracking stock per variant per depot
 model VariantStock {
   id         Int    @id @default(autoincrement())
   productId  Int
@@ -476,6 +498,7 @@ model Purchase {
   updatedById  Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  paidAmt      Float     @default(0)
 
   // Relations
   vendor    Vendor @relation(fields: [vendorId], references: [id])
@@ -483,7 +506,9 @@ model Purchase {
   createdBy User?  @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
   updatedBy User?  @relation("PurchaseUpdatedBy", fields: [updatedById], references: [id])
 
-  details PurchaseDetail[]
+  details               PurchaseDetail[]
+  payments              PurchasePayment[]
+  PurchasePaymentDetail PurchasePaymentDetail[]
 
   @@index([vendorId])
   @@index([depotId])
@@ -507,6 +532,45 @@ model PurchaseDetail {
   @@index([purchaseId])
   @@index([productId])
   @@index([variantId])
+}
+
+model PurchasePayment {
+  id          Int      @id @default(autoincrement())
+  paymentno   String?   @unique
+  paymentDate DateTime @db.Date
+  vendorId    Int
+  mode        String
+  referenceNo String?
+  notes       String?  @db.Text
+  totalAmount Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  vendor     Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  details    PurchasePaymentDetail[]
+  Purchase   Purchase?               @relation(fields: [purchaseId], references: [id])
+  purchaseId Int?
+
+  @@index([vendorId])
+  @@map("purchase_payments")
+}
+
+model PurchasePaymentDetail {
+  id                Int      @id @default(autoincrement())
+  purchasePaymentId Int
+  purchaseId        Int
+  amount            Decimal  @db.Decimal(10, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  purchasePayment PurchasePayment @relation(fields: [purchasePaymentId], references: [id], onDelete: Cascade)
+  purchase        Purchase        @relation(fields: [purchaseId], references: [id])
+
+  @@index([purchasePaymentId])
+  @@index([purchaseId])
+  @@map("purchase_payment_details")
 }
 
 model Wastage {

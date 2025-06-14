@@ -168,6 +168,7 @@ exports.listPurchases = async (req, res, next) => {
     const formatted = purchases.map((p) => ({
       ...p,
       purchaseDetails: p.details,
+      paidAmt: p.paidAmt ?? 0,
     }));
 
     return res.json({
@@ -304,7 +305,12 @@ exports.deletePurchase = async (req, res, next) => {
         throw new Error('Purchase not found');
       }
 
-      // delete child and parent rows
+      // delete dependent payment details first to avoid FK constraints
+      await tx.purchasePaymentDetail.deleteMany({ where: { purchaseId: id } });
+      // if any purchasePayment rows directly reference this purchase, detach them (or delete as per business logic)
+      await tx.purchasePayment.updateMany({ where: { purchaseId: id }, data: { purchaseId: null } });
+
+      // delete child purchase detail rows
       await tx.purchaseDetail.deleteMany({ where: { purchaseId: id } });
       await tx.purchase.delete({ where: { id } });
 

@@ -133,10 +133,9 @@ module.exports = router;
  *           type: integer
  *           nullable: true
  *           description: ID of the user who initiated the transaction (if applicable).
- *         walletId:
+ *         memberId:
  *           type: integer
- *           nullable: true
- *           description: ID of the wallet this transaction belongs to (null if PENDING or not yet assigned).
+ *           description: ID of the member whose wallet balance changed.
  *         amount:
  *           type: number
  *           format: float

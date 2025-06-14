@@ -1,23 +1,5 @@
-const { PrismaClient, TransactionStatus } = require('@prisma/client');
+const { PrismaClient, TransactionStatus, TransactionType } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-// Helper function to find or create a wallet for a member (primarily for GET operations)
-async function findOrCreateWalletForGetOperations(memberId, prismaInstance = prisma) {
-  let wallet = await prismaInstance.wallet.findUnique({
-    where: { memberId: parseInt(memberId) },
-  });
-
-  if (!wallet) {
-    wallet = await prismaInstance.wallet.create({
-      data: {
-        memberId: parseInt(memberId),
-        balance: 0.0,
-        currency: 'INR',
-      },
-    });
-  }
-  return wallet;
-}
 
 /**
  * @desc Get all member wallet balances
@@ -26,29 +8,17 @@ async function findOrCreateWalletForGetOperations(memberId, prismaInstance = pri
  */
 exports.getMemberWallets = async (req, res, next) => {
   try {
-    const membersWithWallets = await prisma.member.findMany({
+    const members = await prisma.member.findMany({
       include: {
-        wallet: true,
         user: { select: { name: true, email: true } },
       },
     });
 
-    const memberWallets = membersWithWallets.map(member => ({
+    const memberWallets = members.map(member => ({
       memberId: member.id,
       memberName: member.user?.name || member.name,
       memberEmail: member.user?.email,
-      wallet: member.wallet ? {
-        walletId: member.wallet.id,
-        balance: member.wallet.balance,
-        currency: member.wallet.currency,
-        updatedAt: member.wallet.updatedAt,
-      } : {
-        walletId: null,
-        balance: 0.0,
-        currency: 'INR',
-        updatedAt: null,
-        status: 'No wallet associated. Default values shown.',
-      },
+      balance: member.walletBalance,
     }));
 
     res.status(200).json({ success: true, data: memberWallets });
@@ -83,67 +53,42 @@ exports.getMemberWalletDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, message: `Member with ID ${memberIdInt} not found.` });
     }
 
-    // Find or create wallet for consistent response structure
-    const walletEntity = await findOrCreateWalletForGetOperations(memberIdInt);
-
-    // Fetch transactions already linked to the wallet
-    const walletTransactions = await prisma.transaction.findMany({
-      where: { walletId: walletEntity.id },
+    // Fetch transactions
+    const transactions = await prisma.walletTransaction.findMany({
+      where: { memberId: memberIdInt },
       orderBy: { createdAt: 'desc' },
-      include: { 
+      include: {
         processedByAdmin: { select: { name: true, email: true } },
-        user: { select: { name: true, email: true } } // Include initiator user details
       },
     });
 
-    // Fetch PENDING CREDIT transactions initiated by the member (userId) but not yet linked to a wallet
-    // These are typically user top-up requests awaiting approval.
+    // Also get pending credit transactions initiated by this member's user
     let pendingUserTransactions = [];
-    if (member.userId) { // Ensure member.userId is available
-      pendingUserTransactions = await prisma.transaction.findMany({
+    if (member.userId) {
+      pendingUserTransactions = await prisma.walletTransaction.findMany({
         where: {
-          userId: member.userId, // Link to the User who initiated it
-          walletId: null,        // Not yet assigned to a wallet
+          memberId: memberIdInt,
           status: TransactionStatus.PENDING,
-          type: 'CREDIT'         // Specifically top-up requests
+          type: TransactionType.CREDIT,
         },
         orderBy: { createdAt: 'desc' },
-        include: { 
-          processedByAdmin: { select: { name: true, email: true } }, // Usually null for these
-          user: { select: { name: true, email: true } } // Initiator details
-        },
+        include: { processedByAdmin: { select: { name: true, email: true } } },
       });
     }
 
-    // Combine and sort all transactions
-    // We filter out any pendingUserTransactions that might somehow already be in walletTransactions (e.g., if walletId was later assigned but status remained PENDING)
-    // This is a safeguard, typically pendingUserTransactions should have walletId: null
-    const combinedTransactions = [
-      ...walletTransactions,
-      ...pendingUserTransactions.filter(pt => !walletTransactions.some(wt => wt.id === pt.id))
-    ];
-
-    combinedTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    const transactions = combinedTransactions; // Use the combined list for mapping
+    const transactionsCombined = [...transactions, ...pendingUserTransactions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
 
     const walletDetails = {
-      walletId: walletEntity.id,
-      balance: walletEntity.balance,
-      currency: walletEntity.currency,
-      updatedAt: walletEntity.updatedAt,
-      transactions: transactions.map(t => ({
+      balance: member.walletBalance,
+      transactions: transactionsCombined.map(t => ({
         id: t.id,
         type: t.type,
         amount: t.amount,
-        status: t.status, // Added status here
+        status: t.status, 
         paymentMethod: t.paymentMethod,
         referenceNumber: t.referenceNumber,
         notes: t.notes,
-        adminName: t.processedByAdmin?.name || 'N/A', // Admin who processed (approved/rejected)
-        processedByAdminId: t.processedByAdminId,
-        userName: t.user?.name, // User who initiated (for PENDING top-ups)
-        userEmail: t.user?.email,
+        adminName: t.processedByAdmin?.name || 'N/A',
         timestamp: t.createdAt,
       })),
     };
@@ -171,7 +116,7 @@ exports.getMemberWalletDetails = async (req, res, next) => {
 exports.addFundsToWallet = async (req, res, next) => {
   const { memberId } = req.params;
   const { amount, paymentMethod, referenceNumber, notes } = req.body;
-  const adminId = req.user?.id; // Assumes auth middleware populates req.user
+  const adminId = req.user?.id; 
 
   if (!adminId) {
     return res.status(401).json({ success: false, message: 'Unauthorized: Admin ID not found. Ensure you are logged in.' });
@@ -191,46 +136,31 @@ exports.addFundsToWallet = async (req, res, next) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      let wallet = await tx.wallet.findUnique({
-        where: { memberId: memberIdInt },
+      const updatedMember = await tx.member.update({
+        where: { id: memberIdInt },
+        data: { walletBalance: { increment: amountFloat } },
       });
 
-      if (!wallet) {
-        wallet = await tx.wallet.create({
-          data: {
-            memberId: memberIdInt,
-            balance: 0.0,
-            currency: 'INR',
-          },
-        });
-      }
-
-      const updatedWallet = await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { increment: amountFloat } },
-      });
-
-      // Add funds directly creates a COMPLETED transaction
-      const transaction = await tx.transaction.create({
+      const transaction = await tx.walletTransaction.create({
         data: {
-          wallet: { connect: { id: updatedWallet.id } },
+          memberId: memberIdInt,
           type: 'CREDIT',
           amount: amountFloat,
-          status: TransactionStatus.PAID, // Admin direct topup, considered paid
+          status: TransactionStatus.PAID,
           paymentMethod,
           referenceNumber,
           notes,
-          processedByAdmin: { connect: { id: adminId } }, // Admin performing the action
+          processedByAdminId: adminId,
         },
       });
-      return { updatedWallet, transaction };
+      return { updatedMember, transaction };
     });
 
     res.status(200).json({
       success: true,
-      message: `Successfully added ${amountFloat} to member ${memberIdInt}'s wallet. New balance: ${result.updatedWallet.balance}`,
+      message: `Successfully added ${amountFloat} to member ${memberIdInt}'s wallet. New balance: ${result.updatedMember.walletBalance}`,
       data: {
-        wallet: result.updatedWallet,
+        balance: result.updatedMember.walletBalance,
         transaction: result.transaction,
       },
     });
@@ -241,9 +171,9 @@ exports.addFundsToWallet = async (req, res, next) => {
 };
 
 /**
- * @desc    Approve a pending wallet transaction
- * @route   POST /api/admin/wallets/transactions/:transactionId/approve
- * @access  Private/Admin
+ * @desc Approve a pending wallet transaction
+ * @route POST /api/admin/wallets/transactions/:transactionId/approve
+ * @access Private/Admin
  */
 exports.approveWalletTransaction = async (req, res, next) => {
   const { transactionId } = req.params;
@@ -269,7 +199,7 @@ exports.approveWalletTransaction = async (req, res, next) => {
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Fetch the transaction to be approved
-      const pendingTransaction = await tx.transaction.findUnique({
+      const pendingTransaction = await tx.walletTransaction.findUnique({
         where: { id: transactionIdInt },
       });
 
@@ -287,44 +217,27 @@ exports.approveWalletTransaction = async (req, res, next) => {
           throw { statusCode: 400, message: 'Only CREDIT transactions can be approved as top-ups.' };
       }
 
-      // 2. Find the member associated with the transaction's userId
+      // 2. Find the member associated with the transaction's memberId
       const member = await tx.member.findUnique({
-        where: { userId: pendingTransaction.userId }, // userId on transaction is the User's ID
+        where: { id: pendingTransaction.memberId }, 
       });
 
       if (!member) {
-        throw { statusCode: 500, message: `Member profile not found for user ID ${pendingTransaction.userId} associated with the transaction.` };
+        throw { statusCode: 500, message: `Member profile not found for member ID ${pendingTransaction.memberId} associated with the transaction.` };
       }
       const memberIdForWallet = member.id; // This is Member.id
 
-      // 3. Find or create the wallet for the member and update its balance
-      let wallet = await tx.wallet.findUnique({
-        where: { memberId: memberIdForWallet },
+      // 3. Update the member's wallet balance
+      const updatedMember = await tx.member.update({
+        where: { id: memberIdForWallet },
+        data: { walletBalance: { increment: pendingTransaction.amount } },
       });
 
-      if (!wallet) {
-        // Wallet doesn't exist, create it with the transaction amount
-        wallet = await tx.wallet.create({
-          data: {
-            memberId: memberIdForWallet,
-            balance: pendingTransaction.amount, // Initial balance is the transaction amount
-            currency: 'INR', // Or your default currency
-          },
-        });
-      } else {
-        // Wallet exists, increment its balance
-        wallet = await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: { increment: pendingTransaction.amount } },
-        });
-      }
-
-      // 4. Update the transaction: set status to PAID, link to wallet, and set admin
-      const approvedTransaction = await tx.transaction.update({
+      // 4. Update the transaction: set status to PAID, and set admin
+      const approvedTransaction = await tx.walletTransaction.update({
         where: { id: transactionIdInt },
         data: {
           status: TransactionStatus.PAID,
-          walletId: wallet.id, // Link transaction to the wallet
           processedByAdminId: adminUserId, // Record admin who approved (schema change)
           paymentMethod: paymentMethod || pendingTransaction.paymentMethod, // Keep original if not provided by admin
           referenceNumber: referenceNumber || pendingTransaction.referenceNumber,
@@ -332,7 +245,7 @@ exports.approveWalletTransaction = async (req, res, next) => {
         },
       });
 
-      return { approvedTransaction, updatedWallet: wallet };
+      return { approvedTransaction, updatedMember };
     });
 
     res.status(200).json({
@@ -340,7 +253,7 @@ exports.approveWalletTransaction = async (req, res, next) => {
       message: 'Transaction approved successfully.',
       data: {
         transaction: result.approvedTransaction,
-        wallet: result.updatedWallet, // Return the full wallet object
+        balance: result.updatedMember.walletBalance, // Return the full wallet object
       },
     });
 
@@ -383,49 +296,42 @@ exports.removeFundsFromWallet = async (req, res, next) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const wallet = await tx.wallet.findUnique({
-        where: { memberId: memberIdInt },
-      });
-
-      if (!wallet) {
-        throw new Error('Wallet not found for this member. Cannot remove funds.');
+      const memberRecord = await tx.member.findUnique({ where: { id: memberIdInt } });
+      if (memberRecord.walletBalance < amountFloat) {
+        throw new Error(`Insufficient funds. Current balance: ${memberRecord.walletBalance}, tried to remove: ${amountFloat}.`);
       }
 
-      if (wallet.balance < amountFloat) {
-        throw new Error(`Insufficient funds. Current balance: ${wallet.balance}, tried to remove: ${amountFloat}.`);
-      }
-
-      const updatedWallet = await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { decrement: amountFloat } },
+      const updatedMember = await tx.member.update({
+        where: { id: memberIdInt },
+        data: { walletBalance: { decrement: amountFloat } },
       });
 
-      const transaction = await tx.transaction.create({
+      const transaction = await tx.walletTransaction.create({
         data: {
-          walletId: updatedWallet.id,
+          memberId: memberIdInt,
           type: 'DEBIT',
           amount: amountFloat,
+          status: TransactionStatus.PAID,
           paymentMethod,
           referenceNumber,
           notes,
-          status: TransactionStatus.PAID, // Admin action, so transaction is paid
-          processedByAdminId: adminId,    // Corrected field name
+          processedByAdminId: adminId,
         },
       });
-      return { updatedWallet, transaction };
+      return { updatedMember, transaction };
     });
 
     res.status(200).json({
       success: true,
-      message: `Successfully removed ${amountFloat} from member ${memberIdInt}'s wallet. New balance: ${result.updatedWallet.balance}`,
+      message: `Successfully removed ${amountFloat} from member ${memberIdInt}'s wallet. New balance: ${result.updatedMember.walletBalance}`,
       data: {
-        wallet: result.updatedWallet,
+        balance: result.updatedMember.walletBalance,
         transaction: result.transaction,
       },
     });
   } catch (error) {
     console.error(`Error removing funds from member ${memberIdInt}'s wallet:`, error);
-    if (error.message.startsWith('Insufficient funds') || error.message.startsWith('Wallet not found')) {
+    if (error.message.startsWith('Insufficient funds')) {
       return res.status(400).json({ success: false, message: error.message });
     }
     next(error);
@@ -445,42 +351,36 @@ exports.getAllTransactions = async (req, res, next) => {
   const whereConditions = {};
   if (type) whereConditions.type = type.toUpperCase();
   if (memberId) {
-    const memberWallet = await prisma.wallet.findUnique({ where: { memberId: parseInt(memberId) } });
-    if (memberWallet) {
-      whereConditions.walletId = memberWallet.id;
-    } else {
-      return res.status(200).json({ success: true, data: [], total: 0, page: parseInt(page), limit: parseInt(limit), totalPages: 0 });
-    }
+    whereConditions.memberId = parseInt(memberId);
   }
-  if (queryAdminId) whereConditions.adminId = parseInt(queryAdminId);
+  if (queryAdminId) whereConditions.processedByAdminId = parseInt(queryAdminId);
 
   try {
-    const transactions = await prisma.transaction.findMany({
+    const transactions = await prisma.walletTransaction.findMany({
       where: whereConditions,
       include: {
-        wallet: { include: { member: { select: { id: true, name: true, user: { select: { name: true, email: true } } } } } },
-        admin: { select: { id: true, name: true, email: true } },
+        member: { select: { id: true, name: true, user: { select: { name: true, email: true } } } },
+        processedByAdmin: { select: { id: true, name: true, email: true } },
       },
       orderBy: { [sortBy]: sortOrder },
       skip,
       take,
     });
 
-    const totalTransactions = await prisma.transaction.count({ where: whereConditions });
+    const totalTransactions = await prisma.walletTransaction.count({ where: whereConditions });
 
     const formattedTransactions = transactions.map(t => ({
       id: t.id,
-      memberId: t.wallet.member.id,
-      memberName: t.wallet.member.user?.name || t.wallet.member.name,
+      memberId: t.memberId,
+      memberName: t.member.user?.name || t.member.name,
       type: t.type,
       amount: t.amount,
       paymentMethod: t.paymentMethod,
       referenceNumber: t.referenceNumber,
       notes: t.notes,
-      adminId: t.adminId,
-      adminName: t.admin?.name,
+      adminId: t.processedByAdminId,
+      adminName: t.processedByAdmin?.name,
       timestamp: t.createdAt,
-      walletId: t.walletId,
     }));
 
     res.status(200).json({
@@ -513,11 +413,11 @@ exports.getTransactionDetails = async (req, res, next) => {
   }
 
   try {
-    const transaction = await prisma.transaction.findUnique({
+    const transaction = await prisma.walletTransaction.findUnique({
       where: { id: transactionIdInt },
       include: {
-        wallet: { include: { member: { select: { id: true, name: true, user: { select: { name: true, email: true } } } } } },
-        admin: { select: { id: true, name: true, email: true } },
+        member: { select: { id: true, name: true, user: { select: { name: true, email: true } } } },
+        processedByAdmin: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -527,17 +427,16 @@ exports.getTransactionDetails = async (req, res, next) => {
 
     const formattedTransaction = {
       id: transaction.id,
-      memberId: transaction.wallet.member.id,
-      memberName: transaction.wallet.member.user?.name || transaction.wallet.member.name,
+      memberId: transaction.memberId,
+      memberName: transaction.member.user?.name || transaction.member.name,
       type: transaction.type,
       amount: transaction.amount,
       paymentMethod: transaction.paymentMethod,
       referenceNumber: transaction.referenceNumber,
       notes: transaction.notes,
-      adminId: transaction.adminId,
-      adminName: transaction.admin?.name,
+      adminId: transaction.processedByAdminId,
+      adminName: transaction.processedByAdmin?.name,
       timestamp: transaction.createdAt,
-      walletId: transaction.walletId,
     };
 
     res.status(200).json({ success: true, data: formattedTransaction });
