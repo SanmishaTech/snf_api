@@ -35,13 +35,12 @@ exports.createWastage = async (req, res, next) => {
     wastageDate,
     invoiceNo,
     invoiceDate,
-    vendorId,
     depotId,
     details,
   } = req.body;
-  if (!wastageDate || !vendorId || !depotId || !details?.length) {
+  if (!wastageDate || !depotId || !details?.length) {
     return next(
-      createError(400, 'wastageDate, vendorId, depotId and at least one detail are required')
+      createError(400, 'wastageDate, depotId and at least one detail are required')
     );
   }
   try {
@@ -54,8 +53,7 @@ exports.createWastage = async (req, res, next) => {
           wastageDate: new Date(wastageDate),
           invoiceNo: invoiceNo?.trim() || null,
           invoiceDate: invoiceDate ? new Date(invoiceDate) : null,
-          vendorId: parseInt(vendorId, 10),
-          depotId: parseInt(depotId, 10),
+           depotId: parseInt(depotId, 10),
           createdById,
           details: {
             create: details.map((d) => ({
@@ -146,14 +144,13 @@ exports.updateWastage = async (req, res, next) => {
     wastageDate,
     invoiceNo,
     invoiceDate,
-    vendorId,
     depotId,
     details,
   } = req.body;
 
-  if (!wastageDate || !vendorId || !depotId || !details?.length) {
+  if (!wastageDate || !depotId || !details?.length) {
     return next(
-      createError(400, 'wastageDate, vendorId, depotId and details are required')
+      createError(400, 'wastageDate, depotId and details are required')
     );
   }
 
@@ -165,7 +162,6 @@ exports.updateWastage = async (req, res, next) => {
           wastageDate: new Date(wastageDate),
           invoiceNo: invoiceNo?.trim() || null,
           invoiceDate: invoiceDate ? new Date(invoiceDate) : null,
-          vendorId: parseInt(vendorId, 10),
           depotId: parseInt(depotId, 10),
           updatedById: req.user?.id || null,
         },
