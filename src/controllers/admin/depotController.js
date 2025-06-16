@@ -1,6 +1,9 @@
 const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const bcrypt = require('bcryptjs');
+const createError = require('http-errors');
+const validateRequest = require('../../utils/validateRequest');
 
 // Zod schema for depot creation and update
 const depotSchema = z.object({
@@ -10,28 +13,79 @@ const depotSchema = z.object({
   contactNumber: z.string().max(20).optional().nullable(),
 });
 
-// Create a new Depot
+// Schema to create depot along with admin user details
+const createDepotSchema = depotSchema.extend({
+  userFullName: z.string().min(2, { message: 'User full name is required' }),
+  userLoginEmail: z.string().optional().nullable(),
+  userPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
+});
+
+// Create a new Depot along with its admin user
 exports.createDepot = async (req, res, next) => {
   try {
-    const validatedData = await depotSchema.parseAsync(req.body);
-
-    const existingDepot = await prisma.depot.findUnique({
-      where: { name: validatedData.name },
-    });
-
-    if (existingDepot) {
-      return res.status(409).json({ error: 'A depot with this name already exists.' });
+    const validationResult = await validateRequest(createDepotSchema, req.body, {});
+    if (validationResult.errors) {
+      return res.status(400).json(validationResult);
     }
 
-    const newDepot = await prisma.depot.create({
-      data: validatedData,
+    const {
+      userFullName,
+      userLoginEmail,
+      userPassword,
+      ...depotInput
+    } = validationResult;
+
+    // Check duplicates for depot name
+    const existingDepot = await prisma.depot.findUnique({ where: { name: depotInput.name } });
+    if (existingDepot) {
+      return next(createError(409, `A depot named ${depotInput.name} already exists.`));
+    }
+
+    // Duplicate user email check
+    if (userLoginEmail) {
+      const existingUser = await prisma.user.findUnique({ where: { email: userLoginEmail } });
+      if (existingUser) {
+        return next(createError(400, `User with email ${userLoginEmail} already exists.`));
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userPassword, salt);
+
+    // Transaction: create depot then user linked via depotId
+    const { newDepot, newUser } = await prisma.$transaction(async (tx) => {
+      const newDepot = await tx.depot.create({ data: depotInput });
+
+      const newUser = await tx.user.create({
+        data: {
+          name: userFullName,
+          email: userLoginEmail,
+          password: hashedPassword,
+          role: 'DepotAdmin',
+          active: true,
+          depot: {
+            connect: { id: newDepot.id },
+          },
+        },
+      });
+
+      return { newDepot, newUser };
     });
-    res.status(201).json(newDepot);
+
+    return res.status(201).json({
+      message: 'Depot and admin user created successfully.',
+      depot: newDepot,
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
+    });
   } catch (error) {
+    console.error('Error creating depot and user:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ errors: error.errors });
     }
-    next(error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+      return next(createError(400, 'Email is already in use.'));
+    }
+    return next(createError(500, 'Failed to create depot and user.'));
   }
 };
 

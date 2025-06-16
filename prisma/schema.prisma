@@ -13,7 +13,7 @@ model User {
   email             String        @unique
   password          String
   role              Role
-  mobile            String?        @unique
+  mobile            String?       @unique
   active            Boolean       @default(true)
   joiningDate       DateTime?
   lastLogin         DateTime?
@@ -108,6 +108,7 @@ model Product {
   subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
   variants                ProductVariant[]
+  depotProductVariants    DepotProductVariant[]
   variantStocks           VariantStock[]
   purchaseDetails         PurchaseDetail[]
   stockLedgers            StockLedger[]
@@ -131,19 +132,18 @@ model ProductVariant {
   variantStocks   VariantStock[]
   purchaseDetails PurchaseDetail[]
   stockLedgers    StockLedger[]
-  wastageDetails  WastageDetail[]
 
   @@index([productId])
 }
 
 model Category {
-  id           Int       @id @default(autoincrement())
-  name         String    @unique
-  isDairy      Boolean   @default(false)
-  imageUrl     String? // Optional: URL or path to the category image
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  products     Product[]
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  isDairy   Boolean   @default(false)
+  imageUrl  String? // Optional: URL or path to the category image
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 
   @@map("categories")
 }
@@ -206,8 +206,8 @@ model Member {
   addresses               DeliveryAddress[]
   subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
-  walletBalance          Float @default(0)
-  walletTransactions      WalletTransaction[] @relation("MemberTransactions")
+  walletBalance           Float                   @default(0)
+  walletTransactions      WalletTransaction[]     @relation("MemberTransactions")
 
   @@map("members")
 }
@@ -223,19 +223,20 @@ model Banner {
 }
 
 model Depot {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
-  address       String
-  contactPerson String?
-  contactNumber String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  areas         AreaMaster[] // Relation to AreaMaster
-  members       User[]
-  variantStocks VariantStock[]
-  purchases     Purchase[]
-  stockLedgers  StockLedger[]
-  wastages      Wastage[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String                @unique
+  address              String
+  contactPerson        String?
+  contactNumber        String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  areas                AreaMaster[] // Relation to AreaMaster
+  members              User[]
+  variantStocks        VariantStock[]
+  purchases            Purchase[]
+  stockLedgers         StockLedger[]
+  wastages             Wastage[]
+  depotProductVariants DepotProductVariant[]
 
   @@map("depots")
 }
@@ -404,68 +405,61 @@ enum TransactionStatus {
 }
 
 model WalletTransaction {
-  id       Int               @id @default(autoincrement())
-  memberId Int
-  amount   Float
-  status   TransactionStatus @default(PENDING)
-  type     TransactionType
-  paymentMethod   String?
-  referenceNumber String?
-  notes           String? @db.Text
+  id                 Int               @id @default(autoincrement())
+  memberId           Int
+  amount             Float
+  status             TransactionStatus @default(PENDING)
+  type               TransactionType
+  paymentMethod      String?
+  referenceNumber    String?
+  notes              String?           @db.Text
   processedByAdminId Int?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  member             Member  @relation("MemberTransactions", fields: [memberId], references: [id], onDelete: Cascade)
-  processedByAdmin   User?   @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id])
+  member           Member @relation("MemberTransactions", fields: [memberId], references: [id], onDelete: Cascade)
+  processedByAdmin User?  @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id])
 
   @@index([memberId])
   @@index([processedByAdminId])
   @@map("wallet_transactions")
 }
 
-/*
-model Wallet {
-  id        Int      @id @default(autoincrement())
-  memberId  Int      @unique // Foreign key to Member
-  balance   Float    @default(0.0)
-  currency  String   @default("INR") // Default currency, adjust as needed
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  member       Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  transactions Transaction[] // A wallet can have many transactions
-
-  @@map("wallets")
-}
-
-model Transaction {
-  id       Int               @id @default(autoincrement())
-  userId   Int? // ID of the User (member) initiating the transaction. Made optional.
-  amount   Float
-  status   TransactionStatus @default(PENDING)
-  type     TransactionType // e.g., CREDIT for top-up, DEBIT for withdrawal
-  walletId Int? // Foreign key to Wallet, set upon approval. Made optional.
-
-  // Optional details from original model, can be kept
-  paymentMethod   String? // e.g., "Cash", "Bank Transfer", "UPI"
-  referenceNumber String? // e.g., Cheque number, UPI transaction ID
-  notes           String? @db.Text
-
-  processedByAdminId Int? // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  user             User?   @relation("UserTransactions", fields: [userId], references: [id]) // Relation to User is now optional
-  wallet           Wallet? @relation(fields: [walletId], references: [id], onDelete: Cascade) // Relation is now optional
-  processedByAdmin User?   @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id]) // Renamed relation
-
-  @@index([userId]) // Index on optional field
-  @@index([walletId]) // Existing index, field is now optional
-  @@index([processedByAdminId]) // Index for renamed field
-  @@map("transactions")
-}
-*/
+/**
+ * model Wallet {
+ * id        Int      @id @default(autoincrement())
+ * memberId  Int      @unique // Foreign key to Member
+ * balance   Float    @default(0.0)
+ * currency  String   @default("INR") // Default currency, adjust as needed
+ * createdAt DateTime @default(now())
+ * updatedAt DateTime @updatedAt
+ * member       Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+ * transactions Transaction[] // A wallet can have many transactions
+ * @@map("wallets")
+ * }
+ * model Transaction {
+ * id       Int               @id @default(autoincrement())
+ * userId   Int? // ID of the User (member) initiating the transaction. Made optional.
+ * amount   Float
+ * status   TransactionStatus @default(PENDING)
+ * type     TransactionType // e.g., CREDIT for top-up, DEBIT for withdrawal
+ * walletId Int? // Foreign key to Wallet, set upon approval. Made optional.
+ * // Optional details from original model, can be kept
+ * paymentMethod   String? // e.g., "Cash", "Bank Transfer", "UPI"
+ * referenceNumber String? // e.g., Cheque number, UPI transaction ID
+ * notes           String? @db.Text
+ * processedByAdminId Int? // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
+ * createdAt          DateTime @default(now())
+ * updatedAt          DateTime @updatedAt
+ * user             User?   @relation("UserTransactions", fields: [userId], references: [id]) // Relation to User is now optional
+ * wallet           Wallet? @relation(fields: [walletId], references: [id], onDelete: Cascade) // Relation is now optional
+ * processedByAdmin User?   @relation("AdminProcessedTransactions", fields: [processedByAdminId], references: [id]) // Renamed relation
+ * @@index([userId]) // Index on optional field
+ * @@index([walletId]) // Existing index, field is now optional
+ * @@index([processedByAdminId]) // Index for renamed field
+ * @@map("transactions")
+ * }
+ */
 
 model VariantStock {
   id         Int    @id @default(autoincrement())
@@ -474,12 +468,14 @@ model VariantStock {
   depotId    Int
   closingQty String
 
-  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  depot   Depot          @relation(fields: [depotId], references: [id], onDelete: Cascade)
+  product Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant DepotProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  depot   Depot               @relation(fields: [depotId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  ProductVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productVariantId Int?
 
   @@index([productId])
   @@index([variantId])
@@ -525,9 +521,11 @@ model PurchaseDetail {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  purchase Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product  Product        @relation(fields: [productId], references: [id])
-  variant  ProductVariant @relation(fields: [variantId], references: [id])
+  purchase         Purchase            @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product          Product             @relation(fields: [productId], references: [id])
+  variant          DepotProductVariant @relation(fields: [variantId], references: [id])
+  ProductVariant   ProductVariant?     @relation(fields: [productVariantId], references: [id])
+  productVariantId Int?
 
   @@index([purchaseId])
   @@index([productId])
@@ -536,7 +534,7 @@ model PurchaseDetail {
 
 model PurchasePayment {
   id          Int      @id @default(autoincrement())
-  paymentno   String?   @unique
+  paymentno   String?  @unique
   paymentDate DateTime @db.Date
   vendorId    Int
   mode        String
@@ -603,16 +601,44 @@ model WastageDetail {
   wastage   Wastage @relation(fields: [wastageId], references: [id])
 
   productId Int
-  product   Product        @relation(fields: [productId], references: [id])
+  product   Product             @relation(fields: [productId], references: [id])
   variantId Int
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  variant   DepotProductVariant @relation(fields: [variantId], references: [id])
 
   quantity Int
 
+  @@index([variantId])
   @@map("wastage_details")
 }
 
 // Ledger to record every stock movement per variant per depot
+model DepotProductVariant {
+  id            Int     @id @default(autoincrement())
+  depot         Depot   @relation(fields: [depotId], references: [id], onDelete: Cascade)
+  depotId       Int
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     Int
+  name          String
+  hsnCode       String?
+  sellingPrice  Decimal @db.Decimal(10, 2)
+  purchasePrice Decimal @db.Decimal(10, 2)
+  minimumQty    Int     @default(0)
+  closingQty    Int     @default(0)
+
+  wastageDetails WastageDetail[]
+  notInStock     Boolean          @default(false)
+  isHidden       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  VariantStock   VariantStock[]
+  StockLedger    StockLedger[]
+  PurchaseDetail PurchaseDetail[]
+
+  @@index([productId])
+  @@index([depotId])
+  @@map("depot_product_variants")
+}
+
 model StockLedger {
   id              Int      @id @default(autoincrement())
   productId       Int
@@ -625,12 +651,14 @@ model StockLedger {
   foreignKey      Int // Reference record id from the source module
 
   // Relations
-  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  depot   Depot          @relation(fields: [depotId], references: [id], onDelete: Cascade)
+  product Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant DepotProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  depot   Depot               @relation(fields: [depotId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  ProductVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productVariantId Int?
 
   @@index([productId])
   @@index([variantId])

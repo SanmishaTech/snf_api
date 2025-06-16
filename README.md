@@ -66,7 +66,7 @@ A simple Node.js REST API project built with Express, Prisma, and JWT.
 
 6.  Run database migrations:
 
-````bash
+    ```bash
     npx prisma migrate dev --name init
     ```
 
@@ -90,7 +90,7 @@ A simple Node.js REST API project built with Express, Prisma, and JWT.
 
 ## API Documentation
 
-API documentation is available at `http://13.126.180.52api-docs` when the server is running.
+API documentation is available at `http://localhost:3000api-docs` when the server is running.
 
 ## Environment Variables
 

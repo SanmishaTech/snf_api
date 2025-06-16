@@ -60,6 +60,14 @@ const {
   getAllDepotsList, // Added for the new list endpoint
 } = require('../controllers/admin/depotController');
 const {
+  createDepotProductVariant,
+  getDepotProductVariants,
+  getDepotProductVariantById,
+  updateDepotProductVariant,
+  deleteDepotProductVariant,
+} = require('../controllers/admin/depotProductVariantController');
+
+const {
   createBanner,
   getAllBanners,
   getBannerById,
@@ -138,6 +146,16 @@ router.route('/banners/:id')
   .get(authMiddleware, getBannerById)
   .put(authMiddleware, ...bannerUploadMiddleware, updateBanner)
   .delete(authMiddleware, deleteBanner);
+
+// Depot Product Variant Routes
+router.route('/depot-product-variants')
+  .post(authMiddleware, createDepotProductVariant)
+  .get(authMiddleware, getDepotProductVariants);
+
+router.route('/depot-product-variants/:id')
+  .get(authMiddleware, getDepotProductVariantById)
+  .put(authMiddleware, updateDepotProductVariant)
+  .delete(authMiddleware, deleteDepotProductVariant);
 
 // Purchase Payment Routes
 router.route('/purchase-payments')

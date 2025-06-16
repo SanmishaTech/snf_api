@@ -14,7 +14,7 @@ async function generateNewWastageNo() {
   } else {
     fyPrefix = `${String((year - 1) % 100).padStart(2, '0')}${String(year % 100).padStart(2, '0')}`;
   }
-  const prefix = `WG-${fyPrefix}`;
+  const prefix = `${fyPrefix}`;
   const latest = await prisma.wastage.findFirst({
     where: { wastageNo: { startsWith: `${prefix}-` } },
     orderBy: { wastageNo: 'desc' },

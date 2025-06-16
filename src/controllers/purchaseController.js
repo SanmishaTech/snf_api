@@ -91,13 +91,38 @@ exports.createPurchase = async (req, res, next) => {
           })),
         });
 
-        // update variant stocks
+        // update variant stocks and migrate to depot-specific variant ids
         const combos = new Set(
           newPurchase.details.map((d) => `${d.productId}-${d.variantId}-${newPurchase.depotId}`)
         );
         for (const key of combos) {
           const [pId, vId, dId] = key.split('-').map(Number);
-          await updateVariantStock({ productId: pId, variantId: vId, depotId: dId }, tx);
+          // Re-calculate stock, and get / create the depotProductVariant id
+          const depotVariantId = await updateVariantStock({ productId: pId, variantId: vId, depotId: dId }, tx);
+
+          if (depotVariantId) {
+            // Align stock ledger rows to point to the depot variant row
+            await tx.stockLedger.updateMany({
+              where: {
+                foreignKey: newPurchase.id,
+                module: 'purchase',
+                productId: pId,
+                variantId: vId,
+                depotId: dId,
+              },
+              data: { variantId: depotVariantId },
+            });
+
+            // Align purchaseDetail rows as well
+            await tx.purchaseDetail.updateMany({
+              where: {
+                purchaseId: newPurchase.id,
+                productId: pId,
+                variantId: vId,
+              },
+              data: { variantId: depotVariantId },
+            });
+          }
         }
       }
 
@@ -144,6 +169,12 @@ exports.listPurchases = async (req, res, next) => {
     const end = new Date(date);
     end.setUTCHours(23, 59, 59, 999);
     filters.push({ purchaseDate: { gte: start, lte: end } });
+  }
+
+  // Depot scope filter for DepotAdmin
+  const currentUser = req.user;
+  if (currentUser?.role === 'DepotAdmin' && currentUser.depotId) {
+    filters.push({ depotId: currentUser.depotId });
   }
 
   const where = filters.length > 0 ? { AND: filters } : undefined;
@@ -277,7 +308,29 @@ exports.updatePurchase = async (req, res, next) => {
         );
         for (const key of combos) {
           const [pId, vId, dId] = key.split('-').map(Number);
-          await updateVariantStock({ productId: pId, variantId: vId, depotId: dId }, tx);
+          const depotVariantId = await updateVariantStock({ productId: pId, variantId: vId, depotId: dId }, tx);
+
+          if (depotVariantId) {
+            await tx.stockLedger.updateMany({
+              where: {
+                foreignKey: purchase.id,
+                module: 'purchase',
+                productId: pId,
+                variantId: vId,
+                depotId: dId,
+              },
+              data: { variantId: depotVariantId },
+            });
+
+            await tx.purchaseDetail.updateMany({
+              where: {
+                purchaseId: purchase.id,
+                productId: pId,
+                variantId: vId,
+              },
+              data: { variantId: depotVariantId },
+            });
+          }
         }
       }
 

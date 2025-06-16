@@ -13,6 +13,7 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const agencyRoutes = require("./routes/agencyRoutes");
 const productRoutes = require("./routes/productRoutes");
 const productVariantRoutes = require("./routes/productVariantRoutes");
+const depotProductVariantRoutes = require("./routes/depotProductVariantRoutes");
 const swaggerRouter = require("./swagger");
 const vendorOrderRoutes = require("./routes/vendorOrderRoutes");
 const purchaseRoutes = require("./routes/purchaseRoutes");
@@ -46,7 +47,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://13.126.180.52"];
+  : ["http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -82,6 +83,7 @@ app.use("/api/vendors", vendorRoutes);
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/product-variants", productVariantRoutes);
+app.use("/api/depot-product-variants", depotProductVariantRoutes);
 app.use("/api/vendor-orders", vendorOrderRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/wastages", wastageRoutes);

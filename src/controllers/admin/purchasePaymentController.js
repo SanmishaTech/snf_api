@@ -330,7 +330,23 @@ const getVendorPurchases = asyncHandler(async (req, res) => {
     },
   });
 
-  res.status(200).json(purchases);
+  // Compute total amount & outstanding, and filter out fully-paid purchases
+  const result = purchases
+    .map((p) => {
+      const total = p.details.reduce(
+        (sum, d) => sum + parseFloat(d.purchaseRate) * d.quantity,
+        0,
+      );
+      const paid = p.paidAmt ?? 0;
+      return {
+        ...p,
+        totalAmount: total,
+        outstanding: Math.max(total - paid, 0),
+      };
+    })
+    .filter((p) => p.outstanding > 0);
+
+  res.status(200).json(result);
 });
 
 module.exports = {
