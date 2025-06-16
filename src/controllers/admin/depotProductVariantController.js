@@ -59,7 +59,7 @@ module.exports = {
 
       const [variants, totalRecords] = await prisma.$transaction([
         prisma.depotProductVariant.findMany({
-          include: { product: true },
+          include: { product: true, depot: { select: { id: true, name: true } } },
           where,
           skip: (pageNum - 1) * limitNum,
           take: limitNum,
@@ -84,7 +84,7 @@ module.exports = {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return next(createError(400, 'Invalid id parameter'));
 
-    const variant = await prisma.depotProductVariant.findUnique({ where: { id }, include: { product: true } });
+    const variant = await prisma.depotProductVariant.findUnique({ where: { id }, include: { product: true, depot: { select: { id: true, name: true } } } });
     if (!variant) return next(createError(404, 'Depot Product Variant not found'));
     res.json(variant);
   }),
