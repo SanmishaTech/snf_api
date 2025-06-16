@@ -351,9 +351,13 @@ const deleteProduct = asyncHandler(async (req, res, next) => {
     res.status(200).json({ message: `Product with ID ${productId} deleted successfully` });
   } catch (error) {
     console.error('Error deleting product:', error);
-    // Handle potential Prisma errors like P2025 (Record to delete not found)
+    // Prisma error: record not found
     if (error.code === 'P2025') {
-        return next(createError(404, `Product with ID ${productId} not found during delete.`));
+      return next(createError(404, `Product with ID ${productId} not found during delete.`));
+    }
+    // Prisma error: foreign-key constraint violation
+    if (error.code === 'P2003') {
+      return next(createError(400, 'Cannot delete this product because it is referenced in other records (e.g., variants, purchases, or stock ledgers). Remove or update those references first.'));
     }
     next(createError(500, 'Failed to delete product.'));
   }
