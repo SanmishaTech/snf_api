@@ -39,6 +39,7 @@ module.exports = {
     try {
       const {
         productId,
+        depotId: queryDepotId,
         page = 1,
         limit = 1000,
       } = req.query;
@@ -47,10 +48,21 @@ module.exports = {
       const limitNum = parseInt(limit, 10);
 
       const where = {};
+      // ------------------------------
+      // Depot filter handling
+      // ------------------------------
       if (req.user?.depotId) {
-        // DepotAdmin: restrict to own depot
+        // DepotAdmin: always restrict to own depot, ignore query param
         where.depotId = req.user.depotId;
+      } else if (queryDepotId) {
+        const dId = parseInt(queryDepotId, 10);
+        if (isNaN(dId)) return next(createError(400, 'Invalid depotId query param'));
+        where.depotId = dId;
       }
+
+      // ------------------------------
+      // Product filter handling
+      // ------------------------------
       if (productId) {
         const pId = parseInt(productId, 10);
         if (isNaN(pId)) return next(createError(400, 'Invalid productId query param'));
