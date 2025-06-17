@@ -110,9 +110,8 @@ const {
   bulkUpdateVariants,
 } = require('../controllers/productController');
 const authMiddleware = require('../middleware/auth'); // Assuming auth middleware is in the same location
-const aclMiddleware = require('../middleware/acl');   // Assuming acl middleware is in the same location
-const createUploadMiddleware = require('../middleware/uploadMiddleware');
-
+ const createUploadMiddleware = require('../middleware/uploadMiddleware');
+const { allowPublic, allowRoles } = require('../middleware/authorize');
 // Configure upload middleware for product attachments
 const productUploadMiddleware = createUploadMiddleware('products', [
   {
@@ -142,7 +141,7 @@ const productUploadMiddleware = createUploadMiddleware('products', [
  *       500:
  *         description: Internal server error.
  */
-router.get('/public', getPublicProducts);
+router.get('/public', allowPublic(), getPublicProducts);
 
 // POST /api/products - Create a new product
 /**
@@ -207,7 +206,7 @@ router.get('/public', getPublicProducts);
  *       500:
  *         description: Internal server error.
  */
-router.post('/', authMiddleware, productUploadMiddleware, createProduct);
+router.post('/', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), productUploadMiddleware, createProduct);
 
 // GET /api/products - Get all products
 /**
@@ -296,7 +295,7 @@ router.get('/', getAllProducts);
  *     security:
  *       - bearerAuth: [] # Assuming getProductById might require auth based on controller logic, though not explicit in router
  */
-router.get('/:id', getProductById); // Note: authMiddleware is not on this route in original code, but controller might imply access control.
+router.get('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), getProductById); // Note: authMiddleware is not on this route in original code, but controller might imply access control.
 
 // PUT /api/products/:id - Update a product
 /**
@@ -366,7 +365,7 @@ router.get('/:id', getProductById); // Note: authMiddleware is not on this route
  *       500:
  *         description: Internal server error.
  */
-router.put('/:id', authMiddleware, productUploadMiddleware, updateProduct);
+router.put('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), productUploadMiddleware, updateProduct);
 
 // DELETE /api/products/:id - Delete a product
 /**
@@ -404,7 +403,7 @@ router.put('/:id', authMiddleware, productUploadMiddleware, updateProduct);
  *       500:
  *         description: Internal server error.
  */
-router.delete('/:id', authMiddleware, deleteProduct);
+router.delete('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), deleteProduct);
 
 // POST /api/products/:productId/variants/bulk - Bulk update variants for a product
 /**
@@ -470,6 +469,6 @@ router.delete('/:id', authMiddleware, deleteProduct);
  *       500:
  *         description: Internal server error.
  */
-router.post('/:productId/variants/bulk', authMiddleware, bulkUpdateVariants);
+router.post('/:productId/variants/bulk', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), bulkUpdateVariants);
 
 module.exports = router;
