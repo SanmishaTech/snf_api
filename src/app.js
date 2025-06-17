@@ -158,6 +158,7 @@ app.use((err, req, res, next) => {
     error: {
       message: err.message || "An unexpected error occurred.",
       status: err.status || 500,
+      role: err.role || undefined,
     },
   });
 });

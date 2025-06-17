@@ -71,7 +71,10 @@ function roleGuard(...defaultRoles) {
         return next();
       }
 
-      return next(createError(403, "Forbidden: insufficient privileges"));
+      const err = createError(403, "Forbidden: insufficient privileges");
+      // Attach the user's current role so the client can show contextual info or redirect logic
+      err.role = userRole;
+      return next(err);
     } catch (err) {
       console.error("[roleGuard] error:", err);
       return next(createError(500, "Server error while authorizing"));
