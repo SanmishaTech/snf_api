@@ -30,7 +30,10 @@ const teamRoutes = require("./routes/teamRoutes");
 const variantStockRoutes = require("./routes/variantStockRoutes");
 const depotRoutes = require("./routes/depotRoutes");
 const stockLedgerRoutes = require("./routes/stockLedgerRoutes");
-const { getPublicProducts } = require("./controllers/productController");
+const {
+  getPublicProducts,
+  getProductById,
+} = require("./controllers/productController");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -52,7 +55,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://13.126.180.52"];
+  : ["http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -84,31 +87,112 @@ app.use("/uploads", express.static(uploadsPath));
 
 // Public product list (no auth)
 app.get("/api/products/public", getPublicProducts);
+app.get("/api/products/:id", getProductById);
 
 app.use("/api/auth", authRoutes);
-app.use("/api/users", authMiddleware, roleGuard("ADMIN"), userRoutes);
-app.use("/api/vendors", authMiddleware, roleGuard("ADMIN", "VENDOR"), vendorRoutes);
-app.use("/api/agencies", authMiddleware, roleGuard("ADMIN", "AGENCY"), agencyRoutes);
+app.use("/api/users", userRoutes);
+app.use(
+  "/api/vendors",
+  authMiddleware,
+  roleGuard("ADMIN", "VENDOR", "DepotAdmin"),
+  vendorRoutes
+);
+app.use(
+  "/api/agencies",
+  authMiddleware,
+  roleGuard("ADMIN", "AGENCY"),
+  agencyRoutes
+);
 // Product routes include a mix of public and protected endpoints.
 // Individual routes inside productRoutes declare their own auth / role requirements.
 app.use("/api/products", productRoutes);
-app.use("/api/product-variants", authMiddleware, roleGuard("ADMIN","DepotAdmin", "AGENCY", "VENDOR"), productVariantRoutes);
-app.use("/api/depot-product-variants", authMiddleware, roleGuard("ADMIN","DepotAdmin"), depotProductVariantRoutes);
-app.use("/api/vendor-orders", authMiddleware, roleGuard("ADMIN","AGENCY", "VENDOR"), vendorOrderRoutes);
-app.use("/api/purchases", authMiddleware, roleGuard("ADMIN","DepotAdmin"), purchaseRoutes);
-app.use("/api/wastages", authMiddleware, roleGuard("ADMIN","DepotAdmin"), wastageRoutes);
-app.use("/api/delivery-addresses", authMiddleware, roleGuard("ADMIN","MEMBER"), deliveryAddressRoutes);
-app.use("/api/subscriptions", authMiddleware, roleGuard("ADMIN","MEMBER"), subscriptionRoutes);
+app.use(
+  "/api/product-variants",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  productVariantRoutes
+);
+app.use(
+  "/api/depot-product-variants",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  depotProductVariantRoutes
+);
+app.use(
+  "/api/vendor-orders",
+  authMiddleware,
+  roleGuard("ADMIN", "AGENCY", "VENDOR"),
+  vendorOrderRoutes
+);
+app.use(
+  "/api/purchases",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  purchaseRoutes
+);
+app.use(
+  "/api/wastages",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  wastageRoutes
+);
+app.use(
+  "/api/delivery-addresses",
+  authMiddleware,
+  roleGuard("ADMIN", "MEMBER"),
+  deliveryAddressRoutes
+);
+app.use(
+  "/api/subscriptions",
+  authMiddleware,
+  roleGuard("ADMIN", "MEMBER"),
+  subscriptionRoutes
+);
 app.use("/api/admin", adminRoutes); // Added for admin routes
 
-app.use("/api/admin/wallets", authMiddleware, roleGuard("ADMIN"), adminWalletRoutes);
-app.use("/api/admin/members", authMiddleware, roleGuard("ADMIN"), adminMembersRouter); // protected admin members
-app.use("/api/delivery-schedules", authMiddleware, allowRoles("ADMIN", "AGENCY"), deliveryScheduleRoutes);
-app.use("/api/wallet", authMiddleware, allowRoles("ADMIN", "DepotAdmin"), memberwalletRoutes);
+app.use(
+  "/api/admin/wallets",
+  authMiddleware,
+  roleGuard("ADMIN"),
+  adminWalletRoutes
+);
+app.use(
+  "/api/admin/members",
+  authMiddleware,
+  roleGuard("ADMIN"),
+  adminMembersRouter
+); // protected admin members
+app.use(
+  "/api/delivery-schedules",
+  authMiddleware,
+  allowRoles("ADMIN", "AGENCY"),
+  deliveryScheduleRoutes
+);
+app.use(
+  "/api/wallet",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "MEMBER"),
+  memberwalletRoutes
+);
 app.use("/api/teams", authMiddleware, allowRoles("ADMIN"), teamRoutes);
-app.use("/api/variant-stocks", authMiddleware, allowRoles("ADMIN", "DepotAdmin"), variantStockRoutes);
-app.use("/api/depots", authMiddleware, allowRoles("ADMIN", "DepotAdmin"), depotRoutes);
-app.use("/api/stock-ledgers", authMiddleware, allowRoles("ADMIN", "DepotAdmin"), stockLedgerRoutes);
+app.use(
+  "/api/variant-stocks",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin"),
+  variantStockRoutes
+);
+app.use(
+  "/api/depots",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin"),
+  depotRoutes
+);
+app.use(
+  "/api/stock-ledgers",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin"),
+  stockLedgerRoutes
+);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {

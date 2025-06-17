@@ -4,7 +4,7 @@ const router = express.Router();
 const userController = require("../controllers/userController");
 const auth = require("../middleware/auth");
 const acl = require("../middleware/acl");
-
+const { roleGuard } = require("../middleware/authorize");
 /**
  * @swagger
  * tags:
@@ -110,10 +110,10 @@ const acl = require("../middleware/acl");
  *       403:
  *         description: Forbidden
  */
-router.get("/", auth, userController.getUsers);
+router.get("/", auth, roleGuard("ADMIN"), userController.getUsers);
 
 // GET /api/users/me - Get current logged-in user's profile
-router.get('/me', auth, userController.getCurrentUserProfile);
+router.get("/me",auth, userController.getCurrentUserProfile);
 
 /**
  * @swagger
@@ -148,7 +148,7 @@ router.get('/me', auth, userController.getCurrentUserProfile);
  *       403:
  *         description: Forbidden
  */
-router.post("/", auth, userController.createUser);
+router.post("/", auth, roleGuard("ADMIN"), userController.createUser);
 
 /**
  * @swagger
@@ -175,7 +175,7 @@ router.post("/", auth, userController.createUser);
  *       404:
  *         description: User not found
  */
-router.get("/:id", auth, userController.getUserById);
+router.get("/:id", auth, roleGuard("ADMIN"), userController.getUserById);
 
 /**
  * @swagger
@@ -219,7 +219,7 @@ router.get("/:id", auth, userController.getUserById);
  *       404:
  *         description: User not found
  */
-router.put("/:id", auth, userController.updateUser);
+router.put("/:id", auth, roleGuard("ADMIN"), userController.updateUser);
 
 /**
  * @swagger
@@ -246,7 +246,7 @@ router.put("/:id", auth, userController.updateUser);
  *       404:
  *         description: User not found
  */
-router.delete("/:id", auth, userController.deleteUser);
+router.delete("/:id", auth, roleGuard("ADMIN"), userController.deleteUser);
 
 /**
  * @swagger
@@ -284,7 +284,7 @@ router.delete("/:id", auth, userController.deleteUser);
  *       404:
  *         description: User not found
  */
-router.patch("/:id/status", auth, userController.setActiveStatus);
+router.patch("/:id/status", auth, roleGuard("ADMIN"), userController.setActiveStatus);
 
 /**
  * @swagger
@@ -324,6 +324,6 @@ router.patch("/:id/status", auth, userController.setActiveStatus);
  *       404:
  *         description: User not found
  */
-router.patch("/:id/password", auth, userController.changePassword);
+router.patch("/:id/password", auth, roleGuard("ADMIN"), userController.changePassword);
 
 module.exports = router;

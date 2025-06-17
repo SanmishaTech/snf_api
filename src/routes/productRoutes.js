@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 
 /**
  * @swagger
@@ -108,15 +108,15 @@ const {
   deleteProduct,
   getPublicProducts, // Import the new controller function
   bulkUpdateVariants,
-} = require('../controllers/productController');
-const authMiddleware = require('../middleware/auth'); // Assuming auth middleware is in the same location
- const createUploadMiddleware = require('../middleware/uploadMiddleware');
-const { allowPublic, allowRoles } = require('../middleware/authorize');
+} = require("../controllers/productController");
+const authMiddleware = require("../middleware/auth"); // Assuming auth middleware is in the same location
+const createUploadMiddleware = require("../middleware/uploadMiddleware");
+const { allowPublic, allowRoles } = require("../middleware/authorize");
 // Configure upload middleware for product attachments
-const productUploadMiddleware = createUploadMiddleware('products', [
+const productUploadMiddleware = createUploadMiddleware("products", [
   {
-    name: 'productAttachment', // This is the field name expected in FormData
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    name: "productAttachment", // This is the field name expected in FormData
+    allowedTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
     maxSize: 5 * 1024 * 1024, // 5 MB
   },
 ]);
@@ -141,7 +141,7 @@ const productUploadMiddleware = createUploadMiddleware('products', [
  *       500:
  *         description: Internal server error.
  */
-router.get('/public', allowPublic(), getPublicProducts);
+router.get("/public", allowPublic(), getPublicProducts);
 
 // POST /api/products - Create a new product
 /**
@@ -206,7 +206,13 @@ router.get('/public', allowPublic(), getPublicProducts);
  *       500:
  *         description: Internal server error.
  */
-router.post('/', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), productUploadMiddleware, createProduct);
+router.post(
+  "/",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR", "MEMBER"), // Allow MEMBER role for product creation
+  productUploadMiddleware,
+  createProduct
+);
 
 // GET /api/products - Get all products
 /**
@@ -263,7 +269,7 @@ router.post('/', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VE
  *       500:
  *         description: Internal server error.
  */
-router.get('/', getAllProducts);
+router.get("/", getAllProducts);
 
 // GET /api/products/:id - Get a single product by ID
 /**
@@ -295,7 +301,7 @@ router.get('/', getAllProducts);
  *     security:
  *       - bearerAuth: [] # Assuming getProductById might require auth based on controller logic, though not explicit in router
  */
-router.get('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), getProductById); // Note: authMiddleware is not on this route in original code, but controller might imply access control.
+router.get("/:id", getProductById); // Note: authMiddleware is not on this route in original code, but controller might imply access control.
 
 // PUT /api/products/:id - Update a product
 /**
@@ -365,7 +371,13 @@ router.get('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "
  *       500:
  *         description: Internal server error.
  */
-router.put('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), productUploadMiddleware, updateProduct);
+router.put(
+  "/:id",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  productUploadMiddleware,
+  updateProduct
+);
 
 // DELETE /api/products/:id - Delete a product
 /**
@@ -403,7 +415,12 @@ router.put('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "
  *       500:
  *         description: Internal server error.
  */
-router.delete('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), deleteProduct);
+router.delete(
+  "/:id",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  deleteProduct
+);
 
 // POST /api/products/:productId/variants/bulk - Bulk update variants for a product
 /**
@@ -469,6 +486,11 @@ router.delete('/:id', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY"
  *       500:
  *         description: Internal server error.
  */
-router.post('/:productId/variants/bulk', authMiddleware, allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"), bulkUpdateVariants);
+router.post(
+  "/:productId/variants/bulk",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  bulkUpdateVariants
+);
 
 module.exports = router;
