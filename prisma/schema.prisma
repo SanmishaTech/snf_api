@@ -8,27 +8,27 @@ datasource db {
 }
 
 model User {
-  id                Int           @id @default(autoincrement())
-  name              String
-  email             String        @unique
-  password          String
-  role              Role
-  mobile            String?       @unique
-  active            Boolean       @default(true)
-  joiningDate       DateTime?
-  lastLogin         DateTime?
-  resetToken        String?
-  resetTokenExpires DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  agency            Agency?
-  deliveredOrders   VendorOrder[] @relation("DeliveredBy")
-  receivedOrders    VendorOrder[] @relation("ReceivedBy")
-  vendor            Vendor?
-  member            Member?
-  depot             Depot?        @relation(fields: [depotId], references: [id])
-  depotId           Int?
-
+  id                    Int                 @id @default(autoincrement())
+  name                  String
+  email                 String              @unique
+  password              String
+  role                  Role
+  mobile                String?             @unique
+  active                Boolean             @default(true)
+  joiningDate           DateTime?
+  lastLogin             DateTime?
+  resetToken            String?
+  resetTokenExpires     DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  agency                Agency?
+  deliveredOrders       VendorOrder[]       @relation("DeliveredBy")
+  receivedOrders        VendorOrder[]       @relation("ReceivedBy")
+  vendor                Vendor?
+  member                Member?
+  depot                 Depot?              @relation(fields: [depotId], references: [id])
+  depotId               Int?
+  transfersCreated      Transfer[]          @relation("Transfer_createdBy")
   // Wallet Transaction related fields
   processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions") // Wallet transactions processed by this user (admin)
 
@@ -237,6 +237,8 @@ model Depot {
   stockLedgers         StockLedger[]
   wastages             Wastage[]
   depotProductVariants DepotProductVariant[]
+  transfersFrom        Transfer[]            @relation("TransferFromDepot")
+  transfersTo          Transfer[]            @relation("TransferToDepot")
 
   @@map("depots")
 }
@@ -633,6 +635,8 @@ model DepotProductVariant {
   VariantStock   VariantStock[]
   StockLedger    StockLedger[]
   PurchaseDetail PurchaseDetail[]
+  transfersFrom  TransferDetail[] @relation("TransferFromVariant")
+  transfersTo    TransferDetail[] @relation("TransferToVariant")
 
   @@index([productId])
   @@index([depotId])
@@ -663,4 +667,47 @@ model StockLedger {
   @@index([productId])
   @@index([variantId])
   @@index([depotId])
+}
+
+// ---------------- Transfer tables ----------------
+model Transfer {
+  id           Int      @id @default(autoincrement())
+  transferNo   String   @unique
+  transferDate DateTime @db.Date
+  fromDepotId  Int
+  toDepotId    Int
+  notes        String?  @db.Text
+  createdById  Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  fromDepot Depot            @relation("TransferFromDepot", fields: [fromDepotId], references: [id], onDelete: Cascade)
+  toDepot   Depot            @relation("TransferToDepot", fields: [toDepotId], references: [id], onDelete: Cascade)
+  createdBy User?            @relation("Transfer_createdBy", fields: [createdById], references: [id])
+  details   TransferDetail[]
+
+  @@index([fromDepotId])
+  @@index([toDepotId])
+  @@index([createdById])
+  @@map("transfers")
+}
+
+model TransferDetail {
+  id                 Int      @id @default(autoincrement())
+  transferId         Int
+  fromDepotVariantId Int
+  toDepotVariantId   Int
+  quantity           Int
+  createdAt          DateTime @default(now())
+
+  // Relations
+  transfer    Transfer            @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  fromVariant DepotProductVariant @relation("TransferFromVariant", fields: [fromDepotVariantId], references: [id])
+  toVariant   DepotProductVariant @relation("TransferToVariant", fields: [toDepotVariantId], references: [id])
+
+  @@index([transferId])
+  @@index([fromDepotVariantId])
+  @@index([toDepotVariantId])
+  @@map("transfer_details")
 }

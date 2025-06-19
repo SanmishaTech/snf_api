@@ -51,8 +51,8 @@ module.exports = {
       // ------------------------------
       // Depot filter handling
       // ------------------------------
-      if (req.user?.depotId) {
-        // DepotAdmin: always restrict to own depot, ignore query param
+      if (req.user?.role === 'DEPOT_ADMIN' && req.user.depotId) {
+        // Depot Admins are tied to their own depot; ignore query param
         where.depotId = req.user.depotId;
       } else if (queryDepotId) {
         const dId = parseInt(queryDepotId, 10);

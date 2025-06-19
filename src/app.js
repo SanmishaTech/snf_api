@@ -30,6 +30,7 @@ const teamRoutes = require("./routes/teamRoutes");
 const variantStockRoutes = require("./routes/variantStockRoutes");
 const depotRoutes = require("./routes/depotRoutes");
 const stockLedgerRoutes = require("./routes/stockLedgerRoutes");
+const transferRoutes = require("./routes/transferRoutes");
 const {
   getPublicProducts,
   getProductById,
@@ -186,6 +187,12 @@ app.use(
   authMiddleware,
   allowRoles("ADMIN", "DepotAdmin"),
   depotRoutes
+);
+app.use(
+  "/api/transfers",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  transferRoutes
 );
 app.use(
   "/api/stock-ledgers",
