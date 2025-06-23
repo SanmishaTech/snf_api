@@ -101,6 +101,58 @@ module.exports = {
     res.json(variant);
   }),
 
+  // Get all depot product variants for a specific product
+  getDepotProductVariantsByProductId: asyncHandler(async (req, res, next) => {
+    const { productId } = req.params;
+    const { depotId } = req.query; // Capture depotId from query
+
+    const pId = parseInt(productId, 10);
+    if (isNaN(pId)) {
+      return next(createError(400, 'Invalid productId parameter'));
+    }
+
+    const where = {
+      productId: pId,
+      notInStock: false,
+      isHidden: false,
+    };
+
+    // If a depotId is provided, add it to the filter
+    if (depotId) {
+      const dId = parseInt(depotId, 10);
+      if (!isNaN(dId)) {
+        where.depotId = 3;
+      }
+    }
+
+    try {
+      const variants = await prisma.depotProductVariant.findMany({
+        where,
+        select: {
+          id: true,
+          name: true, 
+          sellingPrice: true,
+          minimumQty: true,
+        },
+        orderBy: { name: 'asc' },
+      });
+      console.log(variants)
+
+      // Transform data for frontend compatibility
+      const transformedVariants = variants.map((variant) => ({
+        ...variant,
+        id: variant.id.toString(),
+        price: variant.sellingPrice,
+        rate: variant.sellingPrice,
+        isAvailable: true, // Assuming variants returned are available
+      }));
+
+      res.json(transformedVariants);
+    } catch (error) {
+      next(error);
+    }
+  }),
+
   // Update a depot product variant
   updateDepotProductVariant: asyncHandler(async (req, res, next) => {
     const id = parseInt(req.params.id, 10);

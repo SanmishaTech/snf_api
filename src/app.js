@@ -113,18 +113,13 @@ app.use(
   roleGuard("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
   productVariantRoutes
 );
-app.use(
-  "/api/depot-product-variants",
-  authMiddleware,
-  roleGuard("ADMIN", "DepotAdmin"),
-  depotProductVariantRoutes
-);
+app.use("/api/depot-product-variants", authMiddleware, depotProductVariantRoutes);
 app.use(
   "/api/vendor-orders",
   authMiddleware,
   roleGuard("ADMIN", "AGENCY", "VENDOR"),
   vendorOrderRoutes
-);
+);  
 app.use(
   "/api/purchases",
   authMiddleware,
