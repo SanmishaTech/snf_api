@@ -148,6 +148,27 @@ model Category {
   @@map("categories")
 }
 
+model City {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  locations Location[]
+
+  @@map("cities")
+}
+
+model Location {
+  id        Int      @id @default(autoincrement())
+  name      String
+  cityId    Int
+  city      City     @relation(fields: [cityId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("locations")
+}
+
 model VendorOrder {
   id                Int         @id @default(autoincrement())
   poNumber          String?

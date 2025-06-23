@@ -82,6 +82,20 @@ const {
   deletePurchasePayment,
   getVendorPurchases
 } = require('../controllers/admin/purchasePaymentController');
+const {
+  createCity,
+  getAllCities,
+  getCityById,
+  updateCity,
+  deleteCity,
+} = require('../controllers/admin/cityController');
+const {
+  createLocation,
+  getAllLocations,
+  getLocationById,
+  updateLocation,
+  deleteLocation,
+} = require('../controllers/admin/locationController');
 const authMiddleware = require('../middleware/auth'); // Corrected path to auth middleware
 const createUploadMiddleware = require('../middleware/uploadMiddleware');
 
@@ -177,5 +191,25 @@ router.route('/users/:userId')
 
 // Admin Member Status Toggle Route
 router.patch('/members/:memberId/status', authMiddleware, adminToggleMemberStatus);
+
+// City Routes
+router.route('/cities')
+  .post(authMiddleware, createCity)
+  .get(authMiddleware, getAllCities);
+
+router.route('/cities/:id')
+  .get(authMiddleware, getCityById)
+  .put(authMiddleware, updateCity)
+  .delete(authMiddleware, deleteCity);
+
+// Location Routes
+router.route('/locations')
+  .post(authMiddleware, createLocation)
+  .get(authMiddleware, getAllLocations);
+
+router.route('/locations/:id')
+  .get(authMiddleware, getLocationById)
+  .put(authMiddleware, updateLocation)
+  .delete(authMiddleware, deleteLocation);
 
 module.exports = router;
