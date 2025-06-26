@@ -31,6 +31,7 @@ const variantStockRoutes = require("./routes/variantStockRoutes");
 const depotRoutes = require("./routes/depotRoutes");
 const stockLedgerRoutes = require("./routes/stockLedgerRoutes");
 const transferRoutes = require("./routes/transferRoutes");
+const productOrderRoutes = require("./routes/productOrderRoutes");
 const {
   getPublicProducts,
   getProductById,
@@ -89,9 +90,10 @@ app.use("/uploads", express.static(uploadsPath));
 // Public product list (no auth)
 app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
-
-app.use("/api/auth", authRoutes);
+app.use('/api/product-orders', productOrderRoutes);
+app.use('/api/wastage', wastageRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/auth", authRoutes);
 app.use(
   "/api/vendors",
   authMiddleware,

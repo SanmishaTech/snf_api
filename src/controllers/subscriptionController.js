@@ -184,12 +184,11 @@ const createSubscription = asyncHandler(async (req, res) => {
       }
       break;
     case 'ALTERNATE_DAYS':
-    case 'ALTERNATE-DAYS': 
-      // User wants "Alternate Days" input to mean DAILY delivery with VARYING quantity.
-      // This mirrors the behavior of the "VARYING" input.
-      console.log('[SubscriptionController] Frontend sent deliverySchedule: "ALTERNATE_DAYS". Interpreting as DAILY pattern with varying quantities as per user request.');
-      internalScheduleLogicType = 'VARYING'; // Use 'VARYING' logic for daily delivery with alternating qty
-      dbDeliveryScheduleEnum = 'DAILY';    // Store as DAILY in DB
+    case 'ALTERNATE-DAYS':
+      // Frontend expects true "alternate days" pattern (e.g., delivery on days 1,3,5...). Map accordingly.
+      console.log('[SubscriptionController] Frontend sent deliverySchedule: "ALTERNATE_DAYS" – mapping to alternate-day delivery logic.');
+      internalScheduleLogicType = 'ALTERNATE_DAYS_LOGIC'; // generateDeliveryDates handles every-other-day pattern
+      dbDeliveryScheduleEnum = 'ALTERNATE_DAYS'; // Persist as ALTERNATE_DAYS enum in DB
       break;
     case 'VARYING':
       // VARYING from frontend implies daily deliveries with potentially different quantities (using altQty).

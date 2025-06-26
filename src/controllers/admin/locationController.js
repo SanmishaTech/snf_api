@@ -7,7 +7,7 @@ const prisma = require('../../config/db');
  * @access  Private/Admin
  */
 const createLocation = asyncHandler(async (req, res) => {
-  const { name, cityId } = req.body;
+  const { name, cityId, agencyId } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     res.status(400);
@@ -15,15 +15,25 @@ const createLocation = asyncHandler(async (req, res) => {
   }
 
   if (!cityId) {
-      res.status(400);
-      throw new Error('Please provide a city');
+    res.status(400);
+    throw new Error('Please provide a city');
+  }
+
+  const data = {
+    name: name.trim(),
+    cityId: parseInt(cityId),
+  };
+
+  if (agencyId) {
+    data.agencyId = parseInt(agencyId);
   }
 
   try {
     const location = await prisma.location.create({
-      data: {
-        name: name.trim(),
-        cityId: parseInt(cityId),
+      data,
+      include: {
+        city: true,
+        agency: true,
       },
     });
     res.status(201).json(location);
@@ -55,7 +65,10 @@ const getAllLocations = asyncHandler(async (req, res) => {
 
   const locations = await prisma.location.findMany({
     where: whereClause,
-    include: { city: true },
+    include: {
+      city: true,
+      agency: true,
+    },
     skip: skip,
     take: limit,
     orderBy: {
@@ -80,7 +93,10 @@ const getLocationById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const location = await prisma.location.findUnique({
     where: { id: parseInt(id) },
-    include: { city: true },
+    include: {
+      city: true,
+      agency: true,
+    },
   });
 
   if (!location) {
@@ -98,7 +114,7 @@ const getLocationById = asyncHandler(async (req, res) => {
  */
 const updateLocation = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, cityId } = req.body;
+  const { name, cityId, agencyId } = req.body;
 
   const updateData = {};
 
@@ -111,7 +127,15 @@ const updateLocation = asyncHandler(async (req, res) => {
   }
 
   if (cityId !== undefined) {
-      updateData.cityId = parseInt(cityId);
+    updateData.cityId = parseInt(cityId);
+  }
+
+  if (agencyId !== undefined) {
+    if (agencyId === null || agencyId === '') {
+      updateData.agencyId = null;
+    } else {
+      updateData.agencyId = parseInt(agencyId);
+    }
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -123,7 +147,12 @@ const updateLocation = asyncHandler(async (req, res) => {
     const updatedLocation = await prisma.location.update({
       where: { id: parseInt(id) },
       data: updateData,
+      include: {
+        city: true,
+        agency: true,
+      },
     });
+
     res.status(200).json(updatedLocation);
   } catch (error) {
     if (error.code === 'P2025') {

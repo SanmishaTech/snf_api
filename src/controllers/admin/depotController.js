@@ -11,6 +11,8 @@ const depotSchema = z.object({
   address: z.string().min(1, 'Address is required'),
   contactPerson: z.string().max(255).optional().nullable(),
   contactNumber: z.string().max(20).optional().nullable(),
+  isOnline: z.boolean().optional(),
+  agencyId: z.number().int().optional().nullable(),
 });
 
 // Schema to create depot along with admin user details
@@ -32,6 +34,7 @@ exports.createDepot = async (req, res, next) => {
       userFullName,
       userLoginEmail,
       userPassword,
+      agencyId,
       ...depotInput
     } = validationResult;
 
@@ -54,7 +57,12 @@ exports.createDepot = async (req, res, next) => {
 
     // Transaction: create depot then user linked via depotId
     const { newDepot, newUser } = await prisma.$transaction(async (tx) => {
-      const newDepot = await tx.depot.create({ data: depotInput });
+      const newDepot = await tx.depot.create({
+        data: {
+          ...depotInput,
+          agency: agencyId ? { connect: { id: agencyId } } : undefined,
+        },
+      });
 
       const newUser = await tx.user.create({
         data: {
@@ -108,6 +116,7 @@ exports.getAllDepots = async (req, res, next) => {
     try {
         const [depots, totalRecords] = await prisma.$transaction([
             prisma.depot.findMany({
+                include: { agency: true },
                 where: whereClause,
                 skip,
                 take: limit,
@@ -178,9 +187,15 @@ exports.updateDepot = async (req, res, next) => {
       }
     }
 
+    const { isOnline, agencyId, ...otherData } = validatedData;
+
     const updatedDepot = await prisma.depot.update({
       where: { id: parseInt(id) },
-      data: validatedData,
+      data: {
+        ...otherData,
+        isOnline: isOnline,
+        agency: agencyId ? { connect: { id: agencyId } } : { disconnect: true },
+      },
     });
     res.status(200).json(updatedDepot);
   } catch (error) {

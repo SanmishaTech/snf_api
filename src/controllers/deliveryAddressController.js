@@ -15,7 +15,8 @@ const createDeliveryAddress = asyncHandler(async (req, res) => {
     city,
     state,
     isDefault,
-    label
+    label,
+    locationId
   } = req.body;
 
   const userId = req.user.id;
@@ -51,7 +52,8 @@ const createDeliveryAddress = asyncHandler(async (req, res) => {
       city,
       state,
       label,
-      isDefault: isDefault || false
+      isDefault: isDefault || false,
+      locationId: locationId ? parseInt(locationId) : null
     }
   });
 
@@ -76,7 +78,8 @@ const getDeliveryAddresses = asyncHandler(async (req, res) => {
   // Get all addresses for this member
   const addresses = await prisma.deliveryAddress.findMany({
     where: { memberId: member.id },
-    orderBy: { isDefault: 'desc' }
+    orderBy: { isDefault: 'desc' },
+    include: { location: true }
   });
 
   res.status(200).json(addresses);
@@ -105,7 +108,8 @@ const getDeliveryAddress = asyncHandler(async (req, res) => {
 
   // Get the specific address
   const address = await prisma.deliveryAddress.findUnique({
-    where: { id: addressId }
+    where: { id: addressId },
+    include: { location: true }
   });
 
   if (!address) {
@@ -141,7 +145,8 @@ const updateDeliveryAddress = asyncHandler(async (req, res) => {
     city,
     state,
     isDefault,
-    label // Add label to destructuring
+    label, // Add label to destructuring
+    locationId
   } = req.body;
 
   // Find the member associated with the user
@@ -192,7 +197,8 @@ const updateDeliveryAddress = asyncHandler(async (req, res) => {
       city,
       state,
       label: label !== undefined ? label : address.label,
-      isDefault: isDefault !== undefined ? isDefault : address.isDefault
+      isDefault: isDefault !== undefined ? isDefault : address.isDefault,
+      locationId: locationId !== undefined ? (locationId ? parseInt(locationId) : null) : address.locationId
     }
   });
 

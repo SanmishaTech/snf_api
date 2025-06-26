@@ -84,7 +84,11 @@ model Agency {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
   subscriptions     Subscription[]
+  depotId           Int?           @unique
+  depot             Depot?         @relation(fields: [depotId], references: [id])
+  locations         Location[]
 
+  @@index([depotId])
   @@map("agencies")
 }
 
@@ -159,15 +163,21 @@ model City {
 }
 
 model Location {
-  id        Int      @id @default(autoincrement())
-  name      String
-  cityId    Int
-  city      City     @relation(fields: [cityId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                Int               @id @default(autoincrement())
+  name              String
+  cityId            Int
+  city              City              @relation(fields: [cityId], references: [id])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deliveryAddresses DeliveryAddress[]
+  agencyId          Int?
+  agency            Agency?           @relation(fields: [agencyId], references: [id])
 
   @@map("locations")
+  @@index([agencyId])
 }
+
+
 
 model VendorOrder {
   id                Int         @id @default(autoincrement())
@@ -229,6 +239,7 @@ model Member {
   deliveryScheduleEntries DeliveryScheduleEntry[]
   walletBalance           Float                   @default(0)
   walletTransactions      WalletTransaction[]     @relation("MemberTransactions")
+  productOrders           ProductOrder[]
 
   @@map("members")
 }
@@ -249,6 +260,7 @@ model Depot {
   address              String
   contactPerson        String?
   contactNumber        String?
+  isOnline             Boolean               @default(false)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   areas                AreaMaster[] // Relation to AreaMaster
@@ -260,6 +272,7 @@ model Depot {
   depotProductVariants DepotProductVariant[]
   transfersFrom        Transfer[]            @relation("TransferFromDepot")
   transfersTo          Transfer[]            @relation("TransferToDepot")
+  agency               Agency?
 
   @@map("depots")
 }
@@ -297,13 +310,18 @@ model DeliveryAddress {
   subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id])
+
   @@index([memberId], map: "delivery_addresses_memberId_fkey")
+  @@index([locationId])
   @@map("delivery_addresses")
 }
 
 // Enums for Subscriptions
 enum DeliverySchedule {
   DAILY
+  DAY1_DAY2
   WEEKDAYS // maps to SELECT_DAYS in controller logic if weekdays are provided
   ALTERNATE_DAYS
 }
@@ -412,6 +430,10 @@ model Subscription {
   @@index([deliveryAddressId])
   @@index([productId])
   @@index([agencyId])
+
+  productOrder   ProductOrder? @relation(fields: [productOrderId], references: [id])
+  productOrderId Int?
+
   @@map("subscriptions")
 }
 
@@ -645,6 +667,10 @@ model DepotProductVariant {
   hsnCode       String?
   sellingPrice  Decimal @db.Decimal(10, 2)
   purchasePrice Decimal @db.Decimal(10, 2)
+  price3Day     Decimal? @db.Decimal(10, 2)
+  price7Day     Decimal? @db.Decimal(10, 2)
+  price15Day    Decimal? @db.Decimal(10, 2)
+  price1Month   Decimal? @db.Decimal(10, 2)
   minimumQty    Int     @default(0)
   closingQty    Int     @default(0)
 
@@ -731,4 +757,26 @@ model TransferDetail {
   @@index([fromDepotVariantId])
   @@index([toDepotVariantId])
   @@map("transfer_details")
+}
+
+model ProductOrder {
+  id                 Int             @id @default(autoincrement())
+  orderNo            String          @unique
+  memberId           Int
+  member             Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  subscriptions      Subscription[]
+  totalQty           Int
+  totalAmount        Float
+  walletamt          Float           @default(0)
+  payableamt         Float           @default(0)
+  receivedamt        Float           @default(0)
+  paymentMode        PaymentMode?
+  paymentReferenceNo String?
+  paymentDate        DateTime?
+  paymentStatus      PaymentStatus   @default(PENDING)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([memberId])
+  @@map("product_orders")
 }
