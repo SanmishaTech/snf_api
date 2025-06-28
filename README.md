@@ -61,6 +61,7 @@ A simple Node.js REST API project built with Express, Prisma, and JWT.
     MAILTRAP_USER="your_mailtrap_username"
     MAILTRAP_PASSWORD="your_mailtrap_password"
     ALLOW_REGISTRATION=true
+    asd
     DEFAULT_USER_ROLE='user'
     ```
 
