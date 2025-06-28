@@ -71,10 +71,10 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-      path.resolve(__dirname, "..", "..", "frontend", "dist")
-    : path.resolve(__dirname, "..", "..", "frontend", "dist");
+      path.resolve(__dirname, "..", "..", "snf", "dist")
+    : path.resolve(__dirname, "..", "..", "snf", "dist");
 
-console.log(`Frontend bui ld path: ${frontendDistPath}`);
+console.log(`snf bui ld path: ${frontendDistPath}`);
 
 console.log(`Serving frontend static files from: ${frontendDistPath}`);
 app.use(express.static(frontendDistPath));
@@ -90,8 +90,8 @@ app.use("/uploads", express.static(uploadsPath));
 // Public product list (no auth)
 app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
-app.use('/api/product-orders', productOrderRoutes);
-app.use('/api/wastage', wastageRoutes);
+app.use("/api/product-orders", productOrderRoutes);
+app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use(
@@ -115,13 +115,17 @@ app.use(
   roleGuard("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
   productVariantRoutes
 );
-app.use("/api/depot-product-variants", authMiddleware, depotProductVariantRoutes);
+app.use(
+  "/api/depot-product-variants",
+  authMiddleware,
+  depotProductVariantRoutes
+);
 app.use(
   "/api/vendor-orders",
   authMiddleware,
   roleGuard("ADMIN", "AGENCY", "VENDOR"),
   vendorOrderRoutes
-);  
+);
 app.use(
   "/api/purchases",
   authMiddleware,
