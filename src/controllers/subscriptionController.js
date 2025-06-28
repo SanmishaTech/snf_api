@@ -255,27 +255,48 @@ const createSubscription = asyncHandler(async (req, res) => {
         });
       }
 
-      // 2. Create the Subscription record with new fields
-      const newSubscription = await tx.subscription.create({
+      // Create a ProductOrder to wrap the subscription
+      const newProductOrder = await tx.productOrder.create({
         data: {
-          memberId: member.id,
-          deliveryAddressId: parsedDeliveryAddressId,
-          productId: parsedProductId,
-          startDate: baseDate,
-          period: parsedPeriod,
-          expiryDate,
-          deliverySchedule: dbDeliveryScheduleEnum, // Use the DB-specific enum value
-          weekdays: dbDeliveryScheduleEnum === 'WEEKDAYS' ? JSON.stringify(weekdays) : null, // Store weekdays if DB enum is WEEKDAYS
-          qty: parsedQty,
-          altQty: parsedAltQty,
-          rate: product.rate,
-          totalQty, 
-          amount, // Total cost before deductions
-          walletamt, // Amount deducted from wallet
-          payableamt, // Remaining amount to be paid
-          receivedamt: 0, // Initially 0, to be updated upon actual payment if not fully from wallet
-          paymentStatus: paymentStatus, // 'PAID' or 'PENDING'
+          member: { connect: { id: member.id } },
+          orderNo: `SNF-ORD-${Date.now()}`,
+          totalQty: totalQty,
+          totalAmount: amount,
+          walletamt: walletamt,
+          payableamt: payableamt,
+          receivedamt: 0, // Default value
+          paymentStatus: paymentStatus,
         },
+      });
+
+
+      // 2. Create the Subscription record with new fields
+      const subscriptionData = {
+        member: { connect: { id: member.id } },
+        product: { connect: { id: parsedProductId } },
+        productOrder: { connect: { id: newProductOrder.id } },
+        startDate: baseDate,
+        period: parsedPeriod,
+        expiryDate,
+        deliverySchedule: dbDeliveryScheduleEnum,
+        weekdays: dbDeliveryScheduleEnum === 'WEEKDAYS' ? JSON.stringify(weekdays) : null,
+        qty: parsedQty,
+        altQty: parsedAltQty,
+        rate: product.rate,
+        totalQty,
+        amount,
+        walletamt,
+        payableamt,
+        receivedamt: 0,
+        paymentStatus: paymentStatus,
+      };
+
+      if (parsedDeliveryAddressId) {
+        subscriptionData.deliveryAddress = { connect: { id: parsedDeliveryAddressId } };
+      }
+
+      const newSubscription = await tx.subscription.create({
+        data: subscriptionData,
       });
 
       // 3. Create a WalletTransaction record if wallet funds were used
@@ -803,7 +824,7 @@ const getDeliveryScheduleByDate = asyncHandler(async (req, res) => {
       // Initialize product within agency if not present
       const productKey = product.id;
       acc[agencyId].products[productKey] = acc[agencyId].products[productKey] || {
-        productId: product.id,
+        product: { connect: { id: product.id } },
         productName: product.name,
         quantity: 0,
       };

@@ -57,7 +57,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://localhost:3000"];
+  : ["http://localhost:5173", "http://13.126.180.52"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -71,8 +71,8 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-      path.resolve(__dirname, "..", "..", "snf", "dist")
-    : path.resolve(__dirname, "..", "..", "snf", "dist");
+      path.resolve(__dirname, "..", "..", "frontend", "dist")
+    : path.resolve(__dirname, "..", "..", "frontend", "dist");
 
 console.log(`Frontend bui ld path: ${frontendDistPath}`);
 

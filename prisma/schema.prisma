@@ -84,6 +84,7 @@ model Agency {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
   subscriptions     Subscription[]
+  productOrders     ProductOrder[]
   depotId           Int?           @unique
   depot             Depot?         @relation(fields: [depotId], references: [id])
   locations         Location[]
@@ -372,8 +373,8 @@ model DeliveryScheduleEntry {
   subscriptionId    Int // Changed to Int
   member            Member          @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
   memberId          Int // Changed to Int
-  deliveryAddress   DeliveryAddress @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
-  deliveryAddressId Int // Changed to Int
+  deliveryAddress   DeliveryAddress? @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
+  deliveryAddressId Int? // Changed to Int
   product           Product         @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
   productId         Int
   deliveryDate      DateTime        @db.Date
@@ -395,8 +396,9 @@ model DeliveryScheduleEntry {
 model Subscription {
   id                Int              @id @default(autoincrement())
   memberId          Int
-  deliveryAddressId Int
+  deliveryAddressId Int?
   productId         Int
+  depotProductVariantId Int?
   startDate         DateTime         @default(now()) // Date when the subscription effectively starts
   period            Int
   expiryDate        DateTime
@@ -421,8 +423,9 @@ model Subscription {
   updatedAt          DateTime      @updatedAt
 
   member                  Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  deliveryAddress         DeliveryAddress         @relation(fields: [deliveryAddressId], references: [id], onDelete: Restrict)
+  deliveryAddress         DeliveryAddress?        @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade)
   product                 Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  depotProductVariant     DepotProductVariant?    @relation(fields: [depotProductVariantId], references: [id], onDelete: Restrict)
   agency                  Agency?                 @relation(fields: [agencyId], references: [id], onDelete: SetNull)
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
@@ -684,6 +687,7 @@ model DepotProductVariant {
   PurchaseDetail PurchaseDetail[]
   transfersFrom  TransferDetail[] @relation("TransferFromVariant")
   transfersTo    TransferDetail[] @relation("TransferToVariant")
+  subscriptions  Subscription[]
 
   @@index([productId])
   @@index([depotId])
@@ -776,7 +780,10 @@ model ProductOrder {
   paymentStatus      PaymentStatus   @default(PENDING)
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
+  agencyId           Int?
+  agency             Agency?         @relation(fields: [agencyId], references: [id])
 
   @@index([memberId])
+  @@index([agencyId])
   @@map("product_orders")
 }

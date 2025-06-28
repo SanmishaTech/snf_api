@@ -172,10 +172,16 @@ module.exports = {
 
       // Transform data for frontend compatibility
       const transformedVariants = variants.map((variant) => ({
-        ...variant,
         id: variant.id.toString(),
-        price: variant.sellingPrice,
-        rate: variant.sellingPrice,
+        name: variant.name,
+        price: variant.sellingPrice, // Map sellingPrice to price
+        rate: variant.sellingPrice, // Map sellingPrice to rate
+        price3Day: variant.price3Day,
+        price7Day: variant.price7Day,
+        price15Day: variant.price15Day,
+        price1Month: variant.price1Month,
+        minimumQty: variant.minimumQty,
+        depot: variant.depot,
         isAvailable: true, // Assuming variants returned are available
       }));
 

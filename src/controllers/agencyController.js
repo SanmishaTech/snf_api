@@ -126,32 +126,23 @@ const getAllAgencies = asyncHandler(async (req, res, next) => {
   const limitNum = parseInt(limit, 10);
 
   if (isNaN(pageNum) || pageNum < 1) {
-    return next(createError(400, 'Invalid page number'));
+    return next(createError(400, 'Page number must be a positive integer.'));
   }
   if (isNaN(limitNum) || limitNum < 1) {
-    return next(createError(400, 'Invalid limit number'));
+    return next(createError(400, 'Limit must be a positive integer.'));
   }
 
   const whereConditions = {};
 
   if (search) {
     whereConditions.OR = [
-      { name: { contains: search } },
-      { email: { contains: search } },
-      { city: { contains: search } },
-      { user: {
-          OR: [
-            { name: { contains: search } },
-            { email: { contains: search } },
-          ]
-        }
-      }
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
     ];
   }
 
   if (active !== 'all') {
     whereConditions.user = {
-      ...whereConditions.user,
       active: active === 'true'
     };
   }
@@ -171,10 +162,7 @@ const getAllAgencies = asyncHandler(async (req, res, next) => {
       include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
     });
 
-    const totalRecords = await prisma.agency.count({
-      where: whereConditions,
-    });
-
+    const totalRecords = await prisma.agency.count({ where: whereConditions });
     const totalPages = Math.ceil(totalRecords / limitNum);
 
     res.status(200).json({

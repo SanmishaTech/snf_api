@@ -137,9 +137,16 @@ const getAllBanners = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 const getBannerById = asyncHandler(async (req, res) => {
-  const { id } = req.params; // Banner ID is a CUID (string)
+  const { id } = req.params;
+  const bannerId = parseInt(id, 10);
+  
+  if (isNaN(bannerId)) {
+    res.status(400);
+    throw new Error('Invalid banner ID');
+  }
+  
   const banner = await prisma.banner.findUnique({
-    where: { id },
+    where: { id: bannerId },
   });
 
   if (!banner) {
@@ -170,6 +177,13 @@ const updateBanner = asyncHandler(async (req, res) => {
   }
 
   const { id } = req.params;
+  const bannerId = parseInt(id, 10);
+  
+  if (isNaN(bannerId)) {
+    res.status(400);
+    throw new Error('Invalid banner ID');
+  }
+  
   const { caption, description, listOrder } = req.body;
   let dataToUpdate = {
     caption,
@@ -210,7 +224,7 @@ const updateBanner = asyncHandler(async (req, res) => {
     // Check if banner exists, then return it or a 304 Not Modified.
     // For simplicity, we'll let Prisma handle it; it might return the existing record.
     // If you want specific behavior for no-op updates, add it here.
-    const existingBanner = await prisma.banner.findUnique({ where: { id } });
+    const existingBanner = await prisma.banner.findUnique({ where: { id: bannerId } });
     if (!existingBanner) {
         res.status(404); throw new Error('Banner not found');
     }
@@ -219,7 +233,7 @@ const updateBanner = asyncHandler(async (req, res) => {
 
   try {
     const updatedBanner = await prisma.banner.update({
-      where: { id },
+      where: { id: bannerId },
       data: dataToUpdate,
     });
     res.status(200).json(updatedBanner);
@@ -244,11 +258,17 @@ const updateBanner = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 const deleteBanner = asyncHandler(async (req, res) => {
-  const { id } = req.params; // Banner ID is a CUID (string)
+  const { id } = req.params;
+  const bannerId = parseInt(id, 10);
+  
+  if (isNaN(bannerId)) {
+    res.status(400);
+    throw new Error('Invalid banner ID');
+  }
 
   try {
     await prisma.banner.delete({
-      where: { id },
+      where: { id: bannerId },
     });
     res.status(200).json({ message: 'Banner removed successfully' });
   } catch (error) {
