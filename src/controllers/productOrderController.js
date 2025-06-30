@@ -3,6 +3,10 @@ const { PrismaClient } = require('@prisma/client');
 
 // Helper function to get the correct price based on the subscription period
 const getPriceForPeriod = (depotVariant, periodInDays) => {
+  // For single-day purchases ("buy once"), use the specific buyOncePrice if available.
+  if (periodInDays === 1 && depotVariant.buyOncePrice) {
+    return Number(depotVariant.buyOncePrice);
+  }
   // Prices are checked from the longest period to the shortest to ensure the best rate is applied.
   if (periodInDays >= 30 && depotVariant.price1Month) {
     return Number(depotVariant.price1Month);
@@ -345,10 +349,11 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           deliveryDate: entry.date,
           quantity: entry.quantity,
           status: 'PENDING',
+          agentId: subData.agentId, // Ensure agent is assigned to the delivery entry
         }));
         allDeliveryScheduleEntries.push(...entriesForThisSub);
       }
-      
+
       if (walletAmountToUse > 0) {
         await tx.member.update({
           where: { id: memberId },

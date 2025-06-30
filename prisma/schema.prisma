@@ -84,10 +84,11 @@ model Agency {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems        OrderItem[]
   subscriptions     Subscription[]
-  productOrders     ProductOrder[]
-  depotId           Int?           @unique
-  depot             Depot?         @relation(fields: [depotId], references: [id])
-  locations         Location[]
+  productOrders           ProductOrder[]
+  depotId                 Int?                    @unique
+  depot                   Depot?                  @relation(fields: [depotId], references: [id])
+  locations               Location[]
+  deliveryScheduleEntries DeliveryScheduleEntry[]
 
   @@index([depotId])
   @@map("agencies")
@@ -380,16 +381,18 @@ model DeliveryScheduleEntry {
   deliveryDate      DateTime        @db.Date
   quantity          Int             @default(1) // Quantity for this specific delivery, default to 1
   status            DeliveryStatus  @default(PENDING)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  agentId           Int?
+  agent             Agency?         @relation(fields: [agentId], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   @@index([subscriptionId])
   @@index([memberId])
   @@index([deliveryAddressId])
   @@index([productId])
   @@index([deliveryDate])
-  @@map("delivery_schedule")
+  @@index([agentId])
+  @@map("delivery_schedule_entries")
 }
 
 // Model for Subscriptions
@@ -682,6 +685,7 @@ model DepotProductVariant {
   isHidden       Boolean          @default(false)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+  buyOncePrice   Decimal?         @db.Decimal(10, 2)
   VariantStock   VariantStock[]
   StockLedger    StockLedger[]
   PurchaseDetail PurchaseDetail[]

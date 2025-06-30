@@ -27,6 +27,7 @@ const depotProductVariantSchema = z.object({
   price7Day: z.coerce.number().nonnegative().optional(),
   price15Day: z.coerce.number().nonnegative().optional(),
   price1Month: z.coerce.number().nonnegative().optional(),
+  buyOncePrice: z.coerce.number().nonnegative().optional(),
 });
 
 // For updates we still forbid changing depotId via body; omit depotId field entirely
@@ -164,6 +165,7 @@ module.exports = {
           price7Day: true,
           price15Day: true,
           price1Month: true,
+          buyOncePrice: true,
           depot: { select: { id: true, name: true } },
         },
         orderBy: { name: "asc" },
@@ -176,6 +178,7 @@ module.exports = {
         name: variant.name,
         price: variant.sellingPrice, // Map sellingPrice to price
         rate: variant.sellingPrice, // Map sellingPrice to rate
+        buyOncePrice: variant.buyOncePrice,
         price3Day: variant.price3Day,
         price7Day: variant.price7Day,
         price15Day: variant.price15Day,
