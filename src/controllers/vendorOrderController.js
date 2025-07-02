@@ -94,33 +94,55 @@ exports.createVendorOrder = async (req, res, next) => {
     let totalAmount = 0;
     const itemsToCreate = [];
 
-    for (const item of orderItems) {
-      if (!item.productId || !item.quantity || !item.agencyId) {
-        return next(createError(400, `OrderItem missing productId, quantity, or agencyId.`));
-      }
-      if (item.quantity <= 0) {
-        return next(createError(400, `Quantity for product ID ${item.productId} must be positive.`));
-      }
-
-      const product = await prisma.product.findUnique({ where: { id: parseInt(item.productId) } });
-      if (!product) {
-        return next(createError(404, `Product with ID ${item.productId} not found.`));
-      }
-      // Stock check for product.quantity has been commented out in original, retaining that.
-
-      const agency = await prisma.agency.findUnique({ where: { id: parseInt(item.agencyId) } });
-      if (!agency) {
-        return next(createError(404, `Agency with ID ${item.agencyId} not found.`));
-      }
-
-      itemsToCreate.push({
-        productId: parseInt(item.productId),
-        quantity: parseInt(item.quantity),
-        priceAtPurchase: parseFloat(product.price), // Ensure product.price is a number
-        agencyId: parseInt(item.agencyId),
-      });
-      totalAmount += parseFloat(product.price) * parseInt(item.quantity);
+  for (const item of orderItems) {
+    if (!item.productId || !item.quantity || !item.agencyId) {
+      return next(createError(400, `OrderItem missing productId, quantity, or agencyId.`));
     }
+    if (item.quantity <= 0) {
+      return next(createError(400, `Quantity for product ID ${item.productId} must be positive.`));
+    }
+
+    const product = await prisma.product.findUnique({ where: { id: parseInt(item.productId) } });
+    if (!product) {
+      return next(createError(404, `Product with ID ${item.productId} not found.`));
+    }
+    // Stock check for product.quantity has been commented out in original, retaining that.
+
+    const agency = await prisma.agency.findUnique({ where: { id: parseInt(item.agencyId) } });
+    if (!agency) {
+      return next(createError(404, `Agency with ID ${item.agencyId} not found.`));
+    }
+
+    // Validate depot if provided
+    let depotId = null;
+    if (item.depotId && item.depotId !== '') {
+      const depot = await prisma.depot.findUnique({ where: { id: parseInt(item.depotId) } });
+      if (!depot) {
+        return next(createError(404, `Depot with ID ${item.depotId} not found.`));
+      }
+      depotId = parseInt(item.depotId);
+    }
+
+    // Validate depot variant if provided
+    let depotVariantId = null;
+    if (item.depotVariantId && item.depotVariantId !== '') {
+      const depotVariant = await prisma.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
+      if (!depotVariant) {
+        return next(createError(404, `Depot variant with ID ${item.depotVariantId} not found.`));
+      }
+      depotVariantId = parseInt(item.depotVariantId);
+    }
+
+    itemsToCreate.push({
+      productId: parseInt(item.productId),
+      quantity: parseInt(item.quantity),
+      priceAtPurchase: parseFloat(product.price), // Ensure product.price is a number
+      agencyId: parseInt(item.agencyId),
+      depotId: depotId,
+      depotVariantId: depotVariantId,
+    });
+    totalAmount += parseFloat(product.price) * parseInt(item.quantity);
+  }
 
     const newOrder = await prisma.$transaction(async (tx) => {
       const createdOrder = await tx.vendorOrder.create({
@@ -202,7 +224,14 @@ exports.getAllVendorOrders = async (req, res, next) => {
       orderBy: { [sortBy]: sortOrder },
       include: {
         vendor: true,
-        items: { include: { product: true, agency: true } },
+        items: { 
+          include: { 
+            product: true, 
+            agency: true,
+            depot: { select: { id: true, name: true } },
+            depotVariant: { select: { id: true, name: true } }
+          } 
+        },
         deliveredBy: { select: { id: true, name: true, email: true } },
         receivedBy: { select: { id: true, name: true, email: true } },
       },
@@ -296,7 +325,14 @@ exports.getVendorOrderById = async (req, res, next) => {
       where: { id: orderId },
       include: {
         vendor: true,
-        items: { include: { product: true, agency: true } },
+        items: { 
+          include: { 
+            product: true, 
+            agency: true,
+            depot: { select: { id: true, name: true } },
+            depotVariant: { select: { id: true, name: true } }
+          } 
+        },
         deliveredBy: { select: { id: true, name: true, email: true } },
         receivedBy: { select: { id: true, name: true, email: true } },
       },
@@ -389,6 +425,26 @@ exports.updateVendorOrder = async (req, res, next) => {
               throw createError(404, `Agency with ID ${item.agencyId} not found.`);
             }
 
+            // Validate depot if provided in update
+            let depotId = null;
+            if (item.depotId && item.depotId !== '') {
+              const depot = await tx.depot.findUnique({ where: { id: parseInt(item.depotId) } });
+              if (!depot) {
+                throw createError(404, `Depot with ID ${item.depotId} not found.`);
+              }
+              depotId = parseInt(item.depotId);
+            }
+
+            // Validate depot variant if provided in update
+            let depotVariantId = null;
+            if (item.depotVariantId && item.depotVariantId !== '') {
+              const depotVariant = await tx.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
+              if (!depotVariant) {
+                throw createError(404, `Depot variant with ID ${item.depotVariantId} not found.`);
+              }
+              depotVariantId = parseInt(item.depotVariantId);
+            }
+
             // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
             if (parseInt(item.quantity) > 0) {
               itemsToCreateData.push({
@@ -396,6 +452,8 @@ exports.updateVendorOrder = async (req, res, next) => {
                 quantity: parseInt(item.quantity),
                 priceAtPurchase: parseFloat(product.price),
                 agencyId: parseInt(item.agencyId),
+                depotId: depotId,
+                depotVariantId: depotVariantId,
                 vendorOrderId: orderId // ensure vendorOrderId is set for createMany
               });
               newTotalAmount += parseFloat(product.price) * parseInt(item.quantity);
@@ -966,9 +1024,6 @@ exports.deleteVendorOrder = async (req, res, next) => {
  */
 exports.getOrderDetailsByDate = async (req, res, next) => {
   try {
-    // Route: GET /api/vendor-orders/details?date=YYYY-MM-DD
-    // Controller: getOrderDetailsByDate
-    // Usage: router.get('/details', vendorOrderController.getOrderDetailsByDate);
     const { date } = req.query;
 
     if (!date) {
@@ -977,24 +1032,45 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
 
     const deliveryDate = new Date(date);
 
-    // Fetch all order items for the given delivery date, grouped by productId, and include product details
     const deliverySchedule = await prisma.$queryRaw`
-      SELECT 
-        s.agencyId,
-        d.productId,
-        SUM(d.quantity) as totalQty,
-        p.name,
-        p.price
-      FROM delivery_schedule d
-      JOIN subscriptions s ON d.subscriptionId = s.id      
+      SELECT
+        depot.id as depotId,
+        depot.name as depotName,
+        dpv.id as depotVariantId,
+        dpv.name as variantName,
+        p.id as productId,
+        p.name as productName,
+        a.id as agencyId,
+        CASE
+          WHEN s.period = 3 THEN dpv.price3Day
+          WHEN s.period = 7 THEN dpv.price7Day
+          WHEN s.period = 15 THEN dpv.price15Day
+          WHEN s.period = 30 THEN dpv.price1Month
+          ELSE dpv.sellingPrice
+        END as effectivePrice,
+        SUM(d.quantity) as totalQuantity
+      FROM delivery_schedule_entries d
+      JOIN subscriptions s ON d.subscriptionId = s.id
+      JOIN depot_product_variants dpv ON s.depotProductVariantId = dpv.id
+      JOIN product_orders po ON s.productOrderId = po.id
+      JOIN agencies a ON po.agencyId = a.id
+      JOIN depots depot ON dpv.depotId = depot.id
       JOIN products p ON d.productId = p.id
-      WHERE 
+      WHERE
         s.paymentStatus = 'PAID'
         AND d.deliveryDate = ${deliveryDate}
-      GROUP BY s.agencyId, d.productId
-      `;
+        AND po.agencyId IS NOT NULL
+        AND a.depotId IS NOT NULL
+      GROUP BY depot.id, depot.name, dpv.id, dpv.name, p.id, p.name, a.id
+    `;
 
-    return res.json(deliverySchedule);
+    const result = deliverySchedule.map(item => ({
+      ...item,
+      totalQuantity: item.totalQuantity.toString(),
+      effectivePrice: item.effectivePrice ? parseFloat(item.effectivePrice) : null,
+    }));
+
+    return res.json(result);
   } catch (error) {
     console.error('Error fetching order details:', error);
     next(createError(500, 'Failed to fetch order details.'));

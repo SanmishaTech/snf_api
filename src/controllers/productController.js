@@ -440,6 +440,69 @@ const bulkUpdateVariants = asyncHandler(async (req, res) => {
   res.status(200).json(transactionResult);
 });
 
+/**
+ * @desc    Get depot variant pricing for a product (especially buyOnce pricing)
+ * @route   GET /api/products/:id/depot-variant-pricing
+ * @access  Private
+ */
+const getDepotVariantPricing = asyncHandler(async (req, res, next) => {
+  const productId = parseInt(req.params.id, 10);
+  if (isNaN(productId)) {
+    return next(createError(400, 'Invalid product ID format'));
+  }
+
+  try {
+    // Get all depot variants for the product with depot information
+    const depotVariants = await prisma.depotProductVariant.findMany({
+      where: {
+        productId: productId,
+        notInStock: false,
+        isHidden: false,
+      },
+      include: {
+        depot: {
+          select: {
+            id: true,
+            name: true,
+            isOnline: true,
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    if (depotVariants.length === 0) {
+      return next(createError(404, 'No depot variants found for this product'));
+    }
+
+    // Transform the data to include buyonce pricing and other period pricing
+    const transformedVariants = depotVariants.map(variant => ({
+      id: variant.id,
+      name: variant.name,
+      depot: variant.depot,
+      buyOncePrice: variant.buyOncePrice || variant.sellingPrice,
+      sellingPrice: variant.sellingPrice,
+      price3Day: variant.price3Day,
+      price7Day: variant.price7Day,
+      price15Day: variant.price15Day,
+      price1Month: variant.price1Month,
+      minimumQty: variant.minimumQty,
+    }));
+
+    res.status(200).json({
+      productId,
+      variants: transformedVariants,
+      // Provide default buyonce price if available (typically from first variant)
+      buyOncePrice: transformedVariants[0]?.buyOncePrice || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching depot variant pricing:', error);
+    next(createError(500, 'Failed to fetch depot variant pricing'));
+  }
+});
+
 module.exports = {
   createProduct,
   getAllProducts,
@@ -448,5 +511,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   bulkUpdateVariants,
+  getDepotVariantPricing,
 };
 

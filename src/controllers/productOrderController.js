@@ -6,6 +6,7 @@ const getPriceForPeriod = (depotVariant, periodInDays) => {
   // For single-day purchases ("buy once"), use the specific buyOncePrice if available.
   if (periodInDays === 1 && depotVariant.buyOncePrice) {
     return Number(depotVariant.buyOncePrice);
+    
   }
   // Prices are checked from the longest period to the shortest to ensure the best rate is applied.
   if (periodInDays >= 30 && depotVariant.price1Month) {
@@ -346,10 +347,12 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           memberId: memberId,
           deliveryAddressId: deliveryAddressId ? parseInt(deliveryAddressId, 10) : null,
           productId: subData.depotVariant.productId,
+          depotId: subData.depotVariant.depotId,
+          depotProductVariantId: subData.depotVariant.id,
           deliveryDate: entry.date,
           quantity: entry.quantity,
           status: 'PENDING',
-          agentId: subData.agentId, // Ensure agent is assigned to the delivery entry
+          agentId: subData.agentId,
         }));
         allDeliveryScheduleEntries.push(...entriesForThisSub);
       }
@@ -369,7 +372,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
 
       const finalOrder = await tx.productOrder.findUnique({
         where: { id: newOrder.id },
-        include: { subscriptions: { include: { deliveryScheduleEntries: true } } },
+        include: { subscriptions: true },
       });
 
       return { order: finalOrder };

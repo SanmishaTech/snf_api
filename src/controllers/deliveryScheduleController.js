@@ -54,7 +54,11 @@ const getAgencyDeliveriesByDate = async (req, res) => {
 
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        deliveryDate: true,
+        quantity: true,
+        status: true,
         product: {
           select: {
             id: true,
@@ -67,37 +71,25 @@ const getAgencyDeliveriesByDate = async (req, res) => {
             id: true,
             name: true,
             user: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                }
-            }
+              select: {
+                id: true,
+                name: true,
+                mobile: true,
+              },
+            },
           },
         },
-        deliveryAddress: {
+        deliveryAddress: true,
+        subscription: {
           select: {
             id: true,
-            recipientName: true,
-            mobile: true,
-            plotBuilding: true,
-            streetArea: true,
-            landmark: true,
-            pincode: true,
-            city: true,
-            state: true,
-            label: true,
+            period: true,
+            deliverySchedule: true,
           },
         },
-        subscription: {
-            select: {
-                id: true,
-                // any other subscription details if needed by frontend
-            }
-        }
       },
       orderBy: {
-        createdAt: 'asc', // Or any other preferred order
+        createdAt: 'asc',
       },
     });
 

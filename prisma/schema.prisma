@@ -68,22 +68,22 @@ model Vendor {
 }
 
 model Agency {
-  id                Int            @id @default(autoincrement())
-  name              String
-  contactPersonName String?        @map("contact_person_name")
-  mobile            String
-  address1          String
-  address2          String?
-  city              String
-  pincode           Int
-  alternateMobile   String?        @map("alternate_mobile")
-  email             String?        @unique
-  userId            Int            @unique
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderItems        OrderItem[]
-  subscriptions     Subscription[]
+  id                      Int                     @id @default(autoincrement())
+  name                    String
+  contactPersonName       String?                 @map("contact_person_name")
+  mobile                  String
+  address1                String
+  address2                String?
+  city                    String
+  pincode                 Int
+  alternateMobile         String?                 @map("alternate_mobile")
+  email                   String?                 @unique
+  userId                  Int                     @unique
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItems              OrderItem[]
+  subscriptions           Subscription[]
   productOrders           ProductOrder[]
   depotId                 Int?                    @unique
   depot                   Depot?                  @relation(fields: [depotId], references: [id])
@@ -155,10 +155,10 @@ model Category {
 }
 
 model City {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   locations Location[]
 
   @@map("cities")
@@ -175,11 +175,11 @@ model Location {
   agencyId          Int?
   agency            Agency?           @relation(fields: [agencyId], references: [id])
 
-  @@map("locations")
   @@index([agencyId])
+  @@map("locations")
 }
-//at
 
+//at
 
 model VendorOrder {
   id                Int         @id @default(autoincrement())
@@ -209,23 +209,29 @@ model VendorOrder {
 }
 
 model OrderItem {
-  id                Int         @id @default(autoincrement())
+  id                Int                  @id @default(autoincrement())
   vendorOrderId     Int
   productId         Int
   quantity          Int
   priceAtPurchase   Float
   agencyId          Int
+  depotId           Int?
+  depotVariantId    Int?
   deliveredQuantity Int?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   receivedQuantity  Int?
-  agency            Agency      @relation(fields: [agencyId], references: [id])
-  product           Product     @relation(fields: [productId], references: [id])
-  vendorOrder       VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  agency            Agency               @relation(fields: [agencyId], references: [id])
+  product           Product              @relation(fields: [productId], references: [id])
+  vendorOrder       VendorOrder          @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+  depot             Depot?               @relation(fields: [depotId], references: [id])
+  depotVariant      DepotProductVariant? @relation(fields: [depotVariantId], references: [id])
 
   @@index([agencyId], map: "vendor_order_items_agencyId_fkey")
   @@index([productId], map: "vendor_order_items_productId_fkey")
   @@index([vendorOrderId], map: "vendor_order_items_vendorOrderId_fkey")
+  @@index([depotId], map: "vendor_order_items_depotId_fkey")
+  @@index([depotVariantId], map: "vendor_order_items_depotVariantId_fkey")
   @@map("vendor_order_items")
 }
 
@@ -257,24 +263,26 @@ model Banner {
 }
 
 model Depot {
-  id                   Int                   @id @default(autoincrement())
-  name                 String                @unique
-  address              String
-  contactPerson        String?
-  contactNumber        String?
-  isOnline             Boolean               @default(false)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  areas                AreaMaster[] // Relation to AreaMaster
-  members              User[]
-  variantStocks        VariantStock[]
-  purchases            Purchase[]
-  stockLedgers         StockLedger[]
-  wastages             Wastage[]
-  depotProductVariants DepotProductVariant[]
-  transfersFrom        Transfer[]            @relation("TransferFromDepot")
-  transfersTo          Transfer[]            @relation("TransferToDepot")
-  agency               Agency?
+  id                      Int                     @id @default(autoincrement())
+  name                    String                  @unique
+  address                 String
+  contactPerson           String?
+  contactNumber           String?
+  isOnline                Boolean                 @default(false)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  areas                   AreaMaster[] // Relation to AreaMaster
+  members                 User[]
+  variantStocks           VariantStock[]
+  purchases               Purchase[]
+  stockLedgers            StockLedger[]
+  wastages                Wastage[]
+  depotProductVariants    DepotProductVariant[]
+  transfersFrom           Transfer[]              @relation("TransferFromDepot")
+  transfersTo             Transfer[]              @relation("TransferToDepot")
+  agency                  Agency?
+  deliveryScheduleEntries DeliveryScheduleEntry[]
+  orderItems              OrderItem[]
 
   @@map("depots")
 }
@@ -312,8 +320,8 @@ model DeliveryAddress {
   subscriptions           Subscription[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
-  locationId  Int?
-  location    Location? @relation(fields: [locationId], references: [id])
+  locationId Int?
+  location   Location? @relation(fields: [locationId], references: [id])
 
   @@index([memberId], map: "delivery_addresses_memberId_fkey")
   @@index([locationId])
@@ -369,22 +377,26 @@ enum DeliveryStatus {
 }
 
 model DeliveryScheduleEntry {
-  id                Int             @id @default(autoincrement())
-  subscription      Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
-  subscriptionId    Int // Changed to Int
-  member            Member          @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
-  memberId          Int // Changed to Int
-  deliveryAddress   DeliveryAddress? @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
-  deliveryAddressId Int? // Changed to Int
-  product           Product         @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
-  productId         Int
-  deliveryDate      DateTime        @db.Date
-  quantity          Int             @default(1) // Quantity for this specific delivery, default to 1
-  status            DeliveryStatus  @default(PENDING)
-  agentId           Int?
-  agent             Agency?         @relation(fields: [agentId], references: [id])
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id                    Int                  @id @default(autoincrement())
+  subscription          Subscription         @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Added onDelete
+  subscriptionId        Int // Changed to Int
+  member                Member               @relation(fields: [memberId], references: [id], onDelete: Cascade) // Added onDelete
+  memberId              Int // Changed to Int
+  deliveryAddress       DeliveryAddress?     @relation(fields: [deliveryAddressId], references: [id], onDelete: Cascade) // Added onDelete
+  deliveryAddressId     Int? // Changed to Int
+  product               Product              @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
+  productId             Int
+  deliveryDate          DateTime             @db.Date
+  quantity              Int                  @default(1) // Quantity for this specific delivery, default to 1
+  status                DeliveryStatus       @default(PENDING)
+  agentId               Int?
+  agent                 Agency?              @relation(fields: [agentId], references: [id])
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  Depot                 Depot?               @relation(fields: [depotId], references: [id])
+  depotId               Int?
+  DepotProductVariant   DepotProductVariant? @relation(fields: [depotProductVariantId], references: [id])
+  depotProductVariantId Int?
 
   @@index([subscriptionId])
   @@index([memberId])
@@ -397,21 +409,21 @@ model DeliveryScheduleEntry {
 
 // Model for Subscriptions
 model Subscription {
-  id                Int              @id @default(autoincrement())
-  memberId          Int
-  deliveryAddressId Int?
-  productId         Int
+  id                    Int              @id @default(autoincrement())
+  memberId              Int
+  deliveryAddressId     Int?
+  productId             Int
   depotProductVariantId Int?
-  startDate         DateTime         @default(now()) // Date when the subscription effectively starts
-  period            Int
-  expiryDate        DateTime
-  deliverySchedule  DeliverySchedule
-  weekdays          String? // To store JSON array of weekdays, e.g., ["MONDAY", "TUESDAY"] if schedule is WEEKDAYS
-  qty               Int
-  altQty            Int? // Optional: for alternate day deliveries if different quantity
-  rate              Float // Per unit price at the time of subscription
-  totalQty          Int // Calculated by application logic
-  amount            Float // Calculated by application logic: rate * totalQty
+  startDate             DateTime         @default(now()) // Date when the subscription effectively starts
+  period                Int
+  expiryDate            DateTime
+  deliverySchedule      DeliverySchedule
+  weekdays              String? // To store JSON array of weekdays, e.g., ["MONDAY", "TUESDAY"] if schedule is WEEKDAYS
+  qty                   Int
+  altQty                Int? // Optional: for alternate day deliveries if different quantity
+  rate                  Float // Per unit price at the time of subscription
+  totalQty              Int // Calculated by application logic
+  amount                Float // Calculated by application logic: rate * totalQty
 
   walletamt   Float @default(0)
   payableamt  Float @default(0)
@@ -432,14 +444,13 @@ model Subscription {
   agency                  Agency?                 @relation(fields: [agencyId], references: [id], onDelete: SetNull)
   deliveryScheduleEntries DeliveryScheduleEntry[]
 
+  productOrder   ProductOrder? @relation(fields: [productOrderId], references: [id])
+  productOrderId Int?
+
   @@index([memberId])
   @@index([deliveryAddressId])
   @@index([productId])
   @@index([agencyId])
-
-  productOrder   ProductOrder? @relation(fields: [productOrderId], references: [id])
-  productOrderId Int?
-
   @@map("subscriptions")
 }
 
@@ -664,34 +675,36 @@ model WastageDetail {
 
 // Ledger to record every stock movement per variant per depot
 model DepotProductVariant {
-  id            Int     @id @default(autoincrement())
-  depot         Depot   @relation(fields: [depotId], references: [id], onDelete: Cascade)
+  id            Int      @id @default(autoincrement())
+  depot         Depot    @relation(fields: [depotId], references: [id], onDelete: Cascade)
   depotId       Int
-  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId     Int
   name          String
   hsnCode       String?
-  sellingPrice  Decimal @db.Decimal(10, 2)
-  purchasePrice Decimal @db.Decimal(10, 2)
+  sellingPrice  Decimal  @db.Decimal(10, 2)
+  purchasePrice Decimal  @db.Decimal(10, 2)
   price3Day     Decimal? @db.Decimal(10, 2)
   price7Day     Decimal? @db.Decimal(10, 2)
   price15Day    Decimal? @db.Decimal(10, 2)
   price1Month   Decimal? @db.Decimal(10, 2)
-  minimumQty    Int     @default(0)
-  closingQty    Int     @default(0)
+  minimumQty    Int      @default(0)
+  closingQty    Int      @default(0)
 
-  wastageDetails WastageDetail[]
-  notInStock     Boolean          @default(false)
-  isHidden       Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  buyOncePrice   Decimal?         @db.Decimal(10, 2)
-  VariantStock   VariantStock[]
-  StockLedger    StockLedger[]
-  PurchaseDetail PurchaseDetail[]
-  transfersFrom  TransferDetail[] @relation("TransferFromVariant")
-  transfersTo    TransferDetail[] @relation("TransferToVariant")
-  subscriptions  Subscription[]
+  wastageDetails          WastageDetail[]
+  notInStock              Boolean                 @default(false)
+  isHidden                Boolean                 @default(false)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  buyOncePrice            Decimal?                @db.Decimal(10, 2)
+  VariantStock            VariantStock[]
+  StockLedger             StockLedger[]
+  PurchaseDetail          PurchaseDetail[]
+  transfersFrom           TransferDetail[]        @relation("TransferFromVariant")
+  transfersTo             TransferDetail[]        @relation("TransferToVariant")
+  subscriptions           Subscription[]
+  deliveryScheduleEntries DeliveryScheduleEntry[]
+  orderItems              OrderItem[]
 
   @@index([productId])
   @@index([depotId])
@@ -768,24 +781,24 @@ model TransferDetail {
 }
 
 model ProductOrder {
-  id                 Int             @id @default(autoincrement())
-  orderNo            String          @unique
+  id                 Int            @id @default(autoincrement())
+  orderNo            String         @unique
   memberId           Int
-  member             Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member             Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
   subscriptions      Subscription[]
   totalQty           Int
   totalAmount        Float
-  walletamt          Float           @default(0)
-  payableamt         Float           @default(0)
-  receivedamt        Float           @default(0)
+  walletamt          Float          @default(0)
+  payableamt         Float          @default(0)
+  receivedamt        Float          @default(0)
   paymentMode        PaymentMode?
   paymentReferenceNo String?
   paymentDate        DateTime?
-  paymentStatus      PaymentStatus   @default(PENDING)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  paymentStatus      PaymentStatus  @default(PENDING)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   agencyId           Int?
-  agency             Agency?         @relation(fields: [agencyId], references: [id])
+  agency             Agency?        @relation(fields: [agencyId], references: [id])
 
   @@index([memberId])
   @@index([agencyId])

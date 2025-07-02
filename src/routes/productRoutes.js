@@ -108,6 +108,7 @@ const {
   deleteProduct,
   getPublicProducts, // Import the new controller function
   bulkUpdateVariants,
+  getDepotVariantPricing,
 } = require("../controllers/productController");
 const authMiddleware = require("../middleware/auth"); // Assuming auth middleware is in the same location
 const createUploadMiddleware = require("../middleware/uploadMiddleware");
@@ -491,6 +492,84 @@ router.post(
   authMiddleware,
   allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
   bulkUpdateVariants
+);
+
+// GET /api/products/:id/depot-variant-pricing - Get depot variant pricing for a product
+/**
+ * @swagger
+ * /products/{id}/depot-variant-pricing:
+ *   get:
+ *     summary: Get depot variant pricing for a product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the product.
+ *     responses:
+ *       200:
+ *         description: Depot variant pricing information.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 productId:
+ *                   type: integer
+ *                 variants:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       depot:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           isOnline:
+ *                             type: boolean
+ *                       buyOncePrice:
+ *                         type: number
+ *                       sellingPrice:
+ *                         type: number
+ *                       price3Day:
+ *                         type: number
+ *                         nullable: true
+ *                       price7Day:
+ *                         type: number
+ *                         nullable: true
+ *                       price15Day:
+ *                         type: number
+ *                         nullable: true
+ *                       price1Month:
+ *                         type: number
+ *                         nullable: true
+ *                       minimumQty:
+ *                         type: integer
+ *                 buyOncePrice:
+ *                   type: number
+ *                   description: Default buyOnce price from the first variant
+ *       400:
+ *         description: Invalid product ID format.
+ *       404:
+ *         description: No depot variants found for this product.
+ *       500:
+ *         description: Internal server error.
+ */
+router.get(
+  "/:id/depot-variant-pricing",
+  authMiddleware,
+  getDepotVariantPricing
 );
 
 module.exports = router;
