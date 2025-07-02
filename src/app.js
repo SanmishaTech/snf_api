@@ -36,6 +36,9 @@ const {
   getPublicProducts,
   getProductById,
 } = require("./controllers/productController");
+const {
+  getPublicLocations,
+} = require("./controllers/public/locationController");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -57,7 +60,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://13.126.180.52"];
+  : ["http://localhost:5173", "http://www.indraai.in"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -87,9 +90,10 @@ const uploadsPath =
 console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
 
-// Public product list (no auth)
+// Public APIs (no auth)
 app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
+app.get("/api/public/locations", getPublicLocations);
 app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);

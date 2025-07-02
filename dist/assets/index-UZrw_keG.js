@@ -14802,7 +14802,7 @@ Error generating stack: ` +
     return { ...a, mutate: i, mutateAsync: a.mutate };
   }
   const Ug = "SNF",
-    mG = () => "http://13.126.180.52",
+    mG = () => "http://www.indraai.in",
     $b = mG();
   var Kp = {},
     $D;
@@ -34721,8 +34721,8 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
               to: "/",
               end: !0,
               className: ({ isActive: n }) =>
-                `flex flex-col items-center hover:text-blue-500 ${
-                  n ? "text-blue-500" : "text-gray-600 dark:text-gray-300"
+                `flex flex-col items-center hover:text-secondary ${
+                  n ? "text-secondary" : "text-gray-600 dark:text-gray-300"
                 }`,
               children: [
                 s.jsx(pI, { size: 24 }),
@@ -34733,8 +34733,8 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
               s.jsxs(ug, {
                 to: "/member/products",
                 className: ({ isActive: n }) =>
-                  `flex flex-col items-center hover:text-blue-500 ${
-                    n ? "text-blue-500" : "text-gray-600 dark:text-gray-300"
+                  `flex flex-col items-center hover:text-secondary ${
+                    n ? "text-secondary" : "text-gray-600 dark:text-gray-300"
                   }`,
                 children: [
                   s.jsx(s0, { size: 24 }),
@@ -34744,8 +34744,8 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             s.jsxs(ug, {
               to: e ? "/member/subscriptions" : "/login",
               className: ({ isActive: n }) =>
-                `flex flex-col items-center hover:text-blue-500 ${
-                  n ? "text-blue-500" : "text-gray-600 dark:text-gray-300"
+                `flex flex-col items-center hover:text-secondary ${
+                  n ? "text-secondary" : "text-gray-600 dark:text-gray-300"
                 }`,
               children: [
                 s.jsx(Yb, { size: 24 }),
@@ -34758,8 +34758,8 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             s.jsxs(ug, {
               to: "/about",
               className: ({ isActive: n }) =>
-                `flex flex-col items-center hover:text-blue-500 ${
-                  n ? "text-blue-500" : "text-gray-600 dark:text-gray-300"
+                `flex flex-col items-center hover:text-secondary ${
+                  n ? "text-secondary" : "text-gray-600 dark:text-gray-300"
                 }`,
               children: [
                 s.jsx(gI, { size: 24 }),
@@ -53159,7 +53159,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             case "PENDING":
               return "bg-yellow-500";
             case "DELIVERED":
-              return "bg-blue-500";
+              return "bg-secondary";
             case "RECEIVED":
               return "bg-green-500";
             default:
@@ -53215,7 +53215,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                           to: "/admin/orders/create",
                           children: s.jsxs(me, {
                             className:
-                              "bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600",
+                              "bg-blue-600 hover:bg-blue-700 text-white dark:bg-secondary dark:hover:bg-blue-600",
                             children: [
                               s.jsx(s0, { className: "mr-2 h-5 w-5" }),
                               " Create New Order",
@@ -55150,7 +55150,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                 className: "text-xl flex items-center gap-2",
                                 children: [
                                   s.jsx(s0, {
-                                    className: "h-5 w-5 text-blue-500",
+                                    className: "h-5 w-5 text-secondary",
                                   }),
                                   "Order Information",
                                 ],
@@ -55253,7 +55253,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                 className: "text-xl flex items-center gap-2",
                                 children: [
                                   s.jsx(Di, {
-                                    className: "h-5 w-5 text-blue-500",
+                                    className: "h-5 w-5 text-secondary",
                                   }),
                                   "Order Items",
                                 ],
@@ -55320,7 +55320,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                       A.agencyName &&
                                                         s.jsxs("p", {
                                                           className:
-                                                            "text-xs text-blue-500 dark:text-blue-400",
+                                                            "text-xs text-secondary dark:text-blue-400",
                                                           children: [
                                                             "Agency: ",
                                                             A.agencyName,
@@ -55409,7 +55409,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                 className: "text-xl flex items-center gap-2",
                                 children: [
                                   s.jsx(I1, {
-                                    className: "h-5 w-5 text-blue-500",
+                                    className: "h-5 w-5 text-secondary",
                                   }),
                                   "Vendor Information",
                                 ],
@@ -55518,7 +55518,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                 className: "text-xl flex items-center gap-2",
                                 children: [
                                   s.jsx(Vg, {
-                                    className: "h-5 w-5 text-blue-500",
+                                    className: "h-5 w-5 text-secondary",
                                   }),
                                   "Status Update",
                                 ],
@@ -55582,7 +55582,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                               icon: s.jsx(s0, {
                                 className: "h-5 w-5 text-white",
                               }),
-                              iconBg: "bg-blue-500",
+                              iconBg: "bg-secondary",
                               time: Wt(new Date(i.createdAt), "dd/MM/yyyy"),
                               description: `Order #${i.poNumber} was created with ${i.items.length} product(s).`,
                               stepStatus: "PENDING",
@@ -66055,7 +66055,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                                                 className: `h-7 text-xs ${
                                                                                   Fe.deliveryOption ===
                                                                                   "daily"
-                                                                                    ? "bg-blue-500 hover:bg-blue-600"
+                                                                                    ? "bg-secondary hover:bg-blue-600"
                                                                                     : "border-gray-300"
                                                                                 } truncate`,
                                                                                 title:
@@ -66084,7 +66084,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                                                   className: `h-7 text-xs ${
                                                                                     Fe.deliveryOption ===
                                                                                     "alternate-days"
-                                                                                      ? "bg-blue-500 hover:bg-blue-600"
+                                                                                      ? "bg-secondary hover:bg-blue-600"
                                                                                       : "border-gray-300"
                                                                                   }`,
                                                                                   title:
@@ -66113,7 +66113,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                                                   className: `h-7 text-xs ${
                                                                                     Fe.deliveryOption ===
                                                                                     "day1-day2"
-                                                                                      ? "bg-blue-500 hover:bg-blue-600"
+                                                                                      ? "bg-secondary hover:bg-blue-600"
                                                                                       : "border-gray-300"
                                                                                   } truncate`,
                                                                                   title:
@@ -66142,7 +66142,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                                                   className: `h-7 text-xs ${
                                                                                     Fe.deliveryOption ===
                                                                                     "select-days"
-                                                                                      ? "bg-blue-500 hover:bg-blue-600"
+                                                                                      ? "bg-secondary hover:bg-blue-600"
                                                                                       : "border-gray-300"
                                                                                   }`,
                                                                                   title:
@@ -66613,7 +66613,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                   : "outline",
                                               className: `h-9 text-xs ${
                                                 h === "daily"
-                                                  ? "bg-blue-500 hover:bg-blue-600"
+                                                  ? "bg-secondary hover:bg-blue-600"
                                                   : "border-gray-300"
                                               }`,
                                               title: "Delivery every day",
@@ -66628,7 +66628,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                     : "outline",
                                                 className: `h-9 text-xs ${
                                                   h === "alternate-days"
-                                                    ? "bg-blue-500 hover:bg-blue-600"
+                                                    ? "bg-secondary hover:bg-blue-600"
                                                     : "border-gray-300"
                                                 }`,
                                                 title:
@@ -66645,7 +66645,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                     : "outline",
                                                 className: `h-9 text-xs ${
                                                   h === "day1-day2"
-                                                    ? "bg-blue-500 hover:bg-blue-600"
+                                                    ? "bg-secondary hover:bg-blue-600"
                                                     : "border-gray-300"
                                                 }`,
                                                 title:
@@ -66661,7 +66661,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                                                     : "outline",
                                                 className: `h-9 text-xs ${
                                                   h === "select-days"
-                                                    ? "bg-blue-500 hover:bg-blue-600"
+                                                    ? "bg-secondary hover:bg-blue-600"
                                                     : "border-gray-300"
                                                 }`,
                                                 title:
@@ -69818,7 +69818,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                     "bg-muted/10 rounded-2xl flex items-center justify-center p-8 border border-muted/20",
                   children: j.attachmentUrl
                     ? s.jsx(_s.img, {
-                        src: `http://13.126.180.52${j.attachmentUrl}`,
+                        src: `http://www.indraai.in${j.attachmentUrl}`,
                         alt: j.name,
                         className:
                           "object-cover max-h-[900px] min-h-[600px] rounded-xl",
@@ -70121,7 +70121,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
         [j, A] = x.useState(null),
         [E, _] = x.useState(!1),
         [T, D] = x.useState(null),
-        k = "http://13.126.180.52";
+        k = "http://www.indraai.in";
       x.useEffect(() => {
         (async () => {
           o(!0), d(null);
@@ -83314,7 +83314,7 @@ ${Hw(this.code(t, r))}
               categoryId: r.categoryId || null,
             };
             if ((b(T), r.attachmentUrl)) {
-              const D = `http://13.126.180.52${
+              const D = `http://www.indraai.in${
                 r == null ? void 0 : r.attachmentUrl
               }`;
               f(D);
@@ -83905,7 +83905,7 @@ ${Hw(this.code(t, r))}
           h === "dairy" ||
           (p != null && p.toLowerCase().includes("milk")) ||
           (p != null && p.toLowerCase().includes("yogurt"))
-            ? s.jsx(fX, { className: "w-6 h-6 text-blue-500" })
+            ? s.jsx(fX, { className: "w-6 h-6 text-secondary" })
             : h === "bakery" || (p != null && p.toLowerCase().includes("bread"))
             ? s.jsx(Di, { className: "w-6 h-6 text-yellow-600" })
             : h === "produce" ||
@@ -83958,7 +83958,7 @@ ${Hw(this.code(t, r))}
                     ? s.jsx("img", {
                         src: e.attachmentUrl.startsWith("http")
                           ? e.attachmentUrl
-                          : `http://13.126.180.52${e.attachmentUrl}`,
+                          : `http://www.indraai.in${e.attachmentUrl}`,
                         alt: e.name,
                         className:
                           "h-full w-full object-cover transition-transform duration-300 group-hover:scale-105",
@@ -85924,7 +85924,7 @@ ${Hw(this.code(t, r))}
                                                     children: [
                                                       s.jsx("div", {
                                                         className:
-                                                          "w-1.5 h-1.5 bg-blue-500 rounded-full",
+                                                          "w-1.5 h-1.5 bg-secondary rounded-full",
                                                       }),
                                                       s.jsxs("span", {
                                                         className:
@@ -85985,7 +85985,7 @@ ${Hw(this.code(t, r))}
                                                     children: [
                                                       s.jsx("div", {
                                                         className:
-                                                          "w-1.5 h-1.5 bg-blue-500 rounded-full",
+                                                          "w-1.5 h-1.5 bg-secondary rounded-full",
                                                       }),
                                                       s.jsxs("span", {
                                                         className:
@@ -106281,7 +106281,7 @@ ${Hw(this.code(t, r))}
               attachment: null,
               imageUrl: e.imageUrl || null,
             }),
-            a(e.imageUrl ? `http://13.126.180.52${e.imageUrl}` : null))
+            a(e.imageUrl ? `http://www.indraai.in${e.imageUrl}` : null))
           : (c({ name: "", isDairy: !1, attachment: null, imageUrl: null }),
             a(null));
       }, [e, c]),
@@ -106294,9 +106294,9 @@ ${Hw(this.code(t, r))}
               w.readAsDataURL(g);
           } else
             y
-              ? a(y.startsWith("data:") ? y : `http://13.126.180.52${y}`)
+              ? a(y.startsWith("data:") ? y : `http://www.indraai.in${y}`)
               : g || a(null);
-        }, [g, y, "http://13.126.180.52"]);
+        }, [g, y, "http://www.indraai.in"]);
       const N = () => {
           d("attachment", null, { shouldValidate: !0 }),
             d("imageUrl", null),
@@ -106395,7 +106395,7 @@ ${Hw(this.code(t, r))}
                   src:
                     n.startsWith("data:") || n.startsWith("http")
                       ? n
-                      : `http://13.126.180.52${n}`,
+                      : `http://www.indraai.in${n}`,
                   alt: "Preview",
                   className: "w-full h-full object-cover",
                 }),
@@ -109620,7 +109620,7 @@ ${Hw(this.code(t, r))}
       });
     },
     N6 = "/api/admin/banners",
-    G5e = "http://13.126.180.52",
+    G5e = "http://www.indraai.in",
     Cz = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
     Y5e = Nn({
       caption: ut().optional().default(""),
