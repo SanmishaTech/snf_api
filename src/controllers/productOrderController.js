@@ -7,7 +7,8 @@ const getPriceForPeriod = (product, periodInDays) => {
   // as the previous implementation was causing errors due to missing fields.
   // The original logic can be restored if the 'Product' model is updated
   // with fields like 'buyOncePrice', 'price1Month', etc.
-  return Number(product.price);
+  const price = Number(product.price);
+  return isNaN(price) ? 0 : price;
 };
 const prisma = new PrismaClient();
 
@@ -382,17 +383,13 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
   } = sub;
 
   // Validation
-  if (!productId || !period || !startDate || !rawDeliverySchedule || !qty) {
-    throw new Error('Missing required fields for subscription.');
-  }
 
-  const depotVariant = depotVariantMap.get(parseInt(productId, 10));
-  if (!depotVariant || !depotVariant.product || !depotVariant.product.price) {
-    throw new Error(`Price information is missing for depot product variant with ID ${productId}.`);
-  }
+const depotVariant = depotVariantMap.get(parseInt(productId, 10));
+if (!depotVariant || !depotVariant.product || !depotVariant.product.price) {
+  throw new Error(`Price information is missing for depot product variant with ID ${productId}.`);
+}
 
-  // Parse and calculate dates
-  const parsedQty = parseInt(qty, 10);
+const rate = Number(depotVariant.product.price) || 0;
   const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
   const subscriptionPeriod = parseInt(period, 10);
   const sDate = new Date(startDate);
