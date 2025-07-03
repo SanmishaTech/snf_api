@@ -370,7 +370,6 @@ function calculateWalletDistribution(totalAmount, requestedWalletAmount, availab
   };
 }
 
-// Helper function to process individual subscription
 async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
   const {
     productId,
@@ -383,13 +382,17 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
   } = sub;
 
   // Validation
+  if (!productId || !period || !startDate || !rawDeliverySchedule || !qty) {
+    throw new Error('Missing required fields for subscription.');
+  }
 
-const depotVariant = depotVariantMap.get(parseInt(productId, 10));
-if (!depotVariant || !depotVariant.product || !depotVariant.product.price) {
-  throw new Error(`Price information is missing for depot product variant with ID ${productId}.`);
-}
+  const depotVariant = depotVariantMap.get(parseInt(productId, 10));
+  if (!depotVariant || !depotVariant.product) {
+    throw new Error(`Product information is missing for depot product variant with ID ${productId}.`);
+  }
 
-const rate = Number(depotVariant.product.price) || 0;
+  // Parse and calculate dates
+  const parsedQty = parseInt(qty, 10);
   const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
   const subscriptionPeriod = parseInt(period, 10);
   const sDate = new Date(startDate);
@@ -398,7 +401,7 @@ const rate = Number(depotVariant.product.price) || 0;
 
   // Process delivery schedule
   const { internalScheduleLogicType, dbDeliveryScheduleEnum } = mapDeliverySchedule(rawDeliverySchedule);
-  
+
   const deliveryScheduleDetails = generateDeliveryDates(
     sDate,
     subscriptionPeriod,
@@ -411,12 +414,8 @@ const rate = Number(depotVariant.product.price) || 0;
   // Calculate amounts
   const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
   const rateForPeriod = getPriceForPeriod(depotVariant.product, subscriptionPeriod);
-  
-  if (rateForPeriod === null || rateForPeriod === undefined) {
-    throw new Error(`Price not found for product variant ${depotVariant.id} and period ${subscriptionPeriod} days.`);
-  }
 
-  const subscriptionAmount = Number(rateForPeriod) * subscriptionTotalQty;
+  const subscriptionAmount = rateForPeriod * subscriptionTotalQty;
 
   // Determine agent
   const agentId = await determineAgentId(depotVariant.depot, deliveryAddress, tx);
