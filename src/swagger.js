@@ -14,7 +14,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://www.indraai.in/api",
+        url: "https://www.indraai.in/api",
       },
     ],
     components: {
