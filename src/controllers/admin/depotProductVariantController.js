@@ -11,12 +11,9 @@ const depotProductVariantSchema = z.object({
     .positive({ message: "productId must be a positive integer" }),
   name: z.string().min(1, { message: "name is required" }),
   hsnCode: z.string().optional(),
-  sellingPrice: z.coerce
+  mrp: z.coerce
     .number()
-    .nonnegative({ message: "sellingPrice must be a non-negative number" }),
-  purchasePrice: z.coerce
-    .number()
-    .nonnegative({ message: "purchasePrice must be a non-negative number" }),
+    .nonnegative({ message: "MRP must be a non-negative number" }),
   minimumQty: z.coerce
     .number()
     .int()
@@ -159,7 +156,7 @@ module.exports = {
         select: {
           id: true,
           name: true,
-          sellingPrice: true,
+          mrp: true,
           minimumQty: true,
           price3Day: true,
           price7Day: true,
@@ -176,8 +173,8 @@ module.exports = {
       const transformedVariants = variants.map((variant) => ({
         id: variant.id.toString(),
         name: variant.name,
-        price: variant.sellingPrice, // Map sellingPrice to price
-        rate: variant.sellingPrice, // Map sellingPrice to rate
+        price: variant.mrp, // Map mrp to price
+        rate: variant.mrp, // Map mrp to rate
         buyOncePrice: variant.buyOncePrice,
         price3Day: variant.price3Day,
         price7Day: variant.price7Day,

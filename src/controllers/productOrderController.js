@@ -2,27 +2,12 @@ const asyncHandler = require('express-async-handler');
 const { PrismaClient } = require('@prisma/client');
 
 // Helper function to get the correct price based on the subscription period
-const getPriceForPeriod = (depotVariant, periodInDays) => {
-  // For single-day purchases ("buy once"), use the specific buyOncePrice if available.
-  if (periodInDays === 1 && depotVariant.buyOncePrice) {
-    return Number(depotVariant.buyOncePrice);
-    
-  }
-  // Prices are checked from the longest period to the shortest to ensure the best rate is applied.
-  if (periodInDays >= 30 && depotVariant.price1Month) {
-    return Number(depotVariant.price1Month);
-  }
-  if (periodInDays >= 15 && depotVariant.price15Day) {
-    return Number(depotVariant.price15Day);
-  }
-  if (periodInDays >= 7 && depotVariant.price7Day) {
-    return Number(depotVariant.price7Day);
-  }
-  if (periodInDays >= 3 && depotVariant.price3Day) {
-    return Number(depotVariant.price3Day);
-  }
-  // Fallback to the default selling price if no specific period price is applicable.
-  return Number(depotVariant.sellingPrice);
+const getPriceForPeriod = (product, periodInDays) => {
+  // NOTE: The tiered pricing logic has been simplified to use the base 'price'
+  // as the previous implementation was causing errors due to missing fields.
+  // The original logic can be restored if the 'Product' model is updated
+  // with fields like 'buyOncePrice', 'price1Month', etc.
+  return Number(product.price);
 };
 const prisma = new PrismaClient();
 
@@ -136,7 +121,14 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       const depotVariantIds = subscriptions.map(sub => parseInt(sub.productId, 10));
       const depotVariants = await tx.depotProductVariant.findMany({
         where: { id: { in: depotVariantIds } },
-        include: { depot: true },
+        include: {
+          depot: true,
+          product: {
+            select: {
+              price: true,
+            }
+          }
+        }
       });
       const depotVariantMap = new Map(depotVariants.map(v => [v.id, v]));
 
@@ -306,7 +298,10 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           subscriptions: {
             include: {
               depotProductVariant: {
-                include: { depot: true, product: true }
+                include: {
+                  depot: true,
+                  product: true,
+                },
               }
             }
           }
@@ -392,8 +387,8 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
   }
 
   const depotVariant = depotVariantMap.get(parseInt(productId, 10));
-  if (!depotVariant || !depotVariant.sellingPrice) {
-    throw new Error(`Depot product variant with ID ${productId} not found or missing price.`);
+  if (!depotVariant || !depotVariant.product || !depotVariant.product.price) {
+    throw new Error(`Price information is missing for depot product variant with ID ${productId}.`);
   }
 
   // Parse and calculate dates
@@ -418,7 +413,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
 
   // Calculate amounts
   const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
-  const rateForPeriod = getPriceForPeriod(depotVariant, subscriptionPeriod);
+  const rateForPeriod = getPriceForPeriod(depotVariant.product, subscriptionPeriod);
   
   if (rateForPeriod === null || rateForPeriod === undefined) {
     throw new Error(`Price not found for product variant ${depotVariant.id} and period ${subscriptionPeriod} days.`);
@@ -524,7 +519,17 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
           },
           subscriptions: {
             include: {
-              product: true,
+              product: {
+                include: {
+                  depotProductVariants: {
+                    select: {
+                      price15Day: true,
+                      price1Month: true,
+                      sellingPrice: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },

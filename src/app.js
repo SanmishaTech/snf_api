@@ -39,6 +39,7 @@ const {
 const {
   getPublicLocations,
 } = require("./controllers/public/locationController");
+const publicDepotVariantRoutes = require("./routes/public/depotVariantsRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -94,6 +95,7 @@ app.use("/uploads", express.static(uploadsPath));
 app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
 app.get("/api/public/locations", getPublicLocations);
+app.use("/api/public/depot-variants", publicDepotVariantRoutes);
 app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);

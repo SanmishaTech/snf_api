@@ -682,8 +682,7 @@ model DepotProductVariant {
   productId     Int
   name          String
   hsnCode       String?
-  sellingPrice  Decimal  @db.Decimal(10, 2)
-  purchasePrice Decimal  @db.Decimal(10, 2)
+  mrp           Decimal  @db.Decimal(10, 2) @default(0)
   price3Day     Decimal? @db.Decimal(10, 2)
   price7Day     Decimal? @db.Decimal(10, 2)
   price15Day    Decimal? @db.Decimal(10, 2)
