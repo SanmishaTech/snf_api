@@ -191,9 +191,7 @@ app.use(
 );
 app.use(
   "/api/depots",
-  authMiddleware,
-  allowRoles("ADMIN", "DepotAdmin"),
-  depotRoutes
+   depotRoutes
 );
 app.use(
   "/api/transfers",
