@@ -214,7 +214,13 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         orderData.agencyId = agentId;
       }
 
-      const newOrder = await tx.productOrder.create({ data: orderData });
+      const newOrder = await tx.productOrder.create({
+        data: {
+          ...orderData,
+          walletamt: walletCalculation.walletAmountUsed,
+          payableamt: walletCalculation.totalPayableAmount,
+        },
+      });
 
       // Create subscriptions with distributed wallet amounts
       for (let i = 0; i < processedSubscriptions.length; i++) {
@@ -327,25 +333,43 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
 
 // Helper function to calculate wallet distribution
 function calculateWalletDistribution(totalAmount, requestedWalletAmount, availableWalletBalance, subscriptionDetails) {
-  const walletAmountUsed = Math.min(
-    Math.max(0, parseFloat(requestedWalletAmount) || 0), 
+  // Determine the total wallet amount to be used for the order, rounded to 2 decimal places.
+  const walletAmountToUse = Math.min(
+    Math.max(0, parseFloat(requestedWalletAmount) || 0),
     availableWalletBalance,
     totalAmount
   );
-  
+  const walletAmountUsed = Math.round(walletAmountToUse * 100) / 100;
+
+  // Calculate the total payable amount for the order.
   const totalPayableAmount = totalAmount - walletAmountUsed;
-  
-  // Distribute wallet amount proportionally across subscriptions
-  const subscriptionWalletShares = subscriptionDetails.map(sub => {
-    if (totalAmount > 0) {
-      return (sub.amount / totalAmount) * walletAmountUsed;
-    }
-    return 0;
-  });
+
+  // Distribute the wallet amount across subscriptions.
+  const subscriptionWalletShares = [];
+  let distributedAmount = 0;
+
+  if (totalAmount > 0 && walletAmountUsed > 0) {
+    // Calculate shares for each subscription, rounding as we go.
+    subscriptionDetails.forEach((sub, index) => {
+      if (index === subscriptionDetails.length - 1) {
+        // The last subscription gets the remainder to ensure the total is exact.
+        const lastShare = walletAmountUsed - distributedAmount;
+        subscriptionWalletShares.push(Math.round(lastShare * 100) / 100);
+      } else {
+        const proportionalShare = (sub.amount / totalAmount) * walletAmountUsed;
+        const roundedShare = Math.round(proportionalShare * 100) / 100;
+        subscriptionWalletShares.push(roundedShare);
+        distributedAmount += roundedShare;
+      }
+    });
+  } else {
+    // If no wallet amount is used, or total amount is zero, all shares are zero.
+    subscriptionDetails.forEach(() => subscriptionWalletShares.push(0));
+  }
 
   return {
     walletAmountUsed,
-    totalPayableAmount,
+    totalPayableAmount: Math.round(totalPayableAmount * 100) / 100,
     subscriptionWalletShares
   };
 }
@@ -509,13 +533,16 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     ]);
 
     const ordersWithComputedFields = productOrders.map(order => {
-      const walletPaid = order.walletAmountPaid ?? 0;
-      const payableamt = order.totalAmount - walletPaid;
+      // Prefer explicitly stored columns if they exist, otherwise fall back to legacy/computed values
+      const walletamt = order.walletamt ?? order.walletAmountPaid ?? 0;
+      const payableamt = order.payableamt ?? (order.totalAmount - walletamt);
+      const receivedamt = order.receivedamt ?? order.totalPaidAmount ?? 0;
+
       return {
         ...order,
+        walletamt,
         payableamt,
-        receivedamt: order.totalPaidAmount ?? 0,
-        walletamt: walletPaid,
+        receivedamt,
       };
     });
 
@@ -586,8 +613,8 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
   // Validation: receivedAmount must equal order.payableamt when marking as PAID
   const received = parseFloat(receivedAmount);
   if (paymentStatus === 'PAID') {
-    const walletPaid = order.walletAmountPaid ?? 0;
-    const payable = order.totalAmount - walletPaid;
+    const walletPaid = order.walletamt ?? order.walletAmountPaid ?? 0;
+    const payable = order.payableamt ?? (order.totalAmount - walletPaid);
     const total = order.totalAmount ?? 0;
 
     // Allow received to match totalAmount if payable is 0 (workaround for old orders)
@@ -616,7 +643,7 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
       // 2. Update each linked subscription, correcting their financial details
       for (const sub of order.subscriptions) {
         // Distribute the order-level wallet deduction proportionally to each subscription
-        const subWalletShare = order.totalAmount > 0 ? (sub.amount / order.totalAmount) * (order.walletAmountPaid ?? 0) : 0;
+        const subWalletShare = order.totalAmount > 0 ? (sub.amount / order.totalAmount) * (order.walletamt ?? order.walletAmountPaid ?? 0) : 0;
         const subPayableAmt = sub.amount - subWalletShare;
 
         await tx.subscription.update({
