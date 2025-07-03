@@ -108,6 +108,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
   const { subscriptions, deliveryAddressId, walletamt } = req.body;
   const member = req.user;
 
+  // Input validation
   if (!member) {
     res.status(401);
     throw new Error('User not authenticated');
@@ -116,10 +117,10 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Subscriptions array is required and cannot be empty.');
   }
-  // Note: deliveryAddressId validation moved inside transaction to check depot type
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // Get member details
       const memberRecord = await tx.member.findUnique({
         where: { userId: member.id },
         select: { id: true, walletBalance: true },
@@ -128,8 +129,10 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       if (!memberRecord) {
         throw new Error('Member profile not found for the authenticated user.');
       }
+
       const memberId = memberRecord.id;
 
+      // Fetch depot variants and validate
       const depotVariantIds = subscriptions.map(sub => parseInt(sub.productId, 10));
       const depotVariants = await tx.depotProductVariant.findMany({
         where: { id: { in: depotVariantIds } },
@@ -137,172 +140,91 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       });
       const depotVariantMap = new Map(depotVariants.map(v => [v.id, v]));
 
-      // Determine if any subscription is for an online depot
+      // Address validation for online depots
       const isAnyDepotOnline = depotVariants.some(v => v.depot.isOnline);
-
-      // Validate deliveryAddressId only if an online depot is involved
-      if (isAnyDepotOnline && !deliveryAddressId) {
-        throw new Error('deliveryAddressId is required for online depot subscriptions.');
-      }
-
-      // Fetch delivery address only if an ID is provided
       let deliveryAddress = null;
-      if (deliveryAddressId) {
+      
+      if (isAnyDepotOnline) {
+        if (!deliveryAddressId) {
+          throw new Error('deliveryAddressId is required for online depot subscriptions.');
+        }
+        
         deliveryAddress = await tx.deliveryAddress.findUnique({
           where: { id: parseInt(deliveryAddressId, 10) },
-          include: {
-            location: {
-              include: { agency: true },
-            },
-          },
+          include: { location: { include: { agency: true } } },
         });
-        // Further validation after fetching address
-        if (isAnyDepotOnline && !deliveryAddress) {
+        
+        if (!deliveryAddress) {
           throw new Error('Delivery address could not be found.');
         }
       }
 
+      // Process subscriptions and calculate amounts
       const processedSubscriptions = [];
       const allDeliveryScheduleEntries = [];
-      let totalAmount = 0;
-      let totalQty = 0;
-      let agentId = null; // To hold a single agent ID if consistent across all subs
-      let dbDeliveryScheduleEnum;
+      const financialSummary = {
+        totalAmount: 0,
+        totalQty: 0,
+        subscriptionDetails: []
+      };
 
       for (const sub of subscriptions) {
-        const {
-          productId,
-          period,
-          startDate,
-          deliverySchedule: rawDeliverySchedule,
-          weekdays,
-          qty,
-          altQty,
-        } = sub;
-
-        if (!productId || !period || !startDate || !rawDeliverySchedule || !qty) {
-          throw new Error('Missing required fields for one or more subscriptions.');
-        }
-
-        const depotVariant = depotVariantMap.get(sub.productId);
-        if (!depotVariant || !depotVariant.sellingPrice) {
-          throw new Error(`Depot product variant with ID ${sub.productId} not found or is missing a valid rate.`);
-        }
-
-        const parsedQty = parseInt(qty, 10);
-        const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
-        const subscriptionPeriod = parseInt(period, 10);
-        const sDate = new Date(startDate);
-        let expiryDate = new Date(sDate);
-        expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
-
-        let internalScheduleLogicType;
-
-        switch (rawDeliverySchedule.toUpperCase()) {
-          case 'DAILY':
-            internalScheduleLogicType = 'DAILY';
-            dbDeliveryScheduleEnum = 'DAILY';
-            break;
-          case 'SELECT-DAYS':
-            internalScheduleLogicType = 'SELECT_DAYS';
-            dbDeliveryScheduleEnum = 'WEEKDAYS';
-            break;
-          case 'ALTERNATE-DAYS':
-            internalScheduleLogicType = 'ALTERNATE_DAYS';
-            dbDeliveryScheduleEnum = 'ALTERNATE_DAYS';
-            break;
-          case 'DAY1-DAY2': // Fall-through to handle like VARYING
-          case 'VARYING':
-            internalScheduleLogicType = 'VARYING'; // This will be resolved to VARYING_ALTERNATING or DAILY in generateDeliveryDates
-            dbDeliveryScheduleEnum = 'DAY1_DAY2';
-            break;
-          default:
-            throw new Error(`Invalid delivery schedule type: ${rawDeliverySchedule}`);
-        }
-
-        const deliveryScheduleDetails = generateDeliveryDates(
-          sDate,
-          subscriptionPeriod,
-          internalScheduleLogicType,
-          parsedQty,
-          parsedAltQty,
-          weekdays
+        const subscriptionData = await processSubscription(
+          sub, 
+          depotVariantMap, 
+          deliveryAddress, 
+          tx
         );
-
-        const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
-        const rateForPeriod = getPriceForPeriod(depotVariant, subscriptionPeriod);
-        if (rateForPeriod === null || rateForPeriod === undefined) {
-          throw new Error(`Price not found for product variant ${depotVariant.id} and period ${subscriptionPeriod} days.`);
-        }
-
-        const subscriptionAmount = Number(rateForPeriod) * subscriptionTotalQty;
-        totalAmount += subscriptionAmount;
-        totalQty += subscriptionTotalQty;
-
-        // Agent assignment logic
-        const depot = depotVariant.depot;
-
-        if (depot?.isOnline) {
-          // If depot is online, use agent from the delivery location
-          if (deliveryAddress?.location?.agencyId) {
-            agentId = deliveryAddress.location.agencyId;
-          }
-        } else if (depot) {
-          // If depot is not online, use agent from the depot itself
-          const agency = await tx.agency.findUnique({ where: { depotId: depot.id } });
-          if (agency) {
-            agentId = agency.id;
-          }
-        }
-
-        processedSubscriptions.push({
-          productId: sub.productId,
-          depotVariant,
-          period: subscriptionPeriod,
-          startDate: sDate,
-          expiryDate,
-          deliverySchedule: dbDeliveryScheduleEnum,
-          weekdays,
-          qty: parsedQty,
-          altQty: parsedAltQty,
-          totalQty: subscriptionTotalQty,
-          rate: rateForPeriod,
-          amount: subscriptionAmount,
-          agentId,
-          deliveryScheduleDetails,
+        
+        processedSubscriptions.push(subscriptionData);
+        financialSummary.totalAmount += subscriptionData.amount;
+        financialSummary.totalQty += subscriptionData.totalQty;
+        
+        // Store subscription financial details for later wallet distribution
+        financialSummary.subscriptionDetails.push({
+          id: subscriptionData.productId,
+          amount: subscriptionData.amount,
+          index: processedSubscriptions.length - 1
         });
       }
 
-      const walletAmountToUse = Math.min(parseFloat(walletamt) || 0, memberRecord.walletBalance);
-      if (walletAmountToUse < 0) {
-        throw new Error('Wallet amount cannot be negative.');
-      }
-      
-      const payableamt = totalAmount - walletAmountToUse;
-      const paymentStatus = payableamt <= 0 ? 'PAID' : 'PENDING';
+      // Calculate wallet and payment amounts
+      const walletCalculation = calculateWalletDistribution(
+        financialSummary.totalAmount,
+        walletamt || 0,
+        memberRecord.walletBalance,
+        financialSummary.subscriptionDetails
+      );
+      console.log("Pasdasdasd",walletCalculation)
 
-      const newOrderData = {
+      // Create order with financial summary
+      const orderData = {
         orderNo: `ORD-${Date.now()}`,
         memberId,
-        totalQty,
-        totalAmount,
-        walletamt: walletAmountToUse,
-        payableamt,
-        paymentStatus,
+        totalQty: financialSummary.totalQty,
+        totalAmount: financialSummary.totalAmount,
+        walletamt: walletCalculation.walletAmountUsed,
+        payableamt: walletCalculation.totalPayableAmount,
+        paymentStatus: walletCalculation.totalPayableAmount <= 0 ? 'PAID' : 'PENDING',
       };
 
+      // Set agent if consistent across subscriptions
+      const agentId = getConsistentAgentId(processedSubscriptions);
       if (agentId) {
-        newOrderData.agencyId = agentId;
+        orderData.agencyId = agentId;
       }
 
-      const newOrder = await tx.productOrder.create({ data: newOrderData });
+      const newOrder = await tx.productOrder.create({ data: orderData });
 
-      for (const subData of processedSubscriptions) {
-        const subscriptionWalletShare = totalAmount > 0 ? (subData.amount / totalAmount) * walletAmountToUse : 0;
-        const subscriptionPayable = subData.amount - subscriptionWalletShare;
+      // Create subscriptions with distributed wallet amounts
+      for (let i = 0; i < processedSubscriptions.length; i++) {
+        const subData = processedSubscriptions[i];
+        const walletShare = walletCalculation.subscriptionWalletShares[i];
+        
+        const subscriptionPayable = subData.amount - walletShare;
         const subPaymentStatus = subscriptionPayable <= 0 ? 'PAID' : 'PENDING';
 
-        const subscriptionData = {
+        const subscriptionDbData = {
           member: { connect: { id: memberId } },
           product: { connect: { id: subData.depotVariant.productId } },
           depotProductVariant: { connect: { id: subData.depotVariant.id } },
@@ -317,32 +239,28 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           totalQty: subData.totalQty,
           rate: subData.rate,
           amount: subData.amount,
-          walletamt: subscriptionWalletShare,
+          walletamt: walletShare,
           payableamt: subscriptionPayable,
           paymentStatus: subPaymentStatus,
         };
 
-        // For online depots, connect the delivery address from the request.
-        // For offline depots, the delivery address will be null (by omitting the field).
+        // Add delivery address for online depots
         if (subData.depotVariant.depot.isOnline) {
-          if (!deliveryAddressId) {
-            // This should be caught by the initial validation, but as a safeguard.
-            throw new Error('A delivery address is required for online depot subscriptions.');
-          }
-          subscriptionData.deliveryAddress = {
+          subscriptionDbData.deliveryAddress = {
             connect: { id: parseInt(deliveryAddressId, 10) },
           };
         }
 
         if (subData.agentId) {
-          subscriptionData.agency = { connect: { id: subData.agentId } };
+          subscriptionDbData.agency = { connect: { id: subData.agentId } };
         }
 
         const newSubscription = await tx.subscription.create({
-          data: subscriptionData,
+          data: subscriptionDbData,
         });
 
-        const entriesForThisSub = subData.deliveryScheduleDetails.map(entry => ({
+        // Create delivery schedule entries
+        const deliveryEntries = subData.deliveryScheduleDetails.map(entry => ({
           subscriptionId: newSubscription.id,
           memberId: memberId,
           deliveryAddressId: deliveryAddressId ? parseInt(deliveryAddressId, 10) : null,
@@ -354,28 +272,50 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           status: 'PENDING',
           agentId: subData.agentId,
         }));
-        allDeliveryScheduleEntries.push(...entriesForThisSub);
+        
+        allDeliveryScheduleEntries.push(...deliveryEntries);
       }
 
-      if (walletAmountToUse > 0) {
+      // Update member wallet balance
+      if (walletCalculation.walletAmountUsed > 0) {
         await tx.member.update({
           where: { id: memberId },
-          data: { walletBalance: { decrement: walletAmountToUse } },
+          data: { 
+            walletBalance: { decrement: walletCalculation.walletAmountUsed } 
+          },
         });
       }
 
+      // Create delivery schedule entries
       if (allDeliveryScheduleEntries.length > 0) {
         await tx.deliveryScheduleEntry.createMany({
           data: allDeliveryScheduleEntries,
         });
       }
 
+      // Return complete order with subscriptions
       const finalOrder = await tx.productOrder.findUnique({
         where: { id: newOrder.id },
-        include: { subscriptions: true },
+        include: { 
+          subscriptions: {
+            include: {
+              depotProductVariant: {
+                include: { depot: true, product: true }
+              }
+            }
+          }
+        },
       });
 
-      return { order: finalOrder };
+      return { 
+        order: finalOrder,
+        financialSummary: {
+          totalAmount: financialSummary.totalAmount,
+          walletAmountUsed: walletCalculation.walletAmountUsed,
+          totalPayableAmount: walletCalculation.totalPayableAmount,
+          paymentStatus: orderData.paymentStatus
+        }
+      };
     });
 
     res.status(201).json(result);
@@ -385,6 +325,144 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
   }
 });
 
+// Helper function to calculate wallet distribution
+function calculateWalletDistribution(totalAmount, requestedWalletAmount, availableWalletBalance, subscriptionDetails) {
+  const walletAmountUsed = Math.min(
+    Math.max(0, parseFloat(requestedWalletAmount) || 0), 
+    availableWalletBalance,
+    totalAmount
+  );
+  
+  const totalPayableAmount = totalAmount - walletAmountUsed;
+  
+  // Distribute wallet amount proportionally across subscriptions
+  const subscriptionWalletShares = subscriptionDetails.map(sub => {
+    if (totalAmount > 0) {
+      return (sub.amount / totalAmount) * walletAmountUsed;
+    }
+    return 0;
+  });
+
+  return {
+    walletAmountUsed,
+    totalPayableAmount,
+    subscriptionWalletShares
+  };
+}
+
+// Helper function to process individual subscription
+async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
+  const {
+    productId,
+    period,
+    startDate,
+    deliverySchedule: rawDeliverySchedule,
+    weekdays,
+    qty,
+    altQty,
+  } = sub;
+
+  // Validation
+  if (!productId || !period || !startDate || !rawDeliverySchedule || !qty) {
+    throw new Error('Missing required fields for subscription.');
+  }
+
+  const depotVariant = depotVariantMap.get(parseInt(productId, 10));
+  if (!depotVariant || !depotVariant.sellingPrice) {
+    throw new Error(`Depot product variant with ID ${productId} not found or missing price.`);
+  }
+
+  // Parse and calculate dates
+  const parsedQty = parseInt(qty, 10);
+  const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
+  const subscriptionPeriod = parseInt(period, 10);
+  const sDate = new Date(startDate);
+  const expiryDate = new Date(sDate);
+  expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
+
+  // Process delivery schedule
+  const { internalScheduleLogicType, dbDeliveryScheduleEnum } = mapDeliverySchedule(rawDeliverySchedule);
+  
+  const deliveryScheduleDetails = generateDeliveryDates(
+    sDate,
+    subscriptionPeriod,
+    internalScheduleLogicType,
+    parsedQty,
+    parsedAltQty,
+    weekdays
+  );
+
+  // Calculate amounts
+  const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
+  const rateForPeriod = getPriceForPeriod(depotVariant, subscriptionPeriod);
+  
+  if (rateForPeriod === null || rateForPeriod === undefined) {
+    throw new Error(`Price not found for product variant ${depotVariant.id} and period ${subscriptionPeriod} days.`);
+  }
+
+  const subscriptionAmount = Number(rateForPeriod) * subscriptionTotalQty;
+
+  // Determine agent
+  const agentId = await determineAgentId(depotVariant.depot, deliveryAddress, tx);
+
+  return {
+    productId: parseInt(productId, 10),
+    depotVariant,
+    period: subscriptionPeriod,
+    startDate: sDate,
+    expiryDate,
+    deliverySchedule: dbDeliveryScheduleEnum,
+    weekdays,
+    qty: parsedQty,
+    altQty: parsedAltQty,
+    totalQty: subscriptionTotalQty,
+    rate: rateForPeriod,
+    amount: subscriptionAmount,
+    agentId,
+    deliveryScheduleDetails,
+  };
+}
+
+// Helper function to map delivery schedule types
+function mapDeliverySchedule(rawDeliverySchedule) {
+  const scheduleMap = {
+    'DAILY': { internal: 'DAILY', db: 'DAILY' },
+    'SELECT-DAYS': { internal: 'SELECT_DAYS', db: 'WEEKDAYS' },
+    'ALTERNATE-DAYS': { internal: 'ALTERNATE_DAYS', db: 'ALTERNATE_DAYS' },
+    'DAY1-DAY2': { internal: 'VARYING', db: 'DAY1_DAY2' },
+    'VARYING': { internal: 'VARYING', db: 'DAY1_DAY2' }
+  };
+
+  const mapped = scheduleMap[rawDeliverySchedule.toUpperCase()];
+  if (!mapped) {
+    throw new Error(`Invalid delivery schedule type: ${rawDeliverySchedule}`);
+  }
+
+  return {
+    internalScheduleLogicType: mapped.internal,
+    dbDeliveryScheduleEnum: mapped.db
+  };
+}
+
+// Helper function to determine agent ID
+async function determineAgentId(depot, deliveryAddress, tx) {
+  if (depot?.isOnline) {
+    return deliveryAddress?.location?.agencyId || null;
+  } else if (depot) {
+    const agency = await tx.agency.findUnique({ where: { depotId: depot.id } });
+    return agency?.id || null;
+  }
+  return null;
+}
+
+// Helper function to get consistent agent ID across subscriptions
+function getConsistentAgentId(processedSubscriptions) {
+  const agentIds = processedSubscriptions.map(sub => sub.agentId).filter(Boolean);
+  const uniqueAgentIds = [...new Set(agentIds)];
+  
+  // Return agent ID only if all subscriptions have the same agent
+  return uniqueAgentIds.length === 1 ? uniqueAgentIds[0] : null;
+}
 const getAllProductOrders = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, search = '', paymentStatus = '' } = req.query;
 
