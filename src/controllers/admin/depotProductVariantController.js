@@ -14,6 +14,9 @@ const depotProductVariantSchema = z.object({
   mrp: z.coerce
     .number()
     .nonnegative({ message: "MRP must be a non-negative number" }),
+  sellingPrice: z.coerce
+    .number()
+    .nonnegative({ message: "sellingPrice must be a non-negative number" }),
   minimumQty: z.coerce
     .number()
     .int()
