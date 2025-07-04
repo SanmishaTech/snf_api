@@ -1024,53 +1024,220 @@ exports.deleteVendorOrder = async (req, res, next) => {
  */
 exports.getOrderDetailsByDate = async (req, res, next) => {
   try {
-    const { date } = req.query;
+    const { date, depotId, agencyId } = req.query;
+    console.log('[getOrderDetailsByDate] Request for date:', date, 'depotId:', depotId, 'agencyId:', agencyId);
 
     if (!date) {
       return next(createError(400, 'Date parameter is required.'));
     }
 
     const deliveryDate = new Date(date);
+    console.log('[getOrderDetailsByDate] Parsed delivery date:', deliveryDate);
+    
+    // Build where conditions array
+    const whereConditions = [
+      "s.paymentStatus = 'PAID'",
+      "d.deliveryDate = ?",
+      "d.status = 'PENDING'"
+    ];
+    const queryParams = [deliveryDate];
+    
+    if (depotId) {
+      whereConditions.push("depot.id = ?");
+      queryParams.push(parseInt(depotId));
+    }
+    
+    if (agencyId) {
+      whereConditions.push("a.id = ?");
+      queryParams.push(parseInt(agencyId));
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // Get aggregated data by depot and variant with product information
+    const deliveryScheduleQuery = `
+    SELECT
+      depot.id AS depotId,
+      depot.name AS depotName,
+      depot.address AS depotAddress,
+      depot.contactPerson AS depotContactPerson,
+      depot.contactNumber AS depotContactNumber,
+      dpv.id AS variantId,
+      dpv.name AS variantName,
+      dpv.mrp AS variantMrp,
+      dpv.buyOncePrice AS variantBuyOncePrice,
+      dpv.price3Day AS variantPrice3Day,
+      dpv.price7Day AS variantPrice7Day,
+      dpv.price15Day AS variantPrice15Day,
+      dpv.price1Month AS variantPrice1Month,
+      p.id AS productId,
+      p.name AS productName,
+      p.unit AS productUnit,
+      p.price AS productPrice,
+      p.rate AS productRate,
+      p.isDairyProduct,
+      cat.name AS categoryName,
+      AVG(s.rate) AS avgSubscriptionRate,
+      SUM(d.quantity) AS totalQuantity,
+      COUNT(DISTINCT d.id) AS deliveryCount,
+      COUNT(DISTINCT d.memberId) AS memberCount,
+      COUNT(DISTINCT a.id) AS agencyCount,
+      GROUP_CONCAT(DISTINCT a.name) AS agencyNames,
+      GROUP_CONCAT(DISTINCT a.id) AS agencyIds
+    FROM delivery_schedule_entries d
+    JOIN subscriptions s ON d.subscriptionId = s.id
+    JOIN products p ON d.productId = p.id
+    LEFT JOIN categories cat ON p.categoryId = cat.id
+    JOIN depot_product_variants dpv ON s.depotProductVariantId = dpv.id
+    JOIN depots depot ON dpv.depotId = depot.id
+    LEFT JOIN agencies a ON s.agencyId = a.id
+    WHERE ${whereClause}
+    GROUP BY depot.id, dpv.id, p.id
+    ORDER BY depot.name, dpv.name, p.name
+  `;
+    
+    const deliverySchedule = await prisma.$queryRawUnsafe(deliveryScheduleQuery, ...queryParams);
 
-    const deliverySchedule = await prisma.$queryRaw`
-      SELECT
-        depot.id as depotId,
-        depot.name as depotName,
-        dpv.id as depotVariantId,
-        dpv.name as variantName,
-        p.id as productId,
-        p.name as productName,
-        a.id as agencyId,
-        CASE
-          WHEN s.period = 3 THEN dpv.price3Day
-          WHEN s.period = 7 THEN dpv.price7Day
-          WHEN s.period = 15 THEN dpv.price15Day
-          WHEN s.period = 30 THEN dpv.price1Month
-          ELSE dpv.buyOncePrice
-        END as effectivePrice,
-        SUM(d.quantity) as totalQuantity
-      FROM delivery_schedule_entries d
-      JOIN subscriptions s ON d.subscriptionId = s.id
-      JOIN depot_product_variants dpv ON s.depotProductVariantId = dpv.id
-      JOIN product_orders po ON s.productOrderId = po.id
-      JOIN agencies a ON po.agencyId = a.id
-      JOIN depots depot ON dpv.depotId = depot.id
-      JOIN products p ON d.productId = p.id
-      WHERE
-        s.paymentStatus = 'PAID'
-        AND d.deliveryDate = ${deliveryDate}
-        AND po.agencyId IS NOT NULL
-        AND a.depotId IS NOT NULL
-      GROUP BY depot.id, depot.name, dpv.id, dpv.name, p.id, p.name, a.id
-    `;
+    console.log('[getOrderDetailsByDate] Raw query results count:', deliverySchedule.length);
+    
+    // Get member details for each depot-variant combination
+    const memberDetailsQuery = `
+    SELECT
+      depot.id AS depotId,
+      dpv.id AS variantId,
+      m.id AS memberId,
+      m.name AS memberName,
+      da.recipientName,
+      da.mobile AS memberMobile,
+      da.plotBuilding,
+      da.streetArea,
+      da.landmark,
+      da.pincode,
+      da.city,
+      d.quantity,
+      l.name AS locationName
+    FROM delivery_schedule_entries d
+    JOIN subscriptions s ON d.subscriptionId = s.id
+    JOIN members m ON d.memberId = m.id
+    JOIN depot_product_variants dpv ON s.depotProductVariantId = dpv.id
+    JOIN depots depot ON dpv.depotId = depot.id
+    LEFT JOIN delivery_addresses da ON d.deliveryAddressId = da.id
+    LEFT JOIN locations l ON da.locationId = l.id
+    LEFT JOIN agencies a ON s.agencyId = a.id
+    WHERE ${whereClause}
+    ORDER BY depot.name, dpv.name, m.name
+  `;
+    
+    const memberDetails = await prisma.$queryRawUnsafe(memberDetailsQuery, ...queryParams);
+    
+    // Get summary statistics
+    const summaryStatsQuery = `
+    SELECT
+      COUNT(DISTINCT depot.id) AS totalDepots,
+      COUNT(DISTINCT dpv.id) AS totalVariants,
+      COUNT(DISTINCT d.memberId) AS totalMembers,
+      COUNT(DISTINCT a.id) AS totalAgencies,
+      SUM(d.quantity) AS totalQuantity,
+      COUNT(DISTINCT d.id) AS totalDeliveries
+    FROM delivery_schedule_entries d
+    JOIN subscriptions s ON d.subscriptionId = s.id
+    JOIN depot_product_variants dpv ON s.depotProductVariantId = dpv.id
+    JOIN depots depot ON dpv.depotId = depot.id
+    LEFT JOIN agencies a ON s.agencyId = a.id
+    WHERE ${whereClause}
+  `;
+    
+    const summaryStats = await prisma.$queryRawUnsafe(summaryStatsQuery, ...queryParams);
+    
+    // Process and format the results
+    const result = deliverySchedule.map(item => {
+      // Get member details for this depot-variant combination
+      const members = memberDetails
+        .filter(m => m.depotId === item.depotId && m.variantId === item.variantId)
+        .map(m => ({
+          memberId: m.memberId,
+          memberName: m.memberName,
+          recipientName: m.recipientName,
+          mobile: m.memberMobile,
+          address: {
+            plotBuilding: m.plotBuilding,
+            streetArea: m.streetArea,
+            landmark: m.landmark,
+            pincode: m.pincode,
+            city: m.city,
+            locationName: m.locationName
+          },
+          quantity: parseInt(m.quantity)
+        }));
+      
+      return {
+        depot: {
+          id: item.depotId,
+          name: item.depotName,
+          address: item.depotAddress,
+          contactPerson: item.depotContactPerson,
+          contactNumber: item.depotContactNumber
+        },
+        variant: {
+          id: item.variantId,
+          name: item.variantName,
+          pricing: {
+            mrp: item.variantMrp ? parseFloat(item.variantMrp) : null,
+            buyOncePrice: item.variantBuyOncePrice ? parseFloat(item.variantBuyOncePrice) : null,
+            price3Day: item.variantPrice3Day ? parseFloat(item.variantPrice3Day) : null,
+            price7Day: item.variantPrice7Day ? parseFloat(item.variantPrice7Day) : null,
+            price15Day: item.variantPrice15Day ? parseFloat(item.variantPrice15Day) : null,
+            price1Month: item.variantPrice1Month ? parseFloat(item.variantPrice1Month) : null
+          }
+        },
+        product: {
+          id: item.productId,
+          name: item.productName,
+          unit: item.productUnit,
+          price: item.productPrice ? parseFloat(item.productPrice) : null,
+          rate: item.productRate ? parseFloat(item.productRate) : null,
+          isDairyProduct: item.isDairyProduct,
+          category: item.categoryName
+        },
+        statistics: {
+          totalQuantity: parseInt(item.totalQuantity),
+          deliveryCount: parseInt(item.deliveryCount),
+          memberCount: parseInt(item.memberCount),
+          agencyCount: parseInt(item.agencyCount),
+          avgSubscriptionRate: item.avgSubscriptionRate ? parseFloat(item.avgSubscriptionRate) : null
+        },
+        agencies: {
+          ids: item.agencyIds ? item.agencyIds.split(',').map(id => parseInt(id)) : [],
+          names: item.agencyNames ? item.agencyNames.split(',') : []
+        },
+        members: members
+      };
+    });
+    
+    // Format summary statistics
+    const summary = summaryStats[0] ? {
+      totalDepots: parseInt(summaryStats[0].totalDepots),
+      totalVariants: parseInt(summaryStats[0].totalVariants),
+      totalMembers: parseInt(summaryStats[0].totalMembers),
+      totalAgencies: parseInt(summaryStats[0].totalAgencies),
+      totalQuantity: parseInt(summaryStats[0].totalQuantity),
+      totalDeliveries: parseInt(summaryStats[0].totalDeliveries)
+    } : {
+      totalDepots: 0,
+      totalVariants: 0,
+      totalMembers: 0,
+      totalAgencies: 0,
+      totalQuantity: 0,
+      totalDeliveries: 0
+    };
+    
+    console.log('[getOrderDetailsByDate] Returning', result.length, 'grouped order items with detailed information');
 
-    const result = deliverySchedule.map(item => ({
-      ...item,
-      totalQuantity: item.totalQuantity.toString(),
-      effectivePrice: item.effectivePrice ? parseFloat(item.effectivePrice) : null,
-    }));
-
-    return res.json(result);
+    return res.json({
+      date: date,
+      summary: summary,
+      data: result
+    });
   } catch (error) {
     console.error('Error fetching order details:', error);
     next(createError(500, 'Failed to fetch order details.'));
