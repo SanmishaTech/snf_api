@@ -521,7 +521,7 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
                     select: {
                       price15Day: true,
                       price1Month: true,
-                      sellingPrice: true,
+                      buyOncePrice: true,
                     },
                   },
                 },

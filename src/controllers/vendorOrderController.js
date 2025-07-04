@@ -1046,7 +1046,7 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
           WHEN s.period = 7 THEN dpv.price7Day
           WHEN s.period = 15 THEN dpv.price15Day
           WHEN s.period = 30 THEN dpv.price1Month
-          ELSE dpv.sellingPrice
+          ELSE dpv.buyOncePrice
         END as effectivePrice,
         SUM(d.quantity) as totalQuantity
       FROM delivery_schedule_entries d

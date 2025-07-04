@@ -189,10 +189,7 @@ app.use(
   allowRoles("ADMIN", "DepotAdmin"),
   variantStockRoutes
 );
-app.use(
-  "/api/depots",
-   depotRoutes
-);
+app.use("/api/depots", depotRoutes);
 app.use(
   "/api/transfers",
   authMiddleware,
