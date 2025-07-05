@@ -25038,11 +25038,11 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             destructive:
               "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
             outline:
-              "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+              "border bg-background shadow-xs hover:bg-accent hover:text-gray-700-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
             secondary:
               "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
             ghost:
-              "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+              "hover:bg-accent hover:text-gray-700-foreground dark:hover:bg-accent/50",
             link: "text-primary underline-offset-4 hover:underline",
           },
           size: {
@@ -32507,7 +32507,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
       "data-inset": t,
       "data-variant": r,
       className: qe(
-        "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "focus:bg-accent focus:text-gray-700-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         e
       ),
       ...n,
@@ -40910,12 +40910,12 @@ For more information, see https://radix-ui.com/primitives/docs/components/alert-
           "day-range-end aria-selected:bg-primary aria-selected:text-primary-foreground",
         day_selected:
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-accent text-accent-foreground",
+        day_today: "bg-accent text-gray-700-foreground",
         day_outside:
           "day-outside text-muted-foreground aria-selected:text-muted-foreground",
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          "aria-selected:bg-accent aria-selected:text-gray-700-foreground",
         day_hidden: "invisible",
         ...t,
       },
@@ -44640,7 +44640,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/alert-
     return s.jsxs(Ahe, {
       "data-slot": "select-item",
       className: qe(
-        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        "focus:bg-accent focus:text-gray-700-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         e
       ),
       ...r,
@@ -48416,7 +48416,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
           destructive:
             "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
           outline:
-            "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+            "text-foreground [a&]:hover:bg-accent [a&]:hover:text-gray-700-foreground",
         },
       },
       defaultVariants: { variant: "default" },
@@ -48494,7 +48494,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
     s.jsx(Ya.Item, {
       ref: r,
       className: qe(
-        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected='true']:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected='true']:bg-accent data-[selected=true]:text-gray-700-foreground data-[disabled=true]:opacity-50",
         e
       ),
       ...t,
