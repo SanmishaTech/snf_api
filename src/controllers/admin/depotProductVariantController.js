@@ -3,7 +3,18 @@ const createError = require("http-errors");
 const { z } = require("zod");
 const prisma = require("../../config/db");
 
-// Validation schema for DepotProductVariant (depotId will be taken from logged-in user)
+// Helper for parsing numbers safely, converting invalid/empty values to a default.
+const safeParseNumber = (val, defaultVal) => {
+  if (val === null || val === undefined || val === "") return defaultVal;
+  const num = Number(val);
+  return isNaN(num) ? defaultVal : num;
+};
+
+// Zod preprocessors for required and optional numbers
+const requiredNumber = (val) => safeParseNumber(val, 0);
+const optionalNumber = (val) => safeParseNumber(val, null);
+
+// Validation schema for DepotProductVariant
 const depotProductVariantSchema = z.object({
   productId: z.coerce
     .number()
@@ -11,23 +22,32 @@ const depotProductVariantSchema = z.object({
     .positive({ message: "productId must be a positive integer" }),
   name: z.string().min(1, { message: "name is required" }),
   hsnCode: z.string().optional(),
-  mrp: z.coerce
-    .number()
-    .nonnegative({ message: "MRP must be a non-negative number" }),
-  sellingPrice: z.coerce
-    .number()
-    .nonnegative({ message: "sellingPrice must be a non-negative number" }),
-  minimumQty: z.coerce
-    .number()
-    .int()
-    .nonnegative({ message: "minimumQty must be a non-negative integer" }),
+  mrp: z.preprocess(
+    requiredNumber,
+    z.number().nonnegative({ message: "MRP must be a non-negative number" })
+  ),
+
+  minimumQty: z.preprocess(
+    requiredNumber,
+    z.number().int().nonnegative({ message: "minimumQty must be a non-negative integer" })
+  ),
   notInStock: z.boolean().optional().default(false),
   isHidden: z.boolean().optional().default(false),
-  price3Day: z.coerce.number().nonnegative().optional(),
-  price7Day: z.coerce.number().nonnegative().optional(),
-  price15Day: z.coerce.number().nonnegative().optional(),
-  price1Month: z.coerce.number().nonnegative().optional(),
-  buyOncePrice: z.coerce.number().nonnegative().optional(),
+  price3Day: z
+    .preprocess(optionalNumber, z.number().nonnegative().nullable())
+    .optional(),
+  price7Day: z
+    .preprocess(optionalNumber, z.number().nonnegative().nullable())
+    .optional(),
+  price15Day: z
+    .preprocess(optionalNumber, z.number().nonnegative().nullable())
+    .optional(),
+  price1Month: z
+    .preprocess(optionalNumber, z.number().nonnegative().nullable())
+    .optional(),
+  buyOncePrice: z
+    .preprocess(optionalNumber, z.number().nonnegative().nullable())
+    .optional(),
 });
 
 // For updates we still forbid changing depotId via body; omit depotId field entirely
