@@ -2,13 +2,27 @@ const asyncHandler = require('express-async-handler');
 const { PrismaClient } = require('@prisma/client');
 
 // Helper function to get the correct price based on the subscription period
-const getPriceForPeriod = (product, periodInDays) => {
-  // NOTE: The tiered pricing logic has been simplified to use the base 'price'
-  // as the previous implementation was causing errors due to missing fields.
-  // The original logic can be restored if the 'Product' model is updated
-  // with fields like 'buyOncePrice', 'price1Month', etc.
-  const price = Number(product.price);
-  return isNaN(price) ? 0 : price;
+const getPriceForPeriod = (depotVariant, periodInDays) => {
+  const toNumber = (val) => {
+    const num = Number(val);
+    return Number.isFinite(num) && num > 0 ? num : undefined;
+  };
+
+  let periodPrice;
+  switch (periodInDays) {
+    case 3:
+      periodPrice = toNumber(depotVariant.price3Day);
+      break;
+    case 15:
+      periodPrice = toNumber(depotVariant.price15Day);
+      break;
+    case 30:
+      periodPrice = toNumber(depotVariant.price1Month);
+      break;
+  }
+
+  // Fallback chain: period price -> buyOncePrice -> MRP
+  return periodPrice ?? toNumber(depotVariant.buyOncePrice) ?? toNumber(depotVariant.mrp) ?? 0;
 };
 const prisma = new PrismaClient();
 
@@ -122,13 +136,24 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       const depotVariantIds = subscriptions.map(sub => parseInt(sub.productId, 10));
       const depotVariants = await tx.depotProductVariant.findMany({
         where: { id: { in: depotVariantIds } },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          mrp: true,
+          price3Day: true,
+          price15Day: true,
+          price1Month: true,
+          buyOncePrice: true,
+          depotId: true,
+          productId: true,
           depot: true,
           product: {
             select: {
-              price: true,
+              id: true,
+              name: true,
+              unit: true,
             }
-          }
+          },
         }
       });
       const depotVariantMap = new Map(depotVariants.map(v => [v.id, v]));
@@ -413,7 +438,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
 
   // Calculate amounts
   const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
-  const rateForPeriod = getPriceForPeriod(depotVariant.product, subscriptionPeriod);
+  const rateForPeriod = getPriceForPeriod(depotVariant, subscriptionPeriod);
 
   const subscriptionAmount = rateForPeriod * subscriptionTotalQty;
 
