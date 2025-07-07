@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node prisma/seed.js",
+    "seed": "node prisma/seed.ts",
     "dev": "nodemon server.js",
     "migrate": "npx prisma migrate dev",
     "generate": "npx prisma generate",

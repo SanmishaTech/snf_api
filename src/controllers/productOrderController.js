@@ -551,12 +551,36 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
                   },
                 },
               },
+              depotProductVariant: {
+                select: {
+                  id: true,
+                  name: true,
+                  mrp: true,
+                },
+              },
+              deliveryAddress: true,
+              agency: {
+                include: {
+                  user: true,
+                },
+              },
             },
           },
         },
       }),
       prisma.productOrder.count({ where }),
     ]);
+
+    // Debug: Log the first order's subscription data
+    if (productOrders.length > 0 && productOrders[0].subscriptions.length > 0) {
+      console.log('Debug - First subscription data:', {
+        subscriptionId: productOrders[0].subscriptions[0].id,
+        depotProductVariantId: productOrders[0].subscriptions[0].depotProductVariantId,
+        depotProductVariant: productOrders[0].subscriptions[0].depotProductVariant,
+        productId: productOrders[0].subscriptions[0].productId,
+        product: productOrders[0].subscriptions[0].product?.name
+      });
+    }
 
     const ordersWithComputedFields = productOrders.map(order => {
       // Prefer explicitly stored columns if they exist, otherwise fall back to legacy/computed values
@@ -587,7 +611,27 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
 const getProductOrderById = asyncHandler(async (req, res) => {
     const productOrder = await prisma.productOrder.findUnique({
         where: { id: parseInt(req.params.id, 10) },
-        include: { member: true, subscriptions: true },
+        include: { 
+          member: true, 
+          subscriptions: {
+            include: {
+              product: true,
+              depotProductVariant: {
+                select: {
+                  id: true,
+                  name: true,
+                  mrp: true,
+                },
+              },
+              deliveryAddress: true,
+              agency: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
     });
     if (!productOrder) {
         res.status(404);
@@ -629,7 +673,18 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
 
   const order = await prisma.productOrder.findUnique({
     where: { id: orderId },
-    include: { subscriptions: true },
+    include: { 
+      subscriptions: {
+        include: {
+          depotProductVariant: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!order) {
@@ -690,7 +745,18 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
       // 3. Fetch and return the final, fully updated order data
       const finalUpdatedOrder = await tx.productOrder.findUnique({
         where: { id: orderId },
-        include: { subscriptions: true },
+        include: { 
+          subscriptions: {
+            include: {
+              depotProductVariant: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       return finalUpdatedOrder;

@@ -1092,7 +1092,7 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
     JOIN depots depot ON dpv.depotId = depot.id
     LEFT JOIN agencies a ON s.agencyId = a.id
     WHERE ${whereClause}
-    GROUP BY depot.id, dpv.id, p.id
+    GROUP BY depot.id, dpv.id, p.id, a.id
     ORDER BY depot.name, dpv.name, p.name
   `;
     
@@ -1105,6 +1105,7 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
     SELECT
       depot.id AS depotId,
       dpv.id AS variantId,
+      a.id AS agencyId,
       m.id AS memberId,
       m.name AS memberName,
       da.recipientName,
@@ -1151,9 +1152,16 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
     
     // Process and format the results
     const result = deliverySchedule.map(item => {
-      // Get member details for this depot-variant combination
+      // Get member details for this depot-variant-agency combination
       const members = memberDetails
-        .filter(m => m.depotId === item.depotId && m.variantId === item.variantId)
+        .filter(m => {
+          // Match by depot, variant, and agency
+          const agencyIds = item.agencyIds ? item.agencyIds.split(',').map(id => parseInt(id)) : [];
+          const memberAgencyId = m.agencyId || null;
+          return m.depotId === item.depotId && 
+                 m.variantId === item.variantId && 
+                 (agencyIds.length === 0 || agencyIds.includes(memberAgencyId));
+        })
         .map(m => ({
           memberId: m.memberId,
           memberName: m.memberName,
