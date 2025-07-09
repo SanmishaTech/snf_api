@@ -35358,7 +35358,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                           children: [
                             s.jsx("span", {
                               className:
-                                "w-1.5 h-1.5 bg-green-500 rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
+                                "w-1.5 h-1.5 bg-primary rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
                             }),
                             w.name,
                           ],
@@ -35403,7 +35403,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                           children: [
                             s.jsx("span", {
                               className:
-                                "w-1.5 h-1.5 bg-green-500 rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
+                                "w-1.5 h-1.5 bg-primary rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
                             }),
                             s.jsx(dj, { size: 16, className: "mr-2" }),
                             " Account",
@@ -50651,7 +50651,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                           size: "sm",
                           onClick: () => t("/admin/vendors/create"),
                           className:
-                            "w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white",
+                            "w-full sm:w-auto bg-green-600 hover:bg-primary text-white",
                           children: [
                             s.jsx(Zn, { size: 16, className: "mr-2" }),
                             "Add Vendor",
@@ -51193,7 +51193,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                               size: "sm",
                               onClick: () => t("/admin/agencies/create"),
                               className:
-                                "w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white",
+                                "w-full sm:w-auto bg-green-600 hover:bg-primary text-white",
                               children: [
                                 s.jsx(Zn, { size: 16, className: "mr-2" }),
                                 "Add Delivery Agency",
@@ -51545,7 +51545,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                               s.jsxs(me, {
                                 onClick: () => t("/admin/agencies/create"),
                                 className:
-                                  "bg-green-600 hover:bg-green-700 text-white",
+                                  "bg-green-600 hover:bg-primary text-white",
                                 children: [
                                   s.jsx(Zn, { size: 16, className: "mr-2" }),
                                   "Add Delivery Agency",
@@ -53161,7 +53161,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             case "DELIVERED":
               return "bg-secondary";
             case "RECEIVED":
-              return "bg-green-500";
+              return "bg-primary";
             default:
               return "bg-gray-500";
           }
@@ -55592,7 +55592,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                               activeIcon: s.jsx(pT, {
                                 className: "h-5 w-5 text-white",
                               }),
-                              activeIconBg: "bg-green-500",
+                              activeIconBg: "bg-primary",
                               placeholderIcon: s.jsx(I1, {
                                 className:
                                   "h-5 w-5 text-gray-600 dark:text-gray-400",
@@ -68606,7 +68606,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                             s.jsx(me, {
                               onClick: Ke,
                               className:
-                                "bg-green-500 hover:bg-green-600 text-white rounded-lg h-11",
+                                "bg-primary hover:bg-primary text-white rounded-lg h-11",
                               disabled: !!(
                                 L.recipientName ||
                                 L.mobile ||
@@ -69587,7 +69587,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                         onClick: O,
                         disabled: !c || !y || i < 1,
                         className:
-                          "w-full max-w-[20rem] bg-green-600 hover:bg-green-700 text-white py-3 text-base rounded-md disabled:bg-gray-300",
+                          "w-full max-w-[20rem] bg-green-600 hover:bg-primary text-white py-3 text-base rounded-md disabled:bg-gray-300",
                         children: ["Confirm Order & Pay ₹", k.toFixed(2)],
                       }),
                     ],
@@ -70982,7 +70982,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                         children: s.jsxs("button", {
                           type: "submit",
                           className:
-                            "w-full flex items-center justify-center px-6 py-3 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition duration-150 ease-in-out",
+                            "w-full flex items-center justify-center px-6 py-3 bg-green-600 text-white font-semibold rounded-md hover:bg-primary focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition duration-150 ease-in-out",
                           children: [
                             s.jsx(CX, { className: "w-5 h-5 mr-2" }),
                             " Send",
@@ -85949,7 +85949,7 @@ ${Hw(this.code(t, r))}
                                                     children: [
                                                       s.jsx("div", {
                                                         className:
-                                                          "w-1.5 h-1.5 bg-green-500 rounded-full",
+                                                          "w-1.5 h-1.5 bg-primary rounded-full",
                                                       }),
                                                       s.jsxs("span", {
                                                         className:
@@ -86010,7 +86010,7 @@ ${Hw(this.code(t, r))}
                                                     children: [
                                                       s.jsx("div", {
                                                         className:
-                                                          "w-1.5 h-1.5 bg-green-500 rounded-full",
+                                                          "w-1.5 h-1.5 bg-primary rounded-full",
                                                       }),
                                                       s.jsxs("span", {
                                                         className:
@@ -103527,7 +103527,7 @@ ${Hw(this.code(t, r))}
                       "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
                       d.length === 0 || g
                         ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-500 focus-visible:outline-green-600"
+                        : "bg-green-600 hover:bg-primary focus-visible:outline-green-600"
                     ),
                     children: [
                       s.jsxs("svg", {
@@ -103737,7 +103737,7 @@ ${Hw(this.code(t, r))}
                                       "text-xs font-medium py-1 px-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1",
                                       D.status !== Nl.PENDING || w[D.id]
                                         ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                        : "bg-green-500 text-white hover:bg-green-600 focus:ring-green-400"
+                                        : "bg-primary text-white hover:bg-primary focus:ring-green-400"
                                     ),
                                     title: "Mark as Delivered",
                                     children: [
@@ -104132,7 +104132,7 @@ ${Hw(this.code(t, r))}
                               onClick: () => fe("CREDIT"),
                               size: "sm",
                               className:
-                                "bg-green-600 hover:bg-green-700 text-white",
+                                "bg-green-600 hover:bg-primary text-white",
                               children: [
                                 s.jsx(xE, { className: "mr-1 h-4 w-4" }),
                                 "Deposit",
@@ -104541,7 +104541,7 @@ ${Hw(this.code(t, r))}
                       disabled: A || Object.keys(ne).length > 0,
                       className: `w-full ${
                         O === "CREDIT"
-                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          ? "bg-green-600 hover:bg-primary text-white"
                           : "bg-red-600 hover:bg-red-700 text-white"
                       }`,
                       children: A
