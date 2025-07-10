@@ -4,18 +4,21 @@ const prefixes = {
   transfer: 'TFR',
   purchase: 'PUR',
   wastage: 'WST',
+  invoice: 'INV',
 };
 
 const modelMap = {
   transfer: 'transfer',
   purchase: 'purchase',
   wastage: 'wastage',
+  invoice: 'invoice',
 };
 
 const numberFieldMap = {
   transfer: 'transferNo',
   purchase: 'purchaseNo',
   wastage: 'wastageNo',
+  invoice: 'invoiceNo',
 };
 
 const generateNextNo = async (module) => {

@@ -71,11 +71,13 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
 
   const { 
     invoiceNumber, 
-    invoiceDate, 
-    member, // { memberName, addressLines (array), city, pincode, gstin (optional) }
+    invoiceDate,
+    orderNo,
+    member, // { memberName, mobile, email, addressLines (array), city, state, pincode, gstin (optional) }
     SNFlobal, // { name, addressLines (array), city, pincode, gstinUin, email, logoPath (optional) }
-    items, // array of { srNo, description, hsnSac (optional), amount }
-    totals // { amountBeforeTax, cgstAmount, sgstAmount, igstAmount (optional), totalAmount, amountInWords }
+    items, // array of { srNo, description, hsnSac (optional), quantity, rate, unit, amount }
+    totals, // { amountBeforeTax, cgstAmount, sgstAmount, igstAmount (optional), totalAmount, amountInWords }
+    paymentDetails // { walletAmount, paidAmount, dueAmount, paymentStatus, paymentMode, paymentDate, paymentReferenceNo }
   } = invoiceData;
 
   // Company details from image (can be passed in SNFlobal or hardcoded/configured elsewhere)

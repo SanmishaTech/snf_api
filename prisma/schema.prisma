@@ -794,6 +794,8 @@ model ProductOrder {
   paymentReferenceNo String?
   paymentDate        DateTime?
   paymentStatus      PaymentStatus  @default(PENDING)
+  invoiceNo          String?        @unique
+  invoicePath        String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   agencyId           Int?

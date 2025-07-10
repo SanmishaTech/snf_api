@@ -32,6 +32,7 @@ const depotRoutes = require("./routes/depotRoutes");
 const stockLedgerRoutes = require("./routes/stockLedgerRoutes");
 const transferRoutes = require("./routes/transferRoutes");
 const productOrderRoutes = require("./routes/productOrderRoutes");
+const invoiceRoutes = require("./routes/invoices");
 const {
   getPublicProducts,
   getProductById,
@@ -90,6 +91,11 @@ const uploadsPath =
 
 console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
+
+// Serve invoices statically
+const invoicesPath = path.resolve(__dirname, "invoices");
+console.log(`Serving invoices from: ${invoicesPath}`);
+app.use("/invoices", express.static(invoicesPath));
 
 // Public APIs (no auth)
 app.get("/api/products/public", getPublicProducts);
@@ -155,6 +161,11 @@ app.use(
   authMiddleware,
   roleGuard("ADMIN", "MEMBER"),
   subscriptionRoutes
+);
+app.use(
+  "/api/invoices",
+  authMiddleware,
+  invoiceRoutes
 );
 app.use("/api/admin", adminRoutes); // Added for admin routes
 

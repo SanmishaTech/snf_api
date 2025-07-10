@@ -1,5 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const { PrismaClient } = require('@prisma/client');
+const { generateInvoicePdf } = require('../utils/invoiceGenerator');
+const { generateInvoiceForOrder } = require('../services/invoiceService');
+const path = require('path');
+const fs = require('fs').promises;
 
 // Helper function to get the correct price based on the subscription period
 const getPriceForPeriod = (depotVariant, periodInDays) => {
@@ -323,6 +327,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         include: { 
           subscriptions: {
             include: {
+              deliveryAddress: true,
               depotProductVariant: {
                 include: {
                   depot: true,
@@ -334,6 +339,25 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         },
       });
 
+      // Create invoice for the order
+      let invoice = null;
+      try {
+        invoice = await generateInvoiceForOrder(finalOrder);
+        console.log('Invoice created successfully:', invoice.invoiceNo);
+        
+        // Update the order with invoice information
+        await tx.productOrder.update({
+          where: { id: finalOrder.id },
+          data: {
+            invoiceNo: invoice.invoiceNo,
+            invoicePath: invoice.pdfPath
+          }
+        });
+      } catch (invoiceError) {
+        console.error('Error creating invoice:', invoiceError);
+        // Don't fail the order creation if invoice fails
+      }
+
       return { 
         order: finalOrder,
         financialSummary: {
@@ -341,7 +365,8 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           walletAmountUsed: walletCalculation.walletAmountUsed,
           totalPayableAmount: walletCalculation.totalPayableAmount,
           paymentStatus: orderData.paymentStatus
-        }
+        },
+        invoice: invoice
       };
     });
 
@@ -593,6 +618,10 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
         walletamt,
         payableamt,
         receivedamt,
+        // Include invoice information
+        invoiceNo: order.invoiceNo,
+        invoicePath: order.invoicePath,
+        hasInvoice: !!order.invoicePath
       };
     });
 

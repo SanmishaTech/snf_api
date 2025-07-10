@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const { PrismaClient, TransactionStatus, TransactionType } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { isAfter, startOfDay } = require('date-fns');
+const { createInvoiceForOrder } = require('../services/invoiceService');
 
 // Helper function to get day key from day index (0 for Sunday, 1 for Monday, etc.)
 const getDayKey = (dayIndex) => {
@@ -333,7 +334,47 @@ const createSubscription = asyncHandler(async (req, res) => {
         });
       }
       
-      return newSubscription;
+      // Fetch the complete order with relations for invoice generation
+      const completeOrder = await tx.productOrder.findUnique({
+        where: { id: newProductOrder.id },
+        include: {
+          subscriptions: {
+            include: {
+              product: true,
+              depotProductVariant: true,
+              deliveryAddress: true
+            }
+          },
+          member: true
+        }
+      });
+
+      // Create invoice for the order
+      let invoice = null;
+      try {
+        invoice = await createInvoiceForOrder(completeOrder);
+        console.log('Invoice created successfully:', invoice.invoiceNo);
+        
+        // Update productOrder with invoice details
+        if (invoice && invoice.invoiceNo) {
+          await tx.productOrder.update({
+            where: { id: newProductOrder.id },
+            data: {
+              invoiceNo: invoice.invoiceNo,
+              invoicePath: invoice.pdfPath
+            }
+          });
+        }
+      } catch (invoiceError) {
+        console.error('Error creating invoice:', invoiceError);
+        // Don't fail the subscription creation if invoice fails
+      }
+      
+      return {
+        subscription: newSubscription,
+        order: newProductOrder,
+        invoice: invoice
+      };
     });
 
     res.status(201).json(result);
@@ -367,6 +408,14 @@ const getSubscriptions = asyncHandler(async (req, res) => {
     member: {
       include: {
         user: true,
+      }
+    },
+    productOrder: {
+      select: {
+        id: true,
+        orderNo: true,
+        invoiceNo: true,
+        invoicePath: true
       }
     }
   };
@@ -418,6 +467,14 @@ const getSubscriptionById = asyncHandler(async (req, res) => {
       deliveryScheduleEntries: {
         orderBy: {
           deliveryDate: 'asc' // Optional: order entries by date
+        }
+      },
+      productOrder: {
+        select: {
+          id: true,
+          orderNo: true,
+          invoiceNo: true,
+          invoicePath: true
         }
       }
     }
