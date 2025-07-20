@@ -41,6 +41,8 @@ const {
   getPublicLocations,
 } = require("./controllers/public/locationController");
 const publicDepotVariantRoutes = require("./routes/public/depotVariantsRoutes");
+const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
+const leadRoutes = require("./routes/leadRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -62,7 +64,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "https://www.indraai.in/"];
+  : ["http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -102,6 +104,8 @@ app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
 app.get("/api/public/locations", getPublicLocations);
 app.use("/api/public/depot-variants", publicDepotVariantRoutes);
+app.use("/api/public/area-masters", publicAreaMasterRoutes);
+app.use("/api/leads", leadRoutes);
 app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);

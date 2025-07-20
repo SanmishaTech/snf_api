@@ -8,7 +8,7 @@ const { DeliveryType } = require('@prisma/client'); // Import DeliveryType enum
  * @access  Private/Admin
  */
 const createAreaMaster = asyncHandler(async (req, res) => {
-  const { name, pincodes, depotId, deliveryType } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct } = req.body;
 
   if (!name || !pincodes || !deliveryType) {
     res.status(400);
@@ -24,6 +24,7 @@ const createAreaMaster = asyncHandler(async (req, res) => {
     name,
     pincodes,
     deliveryType,
+    isDairyProduct: Boolean(isDairyProduct),
   };
 
   if (depotId) {
@@ -144,7 +145,7 @@ const getAreaMasterById = asyncHandler(async (req, res) => {
  */
 const updateAreaMaster = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, pincodes, depotId, deliveryType } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct } = req.body;
 
   if (deliveryType && !Object.values(DeliveryType).includes(deliveryType)) {
     res.status(400);
@@ -156,6 +157,7 @@ const updateAreaMaster = asyncHandler(async (req, res) => {
   if (name !== undefined) dataToUpdate.name = name;
   if (pincodes !== undefined) dataToUpdate.pincodes = pincodes;
   if (deliveryType !== undefined) dataToUpdate.deliveryType = deliveryType;
+  if (isDairyProduct !== undefined) dataToUpdate.isDairyProduct = Boolean(isDairyProduct);
 
   if (depotId !== undefined) {
     if (depotId === null || depotId === '') {

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -103,7 +103,7 @@ model Product {
   price                   Float
   rate                    Float
   deliveredQuantity       Int?
-  description             String?                 @db.Text // New field for product description
+  description             String?                  // New field for product description
   unit                    String?
   isDairyProduct          Boolean                 @default(false)
   categoryId              Int?
@@ -128,11 +128,11 @@ model ProductVariant {
   product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId       Int
   hsnCode         String?
-  mrp             Decimal          @db.Decimal(10, 2)
-  sellingPrice    Decimal          @db.Decimal(10, 2)
+  mrp             Decimal          
+  sellingPrice    Decimal          
   name            String
-  purchasePrice   Decimal          @db.Decimal(10, 2)
-  gstRate         Decimal          @db.Decimal(5, 2)
+  purchasePrice   Decimal          
+  gstRate         Decimal          
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   variantStocks   VariantStock[]
@@ -342,14 +342,15 @@ enum DeliveryType {
 }
 
 model AreaMaster {
-  id           Int          @id @default(autoincrement())
-  name         String
-  pincodes     String       @db.LongText // Comma-separated string of pincodes. Explicitly LongText for MySQL.
-  deliveryType DeliveryType
-  depotId      Int? // Foreign key to Depot
-  depot        Depot?       @relation(fields: [depotId], references: [id])
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id             Int          @id @default(autoincrement())
+  name           String
+  pincodes       String       // Comma-separated string of pincodes.
+  deliveryType   DeliveryType
+  isDairyProduct Boolean      @default(false) // Flag to indicate if area supports dairy products
+  depotId        Int? // Foreign key to Depot
+  depot          Depot?       @relation(fields: [depotId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([depotId])
   @@map("area_masters")
@@ -386,7 +387,7 @@ model DeliveryScheduleEntry {
   deliveryAddressId     Int? // Changed to Int
   product               Product              @relation(fields: [productId], references: [id], onDelete: Restrict) // Added onDelete (Restrict as product might be in other schedules)
   productId             Int
-  deliveryDate          DateTime             @db.Date
+  deliveryDate          DateTime             
   quantity              Int                  @default(1) // Quantity for this specific delivery, default to 1
   status                DeliveryStatus       @default(PENDING)
   agentId               Int?
@@ -474,7 +475,7 @@ model WalletTransaction {
   type               TransactionType
   paymentMethod      String?
   referenceNumber    String?
-  notes              String?           @db.Text
+  notes              String?           
   processedByAdminId Int?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
@@ -509,7 +510,7 @@ model WalletTransaction {
  * // Optional details from original model, can be kept
  * paymentMethod   String? // e.g., "Cash", "Bank Transfer", "UPI"
  * referenceNumber String? // e.g., Cheque number, UPI transaction ID
- * notes           String? @db.Text
+ * notes           String? 
  * processedByAdminId Int? // Foreign key to User (admin who approved/processed the transaction). Renamed from adminId & made optional.
  * createdAt          DateTime @default(now())
  * updatedAt          DateTime @updatedAt
@@ -547,9 +548,9 @@ model VariantStock {
 model Purchase {
   id           Int       @id @default(autoincrement())
   purchaseNo   String    @unique // Auto–generated reference e.g., 2526-00001
-  purchaseDate DateTime  @db.Date
+  purchaseDate DateTime  
   invoiceNo    String?
-  invoiceDate  DateTime? @db.Date
+  invoiceDate  DateTime? 
   vendorId     Int
   depotId      Int?
   createdById  Int?
@@ -578,7 +579,7 @@ model PurchaseDetail {
   productId    Int
   variantId    Int
   quantity     Int
-  purchaseRate Decimal  @db.Decimal(10, 2)
+  purchaseRate Decimal  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -597,12 +598,12 @@ model PurchaseDetail {
 model PurchasePayment {
   id          Int      @id @default(autoincrement())
   paymentno   String?  @unique
-  paymentDate DateTime @db.Date
+  paymentDate DateTime 
   vendorId    Int
   mode        String
   referenceNo String?
-  notes       String?  @db.Text
-  totalAmount Decimal  @db.Decimal(10, 2)
+  notes       String?  
+  totalAmount Decimal  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -620,7 +621,7 @@ model PurchasePaymentDetail {
   id                Int      @id @default(autoincrement())
   purchasePaymentId Int
   purchaseId        Int
-  amount            Decimal  @db.Decimal(10, 2)
+  amount            Decimal  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -638,7 +639,7 @@ model Wastage {
   wastageNo   String    @unique
   wastageDate DateTime
   invoiceNo   String?
-  invoiceDate DateTime? @db.Date
+  invoiceDate DateTime? 
   vendorId    Int?
   depotId     Int?
   depot       Depot?    @relation(fields: [depotId], references: [id])
@@ -682,11 +683,11 @@ model DepotProductVariant {
   productId     Int
   name          String
   hsnCode       String?
-  mrp           Decimal  @db.Decimal(10, 2) @default(0)
-  price3Day     Decimal? @db.Decimal(10, 2)
-  price7Day     Decimal? @db.Decimal(10, 2)
-  price15Day    Decimal? @db.Decimal(10, 2)
-  price1Month   Decimal? @db.Decimal(10, 2)
+  mrp           Decimal   @default(0)
+  price3Day     Decimal? 
+  price7Day     Decimal? 
+  price15Day    Decimal? 
+  price1Month   Decimal? 
   minimumQty    Int      @default(0)
   closingQty    Int      @default(0)
 
@@ -695,7 +696,7 @@ model DepotProductVariant {
   isHidden                Boolean                 @default(false)
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
-  buyOncePrice            Decimal?                @db.Decimal(10, 2)
+  buyOncePrice            Decimal?                
   VariantStock            VariantStock[]
   StockLedger             StockLedger[]
   PurchaseDetail          PurchaseDetail[]
@@ -715,7 +716,7 @@ model StockLedger {
   productId       Int
   variantId       Int
   depotId         Int
-  transactionDate DateTime @db.Date
+  transactionDate DateTime 
   receivedQty     Int      @default(0)
   issuedQty       Int      @default(0)
   module          String // Source module e.g. "purchase", "sale"
@@ -740,10 +741,10 @@ model StockLedger {
 model Transfer {
   id           Int      @id @default(autoincrement())
   transferNo   String   @unique
-  transferDate DateTime @db.Date
+  transferDate DateTime 
   fromDepotId  Int
   toDepotId    Int
-  notes        String?  @db.Text
+  notes        String?  
   createdById  Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -804,4 +805,25 @@ model ProductOrder {
   @@index([memberId])
   @@index([agencyId])
   @@map("product_orders")
+}
+
+model Lead {
+  id            Int      @id @default(autoincrement())
+  name          String
+  mobile        String
+  email         String?
+  plotBuilding  String
+  streetArea    String
+  landmark      String?
+  pincode       String
+  city          String
+  state         String
+  productId     Int?     // Optional reference to the product they were interested in
+  isDairyProduct Boolean @default(false) // Flag to indicate if the lead was for a dairy product
+  notes         String?   // Optional notes about the lead
+  status        String   @default("NEW") // Lead status: NEW, CONTACTED, CONVERTED, CLOSED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("leads")
 }

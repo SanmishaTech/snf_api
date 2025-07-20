@@ -14802,7 +14802,7 @@ Error generating stack: ` +
     return { ...a, mutate: i, mutateAsync: a.mutate };
   }
   const Ug = "SNF",
-    mG = () => "https://www.indraai.in/",
+    mG = () => "http://localhost:3000",
     $b = mG();
   var Kp = {},
     $D;
@@ -69818,7 +69818,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
                     "bg-muted/10 rounded-2xl flex items-center justify-center p-8 border border-muted/20",
                   children: j.attachmentUrl
                     ? s.jsx(_s.img, {
-                        src: `https://www.indraai.in/${j.attachmentUrl}`,
+                        src: `http://localhost:3000${j.attachmentUrl}`,
                         alt: j.name,
                         className:
                           "object-cover max-h-[900px] min-h-[600px] rounded-xl",
@@ -70121,7 +70121,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
         [j, A] = x.useState(null),
         [E, _] = x.useState(!1),
         [T, D] = x.useState(null),
-        k = "https://www.indraai.in/";
+        k = "http://localhost:3000";
       x.useEffect(() => {
         (async () => {
           o(!0), d(null);
@@ -83314,7 +83314,7 @@ ${Hw(this.code(t, r))}
               categoryId: r.categoryId || null,
             };
             if ((b(T), r.attachmentUrl)) {
-              const D = `https://www.indraai.in/${
+              const D = `http://localhost:3000${
                 r == null ? void 0 : r.attachmentUrl
               }`;
               f(D);
@@ -83958,7 +83958,7 @@ ${Hw(this.code(t, r))}
                     ? s.jsx("img", {
                         src: e.attachmentUrl.startsWith("http")
                           ? e.attachmentUrl
-                          : `https://www.indraai.in/${e.attachmentUrl}`,
+                          : `http://localhost:3000${e.attachmentUrl}`,
                         alt: e.name,
                         className:
                           "h-full w-full object-cover transition-transform duration-300 group-hover:scale-105",
@@ -106279,7 +106279,7 @@ ${Hw(this.code(t, r))}
               attachment: null,
               imageUrl: e.imageUrl || null,
             }),
-            a(e.imageUrl ? `https://www.indraai.in/${e.imageUrl}` : null))
+            a(e.imageUrl ? `http://localhost:3000${e.imageUrl}` : null))
           : (c({ name: "", isDairy: !1, attachment: null, imageUrl: null }),
             a(null));
       }, [e, c]),
@@ -106292,9 +106292,9 @@ ${Hw(this.code(t, r))}
               w.readAsDataURL(g);
           } else
             y
-              ? a(y.startsWith("data:") ? y : `https://www.indraai.in/${y}`)
+              ? a(y.startsWith("data:") ? y : `http://localhost:3000${y}`)
               : g || a(null);
-        }, [g, y, "https://www.indraai.in/"]);
+        }, [g, y, "http://localhost:3000"]);
       const N = () => {
           d("attachment", null, { shouldValidate: !0 }),
             d("imageUrl", null),
@@ -106393,7 +106393,7 @@ ${Hw(this.code(t, r))}
                   src:
                     n.startsWith("data:") || n.startsWith("http")
                       ? n
-                      : `https://www.indraai.in/${n}`,
+                      : `http://localhost:3000${n}`,
                   alt: "Preview",
                   className: "w-full h-full object-cover",
                 }),
@@ -109618,7 +109618,7 @@ ${Hw(this.code(t, r))}
       });
     },
     N6 = "/api/admin/banners",
-    G5e = "https://www.indraai.in/",
+    G5e = "http://localhost:3000",
     Cz = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
     Y5e = Nn({
       caption: ut().optional().default(""),

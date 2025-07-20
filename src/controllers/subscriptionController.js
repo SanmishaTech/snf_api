@@ -638,6 +638,23 @@ const updateSubscription = asyncHandler(async (req, res) => {
     data: updateData,
   });
 
+  // If agency assignment was updated, also update all related delivery schedule entries
+  if (agencyId !== undefined) {
+    const deliveryScheduleUpdateData = agencyId === null 
+      ? { agentId: null } 
+      : { agentId: Number(agencyId) };
+
+    await prisma.deliveryScheduleEntry.updateMany({
+      where: {
+        subscriptionId: subscriptionId,
+        status: { in: ['PENDING', 'NOT_DELIVERED'] } // Only update non-delivered entries
+      },
+      data: deliveryScheduleUpdateData
+    });
+
+    console.log(`Updated delivery schedule entries for subscription ${subscriptionId} with agentId: ${agencyId}`);
+  }
+
   res.status(200).json(updatedSubscription);
 });
 
@@ -1045,6 +1062,101 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Bulk assign agency to multiple subscriptions
+// @route   POST /api/subscriptions/bulk-assign-agency
+// @access  Private (Admin only)
+const bulkAssignAgency = asyncHandler(async (req, res) => {
+  // Check if user is admin
+  if (req.user.role !== 'ADMIN') {
+    res.status(403);
+    throw new Error('Only admins can perform bulk agency assignments');
+  }
+
+  const { subscriptionIds, agencyId } = req.body;
+
+  // Validate input
+  if (!Array.isArray(subscriptionIds) || subscriptionIds.length === 0) {
+    res.status(400);
+    throw new Error('subscriptionIds must be a non-empty array');
+  }
+
+  if (agencyId !== null && (!Number.isInteger(agencyId) || agencyId <= 0)) {
+    res.status(400);
+    throw new Error('agencyId must be a positive integer or null');
+  }
+
+  // Validate that all subscriptionIds are integers
+  const invalidIds = subscriptionIds.filter(id => !Number.isInteger(id) || id <= 0);
+  if (invalidIds.length > 0) {
+    res.status(400);
+    throw new Error(`Invalid subscription IDs: ${invalidIds.join(', ')}`);
+  }
+
+  // Check if agency exists (if agencyId is not null)
+  if (agencyId !== null) {
+    const agency = await prisma.agency.findUnique({
+      where: { id: agencyId }
+    });
+
+    if (!agency) {
+      res.status(404);
+      throw new Error(`Agency with ID ${agencyId} not found`);
+    }
+  }
+
+  try {
+    // Perform bulk update within a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Update all subscriptions
+      const updateData = agencyId === null 
+        ? { agency: { disconnect: true } }
+        : { agency: { connect: { id: agencyId } } };
+
+      const updatedSubscriptions = await tx.subscription.updateMany({
+        where: {
+          id: { in: subscriptionIds },
+        },
+        data: updateData,
+      });
+
+      // Update all related delivery schedule entries (only non-delivered entries)
+      const deliveryScheduleUpdateData = agencyId === null 
+        ? { agentId: null } 
+        : { agentId: agencyId };
+
+      const updatedDeliveryEntries = await tx.deliveryScheduleEntry.updateMany({
+        where: {
+          subscriptionId: { in: subscriptionIds },
+          status: { in: ['PENDING', 'NOT_DELIVERED'] } // Only update non-delivered entries
+        },
+        data: deliveryScheduleUpdateData
+      });
+
+      return {
+        subscriptionsUpdated: updatedSubscriptions.count,
+        deliveryEntriesUpdated: updatedDeliveryEntries.count
+      };
+    });
+
+    console.log(`Bulk assignment completed: ${result.subscriptionsUpdated} subscriptions and ${result.deliveryEntriesUpdated} delivery entries updated with agencyId: ${agencyId}`);
+
+    const message = agencyId === null 
+      ? `Successfully removed agency assignment from ${result.subscriptionsUpdated} subscription(s)`
+      : `Successfully assigned agency to ${result.subscriptionsUpdated} subscription(s)`;
+
+    res.status(200).json({
+      message,
+      updatedCount: result.subscriptionsUpdated,
+      deliveryEntriesUpdated: result.deliveryEntriesUpdated
+    });
+
+  } catch (error) {
+    console.error('Bulk agency assignment failed:', error);
+    res.status(500);
+    throw new Error('Failed to perform bulk agency assignment. Please try again.');
+  }
+});
+
 module.exports = {
   createSubscription,
   getSubscriptions,
@@ -1053,5 +1165,6 @@ module.exports = {
   cancelSubscription,
   renewSubscription,
   getDeliveryScheduleByDate,
-  skipMemberDelivery
+  skipMemberDelivery,
+  bulkAssignAgency
 };

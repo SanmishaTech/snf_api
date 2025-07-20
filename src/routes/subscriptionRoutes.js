@@ -466,7 +466,8 @@ const {
   cancelSubscription,
   renewSubscription,
   getDeliveryScheduleByDate,
-  skipMemberDelivery
+  skipMemberDelivery,
+  bulkAssignAgency
 } = require('../controllers/subscriptionController');
 const authMiddleware = require('../middleware/auth');
 
@@ -657,6 +658,77 @@ router.route('/')
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse500'
  */
+/**
+ * @swagger
+ * /subscriptions/{id}/assign-agent:
+ *   put:
+ *     summary: Assign agent to a specific subscription (ADMIN only)
+ *     description: Assign a delivery agent to a subscription. Also updates related delivery schedule entries.
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the subscription to assign an agent to
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - agencyId
+ *             properties:
+ *               agencyId:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: ID of the agency to assign (null to remove assignment)
+ *                 example: 301
+ *     responses:
+ *       200:
+ *         description: Successfully assigned agency to subscription.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubscriptionDetailedResponse'
+ *       400:
+ *         description: Bad request (e.g., invalid input).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse400'
+ *       401:
+ *         description: Unauthorized.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse401'
+ *       403:
+ *         description: Forbidden (only ADMIN users can assign agents).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse403'
+ *       404:
+ *         description: Subscription not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse404'
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse500'
+ */
+router.put('/:id/assign-agent', authMiddleware, updateSubscription);
+
 router.route('/:id')
   .get(authMiddleware, getSubscriptionById)
   .put(authMiddleware, updateSubscription);
@@ -894,5 +966,76 @@ router.post('/:id/renew', authMiddleware, renewSubscription);
  *               $ref: '#/components/schemas/ErrorResponse500'
  */
 router.get('/delivery-schedule/by-date', authMiddleware, getDeliveryScheduleByDate);
+
+/**
+ * @swagger
+ * /subscriptions/bulk-assign-agency:
+ *   post:
+ *     summary: Bulk assign agency to multiple subscriptions (ADMIN only)
+ *     description: Assign the same agency to multiple subscriptions at once. Also updates related delivery schedule entries.
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subscriptionIds
+ *               - agencyId
+ *             properties:
+ *               subscriptionIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: Array of subscription IDs to assign the agency to
+ *                 example: [123, 124, 125]
+ *               agencyId:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: ID of the agency to assign (null to remove assignment)
+ *                 example: 301
+ *     responses:
+ *       200:
+ *         description: Successfully updated subscriptions.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully assigned agency to 3 subscription(s)"
+ *                 updatedCount:
+ *                   type: integer
+ *                   example: 3
+ *       400:
+ *         description: Bad request (e.g., invalid input).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse400'
+ *       401:
+ *         description: Unauthorized.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse401'
+ *       403:
+ *         description: Forbidden (only ADMIN users can perform bulk operations).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse403'
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse500'
+ */
+router.post('/bulk-assign-agency', authMiddleware, bulkAssignAgency);
 
 module.exports = router;
