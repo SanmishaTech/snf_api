@@ -2,5 +2,5 @@ module.exports = {
   appName: process.env.APP_NAME || "SNF",
   defaultUserRole: process.env.DEFAULT_USER_ROLE || "MEMBER",
   allowRegistration: process.env.ALLOW_REGISTRATION || true,
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000/",
+  frontendUrl: process.env.FRONTEND_URL || "https://www.indraai.in//",
 };
