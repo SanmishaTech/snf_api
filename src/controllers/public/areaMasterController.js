@@ -19,6 +19,10 @@ const getPublicAreaMasters = asyncHandler(async (req, res) => {
           select: {
             id: true,
             name: true,
+            address: true,
+            isOnline: true,
+            contactPerson: true,
+            contactNumber: true,
           },
         },
       },
@@ -70,6 +74,10 @@ const validateDairySupport = asyncHandler(async (req, res) => {
           select: {
             id: true,
             name: true,
+            address: true,
+            isOnline: true,
+            contactPerson: true,
+            contactNumber: true,
           },
         },
       },
@@ -136,6 +144,10 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
           select: {
             id: true,
             name: true,
+            address: true,
+            isOnline: true,
+            contactPerson: true,
+            contactNumber: true,
           },
         },
       },
