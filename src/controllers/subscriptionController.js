@@ -1109,8 +1109,8 @@ const bulkAssignAgency = asyncHandler(async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       // Update all subscriptions
       const updateData = agencyId === null 
-        ? { agency: { disconnect: true } }
-        : { agency: { connect: { id: agencyId } } };
+        ? { agencyId: null }
+        : { agencyId: agencyId };
 
       const updatedSubscriptions = await tx.subscription.updateMany({
         where: {

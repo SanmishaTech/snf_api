@@ -310,14 +310,15 @@ model DeliveryAddress {
 }
 
 model AreaMaster {
-  id           Int          @id @default(autoincrement())
-  name         String
-  pincodes     String       @db.LongText
-  deliveryType DeliveryType
-  depotId      Int?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  depot        Depot?       @relation(fields: [depotId], references: [id])
+  id             Int          @id @default(autoincrement())
+  name           String
+  pincodes       String       @db.LongText
+  deliveryType   DeliveryType
+  depotId        Int?
+  isDairyProduct Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  depot          Depot?       @relation(fields: [depotId], references: [id])
 
   @@index([depotId])
   @@map("area_masters")

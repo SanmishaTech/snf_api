@@ -583,7 +583,21 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
                   mrp: true,
                 },
               },
-              deliveryAddress: true,
+              member: {
+                include: {
+                  user: true,
+                },
+              },
+              deliveryAddress: {
+                include: {
+                  location: {
+                    include: {
+                      city: true,
+                      agency: true,
+                    },
+                  },
+                },
+              },
               agency: {
                 include: {
                   user: true,

@@ -64,7 +64,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "https://www.indraai.in/"];
+  : ["http://localhost:5173", "http://localhost:3000/"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application

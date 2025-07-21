@@ -935,15 +935,51 @@ exports.getMyAgencyOrders = async (req, res, next) => {
     const orders = await prisma.vendorOrder.findMany({
       where: whereClause,
       include: {
-        vendor: { select: { id: true, name: true } },
+        vendor: { 
+          select: { 
+            id: true, 
+            name: true, 
+            contactPersonName: true, 
+            mobile: true, 
+            email: true 
+          } 
+        },
         items: {
           include: {
-            product: { select: { id: true, name: true, price: true, unit: true } },
-            agency: { select: { id: true, name: true } }, // Included for completeness, though filtered by agencyId
+            product: { 
+              select: { 
+                id: true, 
+                name: true, 
+                price: true, 
+                unit: true, 
+                description: true 
+              } 
+            },
+            agency: { 
+              include: {
+                user: {
+                  select: { 
+                    id: true, 
+                    name: true, 
+                    email: true, 
+                    mobile: true 
+                  }
+                }
+              }
+            },
+            depot: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                contactPerson: true,
+                contactNumber: true
+              }
+            }
           },
         },
-        deliveredBy: { select: { id: true, name: true, email: true } },
-        receivedBy: { select: { id: true, name: true, email: true } },
+        deliveredBy: { select: { id: true, name: true, email: true, mobile: true } },
+        receivedBy: { select: { id: true, name: true, email: true, mobile: true } },
       },
       orderBy: { orderDate: 'desc' },
       skip: skip,
