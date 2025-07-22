@@ -694,6 +694,30 @@ model ProductOrder {
   @@map("product_orders")
 }
 
+model Lead {
+  id             Int       @id @default(autoincrement())
+  name           String
+  mobile         String
+  email          String?
+  plotBuilding   String
+  streetArea     String
+  landmark       String?
+  pincode        String
+  city           String
+  state          String
+  productId      Int?
+  isDairyProduct Boolean   @default(false)
+  notes          String?   @db.Text
+  status         LeadStatus @default(NEW)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([isDairyProduct])
+  @@index([pincode])
+  @@map("leads")
+}
+
 enum Role {
   ADMIN
   AGENCY
@@ -750,4 +774,11 @@ enum TransactionStatus {
   PENDING
   PAID
   FAILED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  CLOSED
 }
