@@ -152,11 +152,12 @@ model Category {
 }
 
 model City {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  locations Location[]
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  locations   Location[]
+  areaMasters AreaMaster[]
 
   @@map("cities")
 }
@@ -315,12 +316,15 @@ model AreaMaster {
   pincodes       String       @db.LongText
   deliveryType   DeliveryType
   depotId        Int?
+  cityId         Int?
   isDairyProduct Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   depot          Depot?       @relation(fields: [depotId], references: [id])
+  city           City?        @relation(fields: [cityId], references: [id])
 
   @@index([depotId])
+  @@index([cityId])
   @@map("area_masters")
 }
 

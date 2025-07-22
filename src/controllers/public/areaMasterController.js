@@ -25,6 +25,12 @@ const getPublicAreaMasters = asyncHandler(async (req, res) => {
             contactNumber: true,
           },
         },
+        city: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: {
         name: 'asc',
@@ -148,6 +154,12 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
             isOnline: true,
             contactPerson: true,
             contactNumber: true,
+          },
+        },
+        city: {
+          select: {
+            id: true,
+            name: true,
           },
         },
       },

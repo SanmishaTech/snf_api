@@ -8,7 +8,7 @@ const { DeliveryType } = require('@prisma/client'); // Import DeliveryType enum
  * @access  Private/Admin
  */
 const createAreaMaster = asyncHandler(async (req, res) => {
-  const { name, pincodes, depotId, deliveryType, isDairyProduct } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId } = req.body;
 
   if (!name || !pincodes || !deliveryType) {
     res.status(400);
@@ -36,6 +36,17 @@ const createAreaMaster = asyncHandler(async (req, res) => {
     data.depotId = parsedDepotId;
   } else {
     data.depotId = null;
+  }
+
+  if (cityId) {
+    const parsedCityId = parseInt(cityId, 10);
+    if (isNaN(parsedCityId)) {
+      res.status(400);
+      throw new Error('Invalid City ID. Must be an integer.');
+    }
+    data.cityId = parsedCityId;
+  } else {
+    data.cityId = null;
   }
 
   const areaMaster = await prisma.areaMaster.create({
@@ -99,6 +110,12 @@ const getAllAreaMasters = asyncHandler(async (req, res) => {
           name: true,
         },
       },
+      city: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
     orderBy: orderByClause,
   });
@@ -127,6 +144,12 @@ const getAreaMasterById = asyncHandler(async (req, res) => {
           name: true,
         },
       },
+      city: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -145,7 +168,7 @@ const getAreaMasterById = asyncHandler(async (req, res) => {
  */
 const updateAreaMaster = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, pincodes, depotId, deliveryType, isDairyProduct } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId } = req.body;
 
   if (deliveryType && !Object.values(DeliveryType).includes(deliveryType)) {
     res.status(400);
@@ -172,10 +195,37 @@ const updateAreaMaster = asyncHandler(async (req, res) => {
     }
   }
 
+  if (cityId !== undefined) {
+    if (cityId === null || cityId === '') {
+      dataToUpdate.cityId = null;
+    } else {
+      const parsedCityId = parseInt(cityId, 10);
+      if (isNaN(parsedCityId)) {
+        res.status(400);
+        throw new Error('Invalid City ID. Must be an integer.');
+      }
+      dataToUpdate.cityId = parsedCityId;
+    }
+  }
+
   try {
     const updatedAreaMaster = await prisma.areaMaster.update({
       where: { id: parseInt(id) },
       data: dataToUpdate,
+      include: {
+        depot: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        city: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
     res.status(200).json(updatedAreaMaster);
   } catch (error) {
