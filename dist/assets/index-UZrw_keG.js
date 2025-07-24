@@ -34220,7 +34220,7 @@ For more information, see https://radix-ui.com/primitives/docs/components/${t.do
             groupLabel: "Master",
           },
           {
-            title: "Vendors",
+            title: "Farmers",
             url: "/admin/vendors",
             icon: Au,
             groupLabel: "Master",
