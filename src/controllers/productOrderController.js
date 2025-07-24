@@ -42,7 +42,7 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
   const baseStartDate = new Date(startDate);
 
   const lowerSelectedWeekdays = Array.isArray(selectedWeekdays) ? selectedWeekdays.map(day => day.toLowerCase()) : [];
-  
+
   const hasValidAltQty = altQty && typeof altQty === 'number' && altQty > 0;
   let effectiveScheduleType = deliveryScheduleType; // Initialize with the passed type
 
@@ -51,10 +51,10 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
     effectiveScheduleType = hasValidAltQty ? 'VARYING_ALTERNATING' : 'DAILY';
   } else if (deliveryScheduleType === 'ALTERNATE_DAYS') {
     // If 'ALTERNATE_DAYS' is chosen directly, and altQty might be provided for varying quantities on those alternate days.
-    effectiveScheduleType = 'ALTERNATE_DAYS_LOGIC'; 
+    effectiveScheduleType = 'ALTERNATE_DAYS_LOGIC';
   }
   // If deliveryScheduleType is 'SELECT_DAYS' or 'DAILY', effectiveScheduleType remains as is (from initialization).
-  
+
   console.log(`[generateDeliveryDates] Computed effectiveScheduleType: ${effectiveScheduleType}`);
 
   let deliveryCountForAlternating = 0; // Used for VARYING_ALTERNATING and ALTERNATE_DAYS_LOGIC with altQty
@@ -165,17 +165,17 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       // Address validation for online depots
       const isAnyDepotOnline = depotVariants.some(v => v.depot.isOnline);
       let deliveryAddress = null;
-      
+
       if (isAnyDepotOnline) {
         if (!deliveryAddressId) {
           throw new Error('deliveryAddressId is required for online depot subscriptions.');
         }
-        
+
         deliveryAddress = await tx.deliveryAddress.findUnique({
           where: { id: parseInt(deliveryAddressId, 10) },
           include: { location: { include: { agency: true } } },
         });
-        
+
         if (!deliveryAddress) {
           throw new Error('Delivery address could not be found.');
         }
@@ -192,16 +192,16 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
 
       for (const sub of subscriptions) {
         const subscriptionData = await processSubscription(
-          sub, 
-          depotVariantMap, 
-          deliveryAddress, 
+          sub,
+          depotVariantMap,
+          deliveryAddress,
           tx
         );
-        
+
         processedSubscriptions.push(subscriptionData);
         financialSummary.totalAmount += subscriptionData.amount;
         financialSummary.totalQty += subscriptionData.totalQty;
-        
+
         // Store subscription financial details for later wallet distribution
         financialSummary.subscriptionDetails.push({
           id: subscriptionData.productId,
@@ -217,7 +217,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         memberRecord.walletBalance,
         financialSummary.subscriptionDetails
       );
-      console.log("Pasdasdasd",walletCalculation)
+      console.log("Pasdasdasd", walletCalculation)
 
       // Create order with financial summary
       const orderData = {
@@ -248,7 +248,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       for (let i = 0; i < processedSubscriptions.length; i++) {
         const subData = processedSubscriptions[i];
         const walletShare = walletCalculation.subscriptionWalletShares[i];
-        
+
         const subscriptionPayable = subData.amount - walletShare;
         const subPaymentStatus = subscriptionPayable <= 0 ? 'PAID' : 'PENDING';
 
@@ -300,7 +300,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
           status: 'PENDING',
           agentId: subData.agentId,
         }));
-        
+
         allDeliveryScheduleEntries.push(...deliveryEntries);
       }
 
@@ -308,8 +308,8 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       if (walletCalculation.walletAmountUsed > 0) {
         await tx.member.update({
           where: { id: memberId },
-          data: { 
-            walletBalance: { decrement: walletCalculation.walletAmountUsed } 
+          data: {
+            walletBalance: { decrement: walletCalculation.walletAmountUsed }
           },
         });
       }
@@ -324,7 +324,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       // Return complete order with subscriptions
       const finalOrder = await tx.productOrder.findUnique({
         where: { id: newOrder.id },
-        include: { 
+        include: {
           subscriptions: {
             include: {
               deliveryAddress: true,
@@ -344,7 +344,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       try {
         invoice = await generateInvoiceForOrder(finalOrder);
         console.log('Invoice created successfully:', invoice.invoiceNo);
-        
+
         // Update the order with invoice information
         await tx.productOrder.update({
           where: { id: finalOrder.id },
@@ -358,7 +358,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         // Don't fail the order creation if invoice fails
       }
 
-      return { 
+      return {
         order: finalOrder,
         financialSummary: {
           totalAmount: financialSummary.totalAmount,
@@ -524,7 +524,7 @@ async function determineAgentId(depot, deliveryAddress, tx) {
 function getConsistentAgentId(processedSubscriptions) {
   const agentIds = processedSubscriptions.map(sub => sub.agentId).filter(Boolean);
   const uniqueAgentIds = [...new Set(agentIds)];
-  
+
   // Return agent ID only if all subscriptions have the same agent
   return uniqueAgentIds.length === 1 ? uniqueAgentIds[0] : null;
 }
@@ -652,43 +652,43 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
 });
 
 const getProductOrderById = asyncHandler(async (req, res) => {
-    const productOrder = await prisma.productOrder.findUnique({
-        where: { id: parseInt(req.params.id, 10) },
-        include: { 
-          member: true, 
-          subscriptions: {
+  const productOrder = await prisma.productOrder.findUnique({
+    where: { id: parseInt(req.params.id, 10) },
+    include: {
+      member: true,
+      subscriptions: {
+        include: {
+          product: true,
+          depotProductVariant: {
+            select: {
+              id: true,
+              name: true,
+              mrp: true,
+            },
+          },
+          deliveryAddress: true,
+          agency: {
             include: {
-              product: true,
-              depotProductVariant: {
-                select: {
-                  id: true,
-                  name: true,
-                  mrp: true,
-                },
-              },
-              deliveryAddress: true,
-              agency: {
-                include: {
-                  user: true,
-                },
-              },
+              user: true,
             },
           },
         },
-    });
-    if (!productOrder) {
-        res.status(404);
-        throw new Error('Product order not found');
-    }
-    res.status(200).json({ success: true, data: productOrder });
+      },
+    },
+  });
+  if (!productOrder) {
+    res.status(404);
+    throw new Error('Product order not found');
+  }
+  res.status(200).json({ success: true, data: productOrder });
 });
 
 const updateProductOrder = asyncHandler(async (req, res) => {
-    const productOrder = await prisma.productOrder.update({
-        where: { id: parseInt(req.params.id, 10) },
-        data: req.body,
-    });
-    res.status(200).json({ success: true, data: productOrder });
+  const productOrder = await prisma.productOrder.update({
+    where: { id: parseInt(req.params.id, 10) },
+    data: req.body,
+  });
+  res.status(200).json({ success: true, data: productOrder });
 });
 
 
@@ -716,7 +716,7 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
 
   const order = await prisma.productOrder.findUnique({
     where: { id: orderId },
-    include: { 
+    include: {
       subscriptions: {
         include: {
           depotProductVariant: {
@@ -788,7 +788,7 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
       // 3. Fetch and return the final, fully updated order data
       const finalUpdatedOrder = await tx.productOrder.findUnique({
         where: { id: orderId },
-        include: { 
+        include: {
           subscriptions: {
             include: {
               depotProductVariant: {
@@ -813,9 +813,9 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-    createOrderWithSubscriptions,
-    getAllProductOrders,
-    getProductOrderById,
-    updateProductOrder,
-    updateProductOrderPayment,
+  createOrderWithSubscriptions,
+  getAllProductOrders,
+  getProductOrderById,
+  updateProductOrder,
+  updateProductOrderPayment,
 };

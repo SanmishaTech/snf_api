@@ -72,10 +72,10 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
   } = invoiceData;
 
   const companyDetails = SNFlobal || {
-    name: 'Indraai',
-    addressLines: ['Sarkhot Natural Farms, Shop no 3,','Chidghan society, Opp. Maharashtra Steel,',"Tilak cross Phadke Road"],
+    name: 'Sarkhot Natural Farms',
+    addressLines: ['B/3 Prabhat Society,','Mukherjee Road, Near CKP Hall,',"Dombivli East", "421201", "Thane", "Maharashtra"],
     city: 'Dombivli East',
-    pincode: '421202',
+    pincode: '421201',
     // gstinUin: '27AAHCB7744A1ZT',
     email: 'sarkhotnaturalfarms@gmail.com'
   };

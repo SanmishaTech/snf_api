@@ -4,6 +4,7 @@ const { generateInvoicePdf } = require('../utils/invoiceGeneratorEnhanced');
 const path = require('path');
 const fs = require('fs').promises;
 const { numberToWords } = require('../utils/numberToWords');
+const { generateInvoiceNumber } = require('../utils/invoiceNumberGenerator');
 
 /**
  * Generates an invoice PDF for a product order
@@ -12,8 +13,8 @@ const { numberToWords } = require('../utils/numberToWords');
  */
 const generateInvoiceForOrder = async (productOrder) => {
   try {
-    // Generate invoice number based on order number
-    const invoiceNo = productOrder.orderNo.replace('ORD', 'INV');
+    // Generate financial year based invoice number
+    const invoiceNo = await generateInvoiceNumber();
     
     // Get member details with address
     const member = await prisma.member.findUnique({
@@ -85,8 +86,8 @@ const generateInvoiceForOrder = async (productOrder) => {
         gstin: member.gstin || null
       },
       SNFlobal: {
-        name: 'Indraai',
-        addressLines: ['Sarkhot Natural Farms, Shop no 3,','Chidghan society, Opp. Maharashtra Steel,',"Tilak cross Phadke Road"],
+        name: 'Sarkhot Natural Farms',
+        addressLines: ['B/3 Prabhat Society,','Mukherjee Road, Near CKP Hall,',"Dombivli East", "421202", "Thane", "Maharashtra"],
         city: 'Dombivli East',
         pincode: '421202',
         gstinUin: '27AAHCB7744A1ZT',
