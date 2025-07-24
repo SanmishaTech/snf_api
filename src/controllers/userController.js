@@ -156,6 +156,13 @@ const getCurrentUserProfile = async (req, res, next) => {
         name: true,
         mobile: true, // Include mobile number
         agency: true,
+        supervisor: {
+          include: {
+            agency: {
+              select: { id: true, name: true }
+            }
+          }
+        },
       },
     });
 
@@ -185,6 +192,19 @@ const getCurrentUserProfile = async (req, res, next) => {
       } else {
         console.warn(`User ${userId} has role AGENCY but no agencyId or agency relation found.`);
         userProfile.agencyId = null;
+      }
+    }
+
+    if (userWithoutPassword.role === 'SUPERVISOR') {
+      if (userWithoutPassword.supervisor) { // If supervisor relation is loaded
+        userProfile.supervisor = {
+          id: userWithoutPassword.supervisor.id,
+          agencyId: userWithoutPassword.supervisor.agencyId,
+          agency: userWithoutPassword.supervisor.agency
+        };
+      } else {
+        console.warn(`User ${userId} has role SUPERVISOR but no supervisor relation found.`);
+        userProfile.supervisor = null;
       }
     }
 

@@ -862,6 +862,215 @@ exports.recordReceipt = async (req, res, next) => {
   }
 };
 
+// @desc    Record supervisor quantity for order items
+// @route   PUT /api/vendor-orders/:id/record-supervisor-quantity
+// @access  Private (SUPERVISOR role)
+exports.recordSupervisorQuantity = async (req, res, next) => {
+  const orderId = parseInt(req.params.id);
+  const { items: supervisorItems } = req.body; // items should be [{ orderItemId, supervisorQuantity }]
+
+  if (isNaN(orderId)) {
+    return next(createError(400, 'Invalid Order ID.'));
+  }
+
+  if (!Array.isArray(supervisorItems) || supervisorItems.length === 0) {
+    return next(createError(400, 'Supervisor items array is required and cannot be empty.'));
+  }
+
+  for (const item of supervisorItems) {
+    if (item.orderItemId == null || item.supervisorQuantity == null) {
+      return next(createError(400, 'Each supervisor item must have orderItemId and supervisorQuantity.'));
+    }
+    if (typeof item.supervisorQuantity !== 'number' || item.supervisorQuantity < 0 || !Number.isInteger(item.supervisorQuantity)) {
+      return next(createError(400, `Supervisor quantity for item ID ${item.orderItemId} must be a non-negative integer.`));
+    }
+  }
+
+  try {
+    const order = await prisma.vendorOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) {
+      return next(createError(404, 'Order not found.'));
+    }
+
+    // Business rule: Order should be in DELIVERED or RECEIVED state to record supervisor quantity
+    if (order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.RECEIVED) {
+      return next(createError(400, `Order status is ${order.status}. Supervisor quantity can only be recorded for DELIVERED or RECEIVED orders.`));
+    }
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Update supervisor quantities for each order item
+      for (const supervisorItem of supervisorItems) {
+        const orderItemToUpdate = order.items.find(oi => oi.id === parseInt(supervisorItem.orderItemId));
+
+        if (!orderItemToUpdate) {
+          throw createError(404, `OrderItem with ID ${supervisorItem.orderItemId} not found in this order.`);
+        }
+
+        if (orderItemToUpdate.receivedQuantity == null) {
+          throw createError(400, `Cannot record supervisor quantity for item ${orderItemToUpdate.productId} as it has no received quantity recorded.`);
+        }
+
+        if (supervisorItem.supervisorQuantity > orderItemToUpdate.receivedQuantity) {
+          throw createError(400, `Supervisor quantity (${supervisorItem.supervisorQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed received quantity (${orderItemToUpdate.receivedQuantity}).`);
+        }
+
+        await tx.orderItem.update({
+          where: { id: parseInt(supervisorItem.orderItemId) },
+          data: { supervisorQuantity: supervisorItem.supervisorQuantity },
+        });
+      }
+
+      // Return the updated order with all items
+      const finalUpdatedOrder = await tx.vendorOrder.findUnique({
+        where: { id: orderId },
+        include: {
+          vendor: true,
+          items: { include: { product: true, agency: true } },
+          deliveredBy: { select: { id: true, name: true, email: true } },
+          receivedBy: { select: { id: true, name: true, email: true } },
+        },
+      });
+      return finalUpdatedOrder;
+    });
+
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
+    res.json(updatedOrder);
+
+  } catch (error) {
+    if (error.statusCode) { // If it's an error created by createError
+      return next(error);
+    }
+    console.error("Error recording supervisor quantity:", error);
+    next(createError(500, 'Failed to record supervisor quantity. ' + error.message));
+  }
+};
+
+// @desc    Get logged in SUPERVISOR's agency orders
+// @route   GET /api/vendor-orders/my-supervisor-orders
+// @access  Private (SUPERVISOR)
+exports.getMySupervisorAgencyOrders = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'SUPERVISOR') {
+      return next(createError(403, 'Forbidden: User is not a supervisor or not authenticated.'));
+    }
+
+    const supervisorUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { 
+        supervisor: {
+          include: {
+            agency: true
+          }
+        }
+      },
+    });
+
+    if (!supervisorUser || !supervisorUser.supervisor) {
+      return next(createError(404, 'Supervisor profile not found for this user.'));
+    }
+
+    if (!supervisorUser.supervisor.agency) {
+      return next(createError(404, 'No agency assigned to this supervisor.'));
+    }
+
+    const agencyId = supervisorUser.supervisor.agency.id;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { search, status: statusFilter, date } = req.query;
+
+    let whereClause = {
+      items: {
+        some: {
+          agencyId: agencyId,
+        },
+      },
+      // Show DELIVERED and RECEIVED orders for supervisor to record quantities and view
+      status: {
+        in: [OrderStatus.DELIVERED, OrderStatus.RECEIVED]
+      },
+    };
+
+    // Handle explicit status filter (supervisors can see DELIVERED and RECEIVED orders)
+    if (statusFilter && (statusFilter.toUpperCase() === 'DELIVERED' || statusFilter.toUpperCase() === 'RECEIVED')) {
+      whereClause.status = statusFilter.toUpperCase() === 'DELIVERED' ? OrderStatus.DELIVERED : OrderStatus.RECEIVED;
+    }
+
+    // Handle search filter
+    if (search) {
+      whereClause.OR = [
+        { poNumber: { contains: search, mode: 'insensitive' } },
+        { vendor: { name: { contains: search, mode: 'insensitive' } } },
+        { items: { some: { product: { name: { contains: search, mode: 'insensitive' } } } } },
+      ];
+    }
+
+    // Handle date filter
+    if (date) {
+      const parsedDate = new Date(date);
+      if (!isNaN(parsedDate.getTime())) {
+        const startOfDay = new Date(parsedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(parsedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        whereClause.orderDate = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      }
+    }
+
+    const orders = await prisma.vendorOrder.findMany({
+      where: whereClause,
+      skip: skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        vendor: true,
+        items: {
+          include: {
+            product: true,
+            agency: true,
+            depot: true,
+            depotVariant: true,
+          },
+        },
+        deliveredBy: { select: { id: true, name: true, email: true } },
+        receivedBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    // Transform orders for response
+    const transformedOrders = orders.map(order => ({
+      ...order,
+      items: transformOrderItems(order.items),
+    }));
+
+    const totalRecords = await prisma.vendorOrder.count({ where: whereClause });
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    res.json({
+      data: transformedOrders,
+      totalRecords,
+      totalPages,
+      currentPage: page,
+    });
+
+  } catch (error) {
+    console.error("Error fetching supervisor agency orders:", error);
+    next(createError(500, 'Failed to fetch supervisor agency orders. ' + error.message));
+  }
+};
+
 // @desc    Delete vendor order
 // @route   DELETE /api/vendor-orders/:id
 // @access  Private (ADMIN)

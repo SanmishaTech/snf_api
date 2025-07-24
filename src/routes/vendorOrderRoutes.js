@@ -92,6 +92,10 @@ const express = require('express');
  *           type: integer
  *           nullable: true
  *           description: Quantity received for this item.
+ *         supervisorQuantity:
+ *           type: integer
+ *           nullable: true
+ *           description: Quantity verified by supervisor for this item.
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -332,6 +336,31 @@ const express = require('express');
  *             $ref: '#/components/schemas/RecordReceiptItem'
  *           minItems: 1
  *
+ *     RecordSupervisorQuantityItem:
+ *       type: object
+ *       required:
+ *         - orderItemId
+ *         - supervisorQuantity
+ *       properties:
+ *         orderItemId:
+ *           type: integer
+ *           description: ID of the order item.
+ *         supervisorQuantity:
+ *           type: integer
+ *           minimum: 0
+ *           description: Quantity verified by supervisor for this item.
+ *
+ *     RecordSupervisorQuantityRequest:
+ *       type: object
+ *       required:
+ *         - items
+ *       properties:
+ *         items:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/RecordSupervisorQuantityItem'
+ *           minItems: 1
+ *
  *   securitySchemes:
  *     bearerAuth:
  *       type: http
@@ -350,6 +379,22 @@ const createError = require('http-errors'); // Added for error handling in custo
 const isAdminOrAgency = (req, res, next) => {
   if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'AGENCY')) {
     return next(createError(403, 'Forbidden: Access restricted to ADMIN or AGENCY roles.'));
+  }
+  next();
+};
+
+// Middleware to check if user is SUPERVISOR or ADMIN
+const isSupervisorOrAdmin = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERVISOR')) {
+    return next(createError(403, 'Forbidden: Access restricted to SUPERVISOR or ADMIN roles.'));
+  }
+  next();
+};
+
+// Middleware to check if user is SUPERVISOR
+const isSupervisor = (req, res, next) => {
+  if (!req.user || req.user.role !== 'SUPERVISOR') {
+    return next(createError(403, 'Forbidden: Access restricted to SUPERVISOR role.'));
   }
   next();
 };
@@ -609,6 +654,55 @@ router.get('/my', auth, vendorOrderController.getMyVendorOrders);
  */
 router.get('/my-agency-orders', auth, vendorOrderController.getMyAgencyOrders);
 
+// GET /api/vendor-orders/my-supervisor-orders - Get orders for the logged-in SUPERVISOR's assigned agency
+/**
+ * @swagger
+ * /vendor-orders/my-supervisor-orders:
+ *   get:
+ *     summary: Get orders for the logged-in SUPERVISOR's assigned agency
+ *     tags: [Vendor Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by PO number, vendor name, product name.
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by order date (YYYY-MM-DD).
+ *     responses:
+ *       200:
+ *         description: A list of the supervisor's assigned agency orders (DELIVERED and RECEIVED status).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VendorOrderListResponse'
+ *       401:
+ *         description: Unauthorized (User is not a SUPERVISOR or not logged in).
+ *       403:
+ *         description: Forbidden (User is not a SUPERVISOR).
+ *       404:
+ *         description: Supervisor profile not found or no agency assigned.
+ *       500:
+ *         description: Internal server error.
+ */
+router.get('/my-supervisor-orders', auth, vendorOrderController.getMySupervisorAgencyOrders);
+
 // GET /api/vendor-orders/:id - Get a single vendor order by ID
 /**
  * @swagger
@@ -853,6 +947,48 @@ router.put('/:id/record-delivery', auth, vendorOrderController.recordDelivery);
  *         description: Internal server error.
  */
 router.put('/:id/record-receipt', auth, vendorOrderController.recordReceipt);
+
+// PUT /api/vendor-orders/:id/record-supervisor-quantity - Record supervisor quantities for order items
+/**
+ * @swagger
+ * /vendor-orders/{id}/record-supervisor-quantity:
+ *   put:
+ *     summary: Record supervisor quantities for items in a vendor order
+ *     tags: [Vendor Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the vendor order.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RecordSupervisorQuantityRequest'
+ *     responses:
+ *       200:
+ *         description: Supervisor quantities recorded successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VendorOrderResponse'
+ *       400:
+ *         description: Bad request (e.g., validation error, item not found, quantity exceeds received quantity).
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Forbidden (e.g., order status does not allow recording supervisor quantity or user is not SUPERVISOR/ADMIN).
+ *       404:
+ *         description: Vendor order or order item not found.
+ *       500:
+ *         description: Internal server error.
+ */
+router.put('/:id/record-supervisor-quantity', auth, isSupervisorOrAdmin, vendorOrderController.recordSupervisorQuantity);
 
 // PATCH /api/vendor-orders/:id/reception - Mark order as received (by AGENCY who placed it or ADMIN)
 // This might require knowing which agency placed the order, or if it's a general reception confirmation.

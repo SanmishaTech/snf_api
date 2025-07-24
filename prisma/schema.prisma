@@ -26,6 +26,7 @@ model User {
   purchasesUpdated      Purchase[]          @relation("PurchaseUpdatedBy")
   agency                Agency?
   member                Member?
+  supervisor            Supervisor?
   transfersCreated      Transfer[]          @relation("Transfer_createdBy")
   depot                 Depot?              @relation(fields: [depotId], references: [id])
   deliveredOrders       VendorOrder[]       @relation("DeliveredBy")
@@ -80,6 +81,7 @@ model Agency {
   depotId                 Int?                    @unique
   depot                   Depot?                  @relation(fields: [depotId], references: [id])
   user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supervisors             Supervisor[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
   locations               Location[]
   productOrders           ProductOrder[]
@@ -88,6 +90,31 @@ model Agency {
 
   @@index([depotId])
   @@map("agencies")
+}
+
+model Supervisor {
+  id                Int      @id @default(autoincrement())
+  name              String
+  contactPersonName String?  @map("contact_person_name")
+  mobile            String
+  address1          String
+  address2          String?
+  city              String
+  pincode           Int
+  alternateMobile   String?  @map("alternate_mobile")
+  email             String?  @unique
+  userId            Int      @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  depotId           Int?
+  agencyId          Int?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  depot             Depot?   @relation(fields: [depotId], references: [id])
+  agency            Agency?  @relation(fields: [agencyId], references: [id])
+
+  @@index([depotId])
+  @@index([agencyId])
+  @@map("supervisors")
 }
 
 model Product {
@@ -216,6 +243,7 @@ model OrderItem {
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   receivedQuantity  Int?
+  supervisorQuantity Int?
   depotId           Int?
   depotVariantId    Int?
   agency            Agency               @relation(fields: [agencyId], references: [id])
@@ -272,6 +300,7 @@ model Depot {
   stockLedgers            StockLedger[]
   variantStocks           VariantStock[]
   agency                  Agency?
+  supervisors             Supervisor[]
   areas                   AreaMaster[]
   deliveryScheduleEntries DeliveryScheduleEntry[]
   depotProductVariants    DepotProductVariant[]
@@ -724,6 +753,7 @@ enum Role {
   MEMBER
   VENDOR
   DepotAdmin
+  SUPERVISOR
 }
 
 enum OrderStatus {

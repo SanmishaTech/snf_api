@@ -11,6 +11,7 @@ const authRoutes = require("./routes/auth");
 
 const vendorRoutes = require("./routes/vendorRoutes");
 const agencyRoutes = require("./routes/agencyRoutes");
+const supervisorRoutes = require("./routes/supervisorRoutes");
 const productRoutes = require("./routes/productRoutes");
 const productVariantRoutes = require("./routes/productVariantRoutes");
 const depotProductVariantRoutes = require("./routes/depotProductVariantRoutes");
@@ -64,7 +65,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "https://www.indraai.in//"];
+  : ["http://localhost:5173", "http://localhost:3000//"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -122,6 +123,12 @@ app.use(
   roleGuard("ADMIN", "AGENCY"),
   agencyRoutes
 );
+app.use(
+  "/api/supervisors",
+  authMiddleware,
+  roleGuard("ADMIN", "SUPERVISOR"),
+  supervisorRoutes
+);
 // Product routes include a mix of public and protected endpoints.
 // Individual routes inside productRoutes declare their own auth / role requirements.
 app.use("/api/products", productRoutes);
@@ -139,7 +146,7 @@ app.use(
 app.use(
   "/api/vendor-orders",
   authMiddleware,
-  roleGuard("ADMIN", "AGENCY", "VENDOR"),
+  roleGuard("ADMIN", "AGENCY", "VENDOR", "SUPERVISOR"),
   vendorOrderRoutes
 );
 app.use(
