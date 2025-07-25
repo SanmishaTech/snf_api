@@ -38,6 +38,14 @@ const upload = multer({
 const { getAllSubscriptions } = require('../controllers/adminSubscriptionController');
 const { adminGetUserById, adminUpdateUserById, adminToggleMemberStatus } = require('../controllers/adminUserController'); // Added for admin user management
 const {
+  getAdminDeliveryAddresses,
+  getAdminDeliveryAddress,
+  updateAdminDeliveryAddress,
+  deleteAdminDeliveryAddress,
+  createAdminDeliveryAddress,
+  setAdminDefaultAddress
+} = require('../controllers/admin/adminDeliveryAddressController');
+const {
   createAreaMaster,
   getAllAreaMasters,
   getAreaMasterById,
@@ -211,5 +219,17 @@ router.route('/locations/:id')
   .get(authMiddleware, getLocationById)
   .put(authMiddleware, updateLocation)
   .delete(authMiddleware, deleteLocation);
+
+// Admin Delivery Address Routes
+router.route('/delivery-addresses')
+  .get(authMiddleware, getAdminDeliveryAddresses)
+  .post(authMiddleware, createAdminDeliveryAddress);
+
+router.route('/delivery-addresses/:id')
+  .get(authMiddleware, getAdminDeliveryAddress)
+  .put(authMiddleware, updateAdminDeliveryAddress)
+  .delete(authMiddleware, deleteAdminDeliveryAddress);
+
+router.patch('/delivery-addresses/:id/set-default', authMiddleware, setAdminDefaultAddress);
 
 module.exports = router;
