@@ -246,17 +246,21 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         },
       });
 
-      // Prepare subscription data for batch creation
-      const subscriptionData = processedSubscriptions.map((subData, i) => {
+      // Create subscriptions with distributed wallet amounts
+      const createdSubscriptions = [];
+      
+      for (let i = 0; i < processedSubscriptions.length; i++) {
+        const subData = processedSubscriptions[i];
         const walletShare = walletCalculation.subscriptionWalletShares[i];
+
         const subscriptionPayable = subData.amount - walletShare;
         const subPaymentStatus = subscriptionPayable <= 0 ? 'PAID' : 'PENDING';
 
         const subscriptionDbData = {
-          memberId: memberId,
-          productId: subData.depotVariant.productId,
-          depotProductVariantId: subData.depotVariant.id,
-          productOrderId: newOrder.id,
+          member: { connect: { id: memberId } },
+          product: { connect: { id: subData.depotVariant.productId } },
+          depotProductVariant: { connect: { id: subData.depotVariant.id } },
+          productOrder: { connect: { id: newOrder.id } },
           period: subData.period,
           startDate: subData.startDate,
           expiryDate: subData.expiryDate,
@@ -274,26 +278,24 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
 
         // Add delivery address for online depots
         if (subData.depotVariant.depot.isOnline) {
-          subscriptionDbData.deliveryAddressId = parseInt(deliveryAddressId, 10);
+          subscriptionDbData.deliveryAddress = {
+            connect: { id: parseInt(deliveryAddressId, 10) },
+          };
         }
 
         if (subData.agentId) {
-          subscriptionDbData.agencyId = subData.agentId;
+          subscriptionDbData.agency = { connect: { id: subData.agentId } };
         }
 
-        return subscriptionDbData;
-      });
+        const newSubscription = await tx.subscription.create({
+          data: subscriptionDbData,
+        });
+        
+        createdSubscriptions.push(newSubscription);
 
-      // Create all subscriptions at once
-      const createdSubscriptions = await tx.subscription.createManyAndReturn({
-        data: subscriptionData,
-      });
-
-      // Prepare delivery schedule entries for batch creation
-      createdSubscriptions.forEach((subscription, i) => {
-        const subData = processedSubscriptions[i];
+        // Prepare delivery schedule entries for this subscription
         const deliveryEntries = subData.deliveryScheduleDetails.map(entry => ({
-          subscriptionId: subscription.id,
+          subscriptionId: newSubscription.id,
           memberId: memberId,
           deliveryAddressId: deliveryAddressId ? parseInt(deliveryAddressId, 10) : null,
           productId: subData.depotVariant.productId,
@@ -306,7 +308,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         }));
 
         allDeliveryScheduleEntries.push(...deliveryEntries);
-      });
+      }
 
       // Update member wallet balance
       if (walletCalculation.walletAmountUsed > 0) {
