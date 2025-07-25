@@ -123,92 +123,94 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
   }
 
   try {
+    // Pre-fetch read-only data outside transaction
+    const memberRecord = await prisma.member.findUnique({
+      where: { userId: member.id },
+      select: { id: true, walletBalance: true },
+    });
+
+    if (!memberRecord) {
+      throw new Error('Member profile not found for the authenticated user.');
+    }
+
+    const memberId = memberRecord.id;
+
+    // Fetch depot variants and validate
+    const depotVariantIds = subscriptions.map(sub => parseInt(sub.productId, 10));
+    const depotVariants = await prisma.depotProductVariant.findMany({
+      where: { id: { in: depotVariantIds } },
+      select: {
+        id: true,
+        name: true,
+        mrp: true,
+        price3Day: true,
+        price15Day: true,
+        price1Month: true,
+        buyOncePrice: true,
+        depotId: true,
+        productId: true,
+        depot: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            unit: true,
+          }
+        },
+      }
+    });
+    const depotVariantMap = new Map(depotVariants.map(v => [v.id, v]));
+
+    // Address validation for online depots
+    const isAnyDepotOnline = depotVariants.some(v => v.depot.isOnline);
+    let deliveryAddress = null;
+
+    if (isAnyDepotOnline) {
+      if (!deliveryAddressId) {
+        throw new Error('deliveryAddressId is required for online depot subscriptions.');
+      }
+
+      deliveryAddress = await prisma.deliveryAddress.findUnique({
+        where: { id: parseInt(deliveryAddressId, 10) },
+        include: { location: { include: { agency: true } } },
+      });
+
+      if (!deliveryAddress) {
+        throw new Error('Delivery address could not be found.');
+      }
+    }
+
+    // Process subscriptions and calculate amounts outside transaction
+    const processedSubscriptions = [];
+    const allDeliveryScheduleEntries = [];
+    const financialSummary = {
+      totalAmount: 0,
+      totalQty: 0,
+      subscriptionDetails: []
+    };
+
+    for (const sub of subscriptions) {
+      const subscriptionData = await processSubscription(
+        sub,
+        depotVariantMap,
+        deliveryAddress,
+        null // Pass null for tx since we're outside transaction
+      );
+
+      processedSubscriptions.push(subscriptionData);
+      financialSummary.totalAmount += subscriptionData.amount;
+      financialSummary.totalQty += subscriptionData.totalQty;
+
+      // Store subscription financial details for later wallet distribution
+      financialSummary.subscriptionDetails.push({
+        id: subscriptionData.productId,
+        amount: subscriptionData.amount,
+        index: processedSubscriptions.length - 1
+      });
+    }
+
+    // Start transaction with only write operations
     const result = await prisma.$transaction(async (tx) => {
-      // Get member details
-      const memberRecord = await tx.member.findUnique({
-        where: { userId: member.id },
-        select: { id: true, walletBalance: true },
-      });
-
-      if (!memberRecord) {
-        throw new Error('Member profile not found for the authenticated user.');
-      }
-
-      const memberId = memberRecord.id;
-
-      // Fetch depot variants and validate
-      const depotVariantIds = subscriptions.map(sub => parseInt(sub.productId, 10));
-      const depotVariants = await tx.depotProductVariant.findMany({
-        where: { id: { in: depotVariantIds } },
-        select: {
-          id: true,
-          name: true,
-          mrp: true,
-          price3Day: true,
-          price15Day: true,
-          price1Month: true,
-          buyOncePrice: true,
-          depotId: true,
-          productId: true,
-          depot: true,
-          product: {
-            select: {
-              id: true,
-              name: true,
-              unit: true,
-            }
-          },
-        }
-      });
-      const depotVariantMap = new Map(depotVariants.map(v => [v.id, v]));
-
-      // Address validation for online depots
-      const isAnyDepotOnline = depotVariants.some(v => v.depot.isOnline);
-      let deliveryAddress = null;
-
-      if (isAnyDepotOnline) {
-        if (!deliveryAddressId) {
-          throw new Error('deliveryAddressId is required for online depot subscriptions.');
-        }
-
-        deliveryAddress = await tx.deliveryAddress.findUnique({
-          where: { id: parseInt(deliveryAddressId, 10) },
-          include: { location: { include: { agency: true } } },
-        });
-
-        if (!deliveryAddress) {
-          throw new Error('Delivery address could not be found.');
-        }
-      }
-
-      // Process subscriptions and calculate amounts
-      const processedSubscriptions = [];
-      const allDeliveryScheduleEntries = [];
-      const financialSummary = {
-        totalAmount: 0,
-        totalQty: 0,
-        subscriptionDetails: []
-      };
-
-      for (const sub of subscriptions) {
-        const subscriptionData = await processSubscription(
-          sub,
-          depotVariantMap,
-          deliveryAddress,
-          tx
-        );
-
-        processedSubscriptions.push(subscriptionData);
-        financialSummary.totalAmount += subscriptionData.amount;
-        financialSummary.totalQty += subscriptionData.totalQty;
-
-        // Store subscription financial details for later wallet distribution
-        financialSummary.subscriptionDetails.push({
-          id: subscriptionData.productId,
-          amount: subscriptionData.amount,
-          index: processedSubscriptions.length - 1
-        });
-      }
 
       // Calculate wallet and payment amounts
       const walletCalculation = calculateWalletDistribution(
@@ -217,7 +219,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         memberRecord.walletBalance,
         financialSummary.subscriptionDetails
       );
-      console.log("Pasdasdasd", walletCalculation)
+      console.log("Wallet calculation:", walletCalculation)
 
       // Create order with financial summary
       const orderData = {
@@ -244,19 +246,17 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         },
       });
 
-      // Create subscriptions with distributed wallet amounts
-      for (let i = 0; i < processedSubscriptions.length; i++) {
-        const subData = processedSubscriptions[i];
+      // Prepare subscription data for batch creation
+      const subscriptionData = processedSubscriptions.map((subData, i) => {
         const walletShare = walletCalculation.subscriptionWalletShares[i];
-
         const subscriptionPayable = subData.amount - walletShare;
         const subPaymentStatus = subscriptionPayable <= 0 ? 'PAID' : 'PENDING';
 
         const subscriptionDbData = {
-          member: { connect: { id: memberId } },
-          product: { connect: { id: subData.depotVariant.productId } },
-          depotProductVariant: { connect: { id: subData.depotVariant.id } },
-          productOrder: { connect: { id: newOrder.id } },
+          memberId: memberId,
+          productId: subData.depotVariant.productId,
+          depotProductVariantId: subData.depotVariant.id,
+          productOrderId: newOrder.id,
           period: subData.period,
           startDate: subData.startDate,
           expiryDate: subData.expiryDate,
@@ -274,22 +274,26 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
 
         // Add delivery address for online depots
         if (subData.depotVariant.depot.isOnline) {
-          subscriptionDbData.deliveryAddress = {
-            connect: { id: parseInt(deliveryAddressId, 10) },
-          };
+          subscriptionDbData.deliveryAddressId = parseInt(deliveryAddressId, 10);
         }
 
         if (subData.agentId) {
-          subscriptionDbData.agency = { connect: { id: subData.agentId } };
+          subscriptionDbData.agencyId = subData.agentId;
         }
 
-        const newSubscription = await tx.subscription.create({
-          data: subscriptionDbData,
-        });
+        return subscriptionDbData;
+      });
 
-        // Create delivery schedule entries
+      // Create all subscriptions at once
+      const createdSubscriptions = await tx.subscription.createManyAndReturn({
+        data: subscriptionData,
+      });
+
+      // Prepare delivery schedule entries for batch creation
+      createdSubscriptions.forEach((subscription, i) => {
+        const subData = processedSubscriptions[i];
         const deliveryEntries = subData.deliveryScheduleDetails.map(entry => ({
-          subscriptionId: newSubscription.id,
+          subscriptionId: subscription.id,
           memberId: memberId,
           deliveryAddressId: deliveryAddressId ? parseInt(deliveryAddressId, 10) : null,
           productId: subData.depotVariant.productId,
@@ -302,7 +306,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         }));
 
         allDeliveryScheduleEntries.push(...deliveryEntries);
-      }
+      });
 
       // Update member wallet balance
       if (walletCalculation.walletAmountUsed > 0) {
@@ -321,56 +325,62 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         });
       }
 
-      // Return complete order with subscriptions
-      const finalOrder = await tx.productOrder.findUnique({
-        where: { id: newOrder.id },
-        include: {
-          subscriptions: {
-            include: {
-              deliveryAddress: true,
-              depotProductVariant: {
-                include: {
-                  depot: true,
-                  product: true,
-                },
-              }
-            }
-          }
-        },
-      });
-
-      // Create invoice for the order
-      let invoice = null;
-      try {
-        invoice = await generateInvoiceForOrder(finalOrder);
-        console.log('Invoice created successfully:', invoice.invoiceNo);
-
-        // Update the order with invoice information
-        await tx.productOrder.update({
-          where: { id: finalOrder.id },
-          data: {
-            invoiceNo: invoice.invoiceNo,
-            invoicePath: invoice.pdfPath
-          }
-        });
-      } catch (invoiceError) {
-        console.error('Error creating invoice:', invoiceError);
-        // Don't fail the order creation if invoice fails
-      }
-
+      // Return order ID for post-transaction processing
       return {
-        order: finalOrder,
+        orderId: newOrder.id,
         financialSummary: {
           totalAmount: financialSummary.totalAmount,
           walletAmountUsed: walletCalculation.walletAmountUsed,
           totalPayableAmount: walletCalculation.totalPayableAmount,
           paymentStatus: orderData.paymentStatus
-        },
-        invoice: invoice
+        }
       };
+    }, { timeout: 15000, maxWait: 10000 });
+
+    // Post-transaction operations (invoice generation)
+    const finalOrder = await prisma.productOrder.findUnique({
+      where: { id: result.orderId },
+      include: {
+        subscriptions: {
+          include: {
+            deliveryAddress: true,
+            depotProductVariant: {
+              include: {
+                depot: true,
+                product: true,
+              },
+            }
+          }
+        }
+      },
     });
 
-    res.status(201).json(result);
+    // Create invoice for the order
+    let invoice = null;
+    try {
+      invoice = await generateInvoiceForOrder(finalOrder);
+      console.log('Invoice created successfully:', invoice.invoiceNo);
+
+      // Update the order with invoice information
+      await prisma.productOrder.update({
+        where: { id: finalOrder.id },
+        data: {
+          invoiceNo: invoice.invoiceNo,
+          invoicePath: invoice.pdfPath
+        }
+      });
+    } catch (invoiceError) {
+      console.error('Error creating invoice:', invoiceError);
+      // Don't fail the order creation if invoice fails
+    }
+
+    const finalResult = {
+      order: finalOrder,
+      financialSummary: result.financialSummary,
+      invoice: invoice
+    };
+
+    res.status(201).json(finalResult);
   } catch (error) {
     console.error('Error creating subscription with order:', error);
     res.status(400).json({ message: error.message });
@@ -510,11 +520,12 @@ function mapDeliverySchedule(rawDeliverySchedule) {
 }
 
 // Helper function to determine agent ID
-async function determineAgentId(depot, deliveryAddress, tx) {
+async function determineAgentId(depot, deliveryAddress, tx = null) {
   if (depot?.isOnline) {
     return deliveryAddress?.location?.agencyId || null;
   } else if (depot) {
-    const agency = await tx.agency.findUnique({ where: { depotId: depot.id } });
+    const dbClient = tx || prisma;
+    const agency = await dbClient.agency.findUnique({ where: { depotId: depot.id } });
     return agency?.id || null;
   }
   return null;
