@@ -901,6 +901,12 @@ exports.recordSupervisorQuantity = async (req, res, next) => {
       return next(createError(400, `Order status is ${order.status}. Supervisor quantity can only be recorded for DELIVERED or RECEIVED orders.`));
     }
 
+    // Check if supervisor quantities have already been recorded for any item in the order
+    const alreadyRecorded = order.items.some(item => item.supervisorQuantity !== null && item.supervisorQuantity !== undefined);
+    if (alreadyRecorded) {
+      return next(createError(400, 'Supervisor quantities have already been recorded for this order.'));
+    }
+
     const updatedOrder = await prisma.$transaction(async (tx) => {
       // Update supervisor quantities for each order item
       for (const supervisorItem of supervisorItems) {
@@ -910,12 +916,13 @@ exports.recordSupervisorQuantity = async (req, res, next) => {
           throw createError(404, `OrderItem with ID ${supervisorItem.orderItemId} not found in this order.`);
         }
 
-        if (orderItemToUpdate.receivedQuantity == null) {
-          throw createError(400, `Cannot record supervisor quantity for item ${orderItemToUpdate.productId} as it has no received quantity recorded.`);
-        }
+        // Supervisor quantity should not exceed delivered quantity (if available)
+        // If no delivered quantity is recorded, supervisor can record up to the ordered quantity
+        const maxAllowedQuantity = orderItemToUpdate.deliveredQuantity || orderItemToUpdate.quantity;
 
-        if (supervisorItem.supervisorQuantity > orderItemToUpdate.receivedQuantity) {
-          throw createError(400, `Supervisor quantity (${supervisorItem.supervisorQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed received quantity (${orderItemToUpdate.receivedQuantity}).`);
+        if (supervisorItem.supervisorQuantity > maxAllowedQuantity) {
+          const limitType = orderItemToUpdate.deliveredQuantity ? 'delivered' : 'ordered';
+          throw createError(400, `Supervisor quantity (${supervisorItem.supervisorQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed ${limitType} quantity (${maxAllowedQuantity}).`);
         }
 
         await tx.orderItem.update({

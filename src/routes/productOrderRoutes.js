@@ -17,12 +17,11 @@ router.post(
   createOrderWithSubscriptions
 );
 
-// Get all product orders (admin only)
+// Get all product orders (admin and supervisor)
 router.get(
-    '/', 
+    '/',
     authMiddleware,
-
-    roleGuard('ADMIN'),
+    roleGuard('ADMIN', 'SUPERVISOR'),
     getAllProductOrders
 );
 

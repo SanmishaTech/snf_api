@@ -529,7 +529,7 @@ function getConsistentAgentId(processedSubscriptions) {
   return uniqueAgentIds.length === 1 ? uniqueAgentIds[0] : null;
 }
 const getAllProductOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, search = '', paymentStatus = '' } = req.query;
+  const { page = 1, limit = 10, search = '', paymentStatus = '', supervisorAgencyId = '' } = req.query;
 
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
@@ -539,6 +539,15 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
 
   if (paymentStatus) {
     where.paymentStatus = paymentStatus;
+  }
+
+  // Add supervisor filtering - only show orders with subscriptions assigned to supervisor's agency
+  if (supervisorAgencyId) {
+    where.subscriptions = {
+      some: {
+        agencyId: parseInt(supervisorAgencyId, 10)
+      }
+    };
   }
 
   if (search) {
