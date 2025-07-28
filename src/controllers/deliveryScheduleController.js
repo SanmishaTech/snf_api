@@ -70,7 +70,6 @@ const getAgencyDeliveriesByDate = async (req, res) => {
           select: {
             id: true,
             name: true,
-            phoneNumber: true,
             user: {
               select: {
                 id: true,
