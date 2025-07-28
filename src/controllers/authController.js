@@ -174,9 +174,89 @@ const login = async (req, res, next) => {
     console.log(`[LOGIN_TRACE] Attempting to fetch user: ${identifier}`);
     let user;
     if (identifier.includes("@")) {
+      // Email login - check User table email field first
       user = await prisma.user.findUnique({ where: { email: identifier } });
+      
+      // If not found in User table, check role-specific tables for email
+      if (!user) {
+        console.log(`[LOGIN_TRACE] User not found in User table, checking role-specific tables for email: ${identifier}`);
+        
+        // Check Vendor table
+        const vendor = await prisma.vendor.findFirst({
+          where: { email: identifier },
+          include: { user: true }
+        });
+        if (vendor) {
+          user = vendor.user;
+          console.log(`[LOGIN_TRACE] User found via Vendor email: ${user.id}`);
+        }
+        
+        // Check Agency table if not found in Vendor
+        if (!user) {
+          const agency = await prisma.agency.findFirst({
+            where: { email: identifier },
+            include: { user: true }
+          });
+          if (agency) {
+            user = agency.user;
+            console.log(`[LOGIN_TRACE] User found via Agency email: ${user.id}`);
+          }
+        }
+        
+        // Check Supervisor table if not found in Agency
+        if (!user) {
+          const supervisor = await prisma.supervisor.findFirst({
+            where: { email: identifier },
+            include: { user: true }
+          });
+          if (supervisor) {
+            user = supervisor.user;
+            console.log(`[LOGIN_TRACE] User found via Supervisor email: ${user.id}`);
+          }
+        }
+      }
     } else {
+      // Mobile login - check User table mobile field first
       user = await prisma.user.findFirst({ where: { mobile: identifier } });
+      
+      // If not found in User table, check role-specific tables
+      if (!user) {
+        console.log(`[LOGIN_TRACE] User not found in User table, checking role-specific tables for mobile: ${identifier}`);
+        
+        // Check Vendor table
+        const vendor = await prisma.vendor.findFirst({
+          where: { mobile: identifier },
+          include: { user: true }
+        });
+        if (vendor) {
+          user = vendor.user;
+          console.log(`[LOGIN_TRACE] User found via Vendor table: ${user.id}`);
+        }
+        
+        // Check Agency table if not found in Vendor
+        if (!user) {
+          const agency = await prisma.agency.findFirst({
+            where: { mobile: identifier },
+            include: { user: true }
+          });
+          if (agency) {
+            user = agency.user;
+            console.log(`[LOGIN_TRACE] User found via Agency table: ${user.id}`);
+          }
+        }
+        
+        // Check Supervisor table if not found in Agency
+        if (!user) {
+          const supervisor = await prisma.supervisor.findFirst({
+            where: { mobile: identifier },
+            include: { user: true }
+          });
+          if (supervisor) {
+            user = supervisor.user;
+            console.log(`[LOGIN_TRACE] User found via Supervisor table: ${user.id}`);
+          }
+        }
+      }
     }
     console.log(`[LOGIN_TRACE] User fetched: ${user ? user.id : 'null'}`);
 
