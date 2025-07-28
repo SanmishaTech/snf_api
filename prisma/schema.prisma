@@ -395,9 +395,9 @@ model Subscription {
   memberId                Int
   deliveryAddressId       Int?
   productId               Int
-  startDate               DateTime                @default(now())
+  startDate               DateTime                @db.Date
   period                  Int
-  expiryDate              DateTime
+  expiryDate              DateTime                @db.Date
   deliverySchedule        DeliverySchedule
   weekdays                String?
   qty                     Int

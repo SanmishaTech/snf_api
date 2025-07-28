@@ -117,7 +117,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('User not authenticated');
   }
-  if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
+if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
     res.status(400);
     throw new Error('Subscriptions array is required and cannot be empty.');
   }
@@ -457,15 +457,35 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
   const parsedQty = parseInt(qty, 10);
   const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
   const subscriptionPeriod = parseInt(period, 10);
+  // Extract the user's intended date from the ISO string
+  // The frontend creates dates like "2025-07-31T18:30:00.000Z" when user selects Aug 1 in IST
+  // This happens because frontend creates midnight local time, then converts to UTC
+  // We need to determine the user's intended calendar date
+  
   const sDate = new Date(startDate);
-  const expiryDate = new Date(sDate);
+  
+  // Simple approach: Add 12 hours to the received timestamp to account for timezone differences
+  // This ensures we get the correct calendar date that the user intended
+  const adjustedDate = new Date(sDate.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
+  
+  const year = adjustedDate.getUTCFullYear();
+  const month = adjustedDate.getUTCMonth(); 
+  const day = adjustedDate.getUTCDate();
+  const startDateOnly = new Date(year, month, day);
+  
+  console.log(`[Date Processing] Frontend sent: ${startDate}`);
+  console.log(`[Date Processing] Parsed as: ${sDate.toString()}`);
+  console.log(`[Date Processing] Adjusted date (+12h): ${adjustedDate.toString()}`);
+  console.log(`[Date Processing] Final date parts: ${year}-${month + 1}-${day}`);
+  console.log(`[Date Processing] Final startDate for storage: ${startDateOnly.toString()}`);
+  const expiryDate = new Date(startDateOnly);
   expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
 
   // Process delivery schedule
   const { internalScheduleLogicType, dbDeliveryScheduleEnum } = mapDeliverySchedule(rawDeliverySchedule);
 
   const deliveryScheduleDetails = generateDeliveryDates(
-    sDate,
+    startDateOnly,
     subscriptionPeriod,
     internalScheduleLogicType,
     parsedQty,
@@ -486,7 +506,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
     productId: parseInt(productId, 10),
     depotVariant,
     period: subscriptionPeriod,
-    startDate: sDate,
+    startDate: startDateOnly,
     expiryDate,
     deliverySchedule: dbDeliveryScheduleEnum,
     weekdays,

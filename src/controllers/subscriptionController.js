@@ -161,7 +161,26 @@ const createSubscription = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Invalid start date provided.');
   }
-  let expiryDate = new Date(baseDate);
+  // Convert to date-only preserving the user's intended date (not UTC date)
+  // The frontend creates dates like "2025-07-31T18:30:00.000Z" when user selects Aug 1 in IST
+  // This happens because frontend creates midnight local time, then converts to UTC
+  // We need to determine the user's intended calendar date
+  
+  // Simple approach: Add 12 hours to the received timestamp to account for timezone differences
+  // This ensures we get the correct calendar date that the user intended
+  const adjustedDate = new Date(baseDate.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
+  
+  const year = adjustedDate.getUTCFullYear();
+  const month = adjustedDate.getUTCMonth();
+  const day = adjustedDate.getUTCDate();
+  const startDateOnly = new Date(year, month, day);
+  
+  console.log(`[Date Processing] Frontend sent: ${startDate}`);
+  console.log(`[Date Processing] Parsed as: ${baseDate.toString()}`);
+  console.log(`[Date Processing] Adjusted date (+12h): ${adjustedDate.toString()}`);
+  console.log(`[Date Processing] Final date parts: ${year}-${month + 1}-${day}`);
+  console.log(`[Date Processing] Final startDate for storage: ${startDateOnly.toString()}`);
+  let expiryDate = new Date(startDateOnly);
   expiryDate.setDate(expiryDate.getDate() + parsedPeriod - 1);
 
   // Map deliverySchedule string to Prisma enum
@@ -206,7 +225,7 @@ const createSubscription = asyncHandler(async (req, res) => {
 
   // Calculate totalQty and amount using the helper function
   const deliveryScheduleDetails = generateDeliveryDates(
-    baseDate,
+    startDateOnly,
     parsedPeriod,
     internalScheduleLogicType, // Use the type for internal logic
     parsedQty,
@@ -276,7 +295,7 @@ const createSubscription = asyncHandler(async (req, res) => {
         member: { connect: { id: member.id } },
         product: { connect: { id: parsedProductId } },
         productOrder: { connect: { id: newProductOrder.id } },
-        startDate: baseDate,
+        startDate: startDateOnly,
         period: parsedPeriod,
         expiryDate,
         deliverySchedule: dbDeliveryScheduleEnum,
