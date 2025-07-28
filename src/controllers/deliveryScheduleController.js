@@ -80,7 +80,7 @@ const getAgencyDeliveriesByDate = async (req, res) => {
           },
         },
         deliveryAddress: true,
-        depotProductVariant: {
+        DepotProductVariant: {
           select: {
             id: true,
             name: true,
@@ -107,7 +107,7 @@ const getAgencyDeliveriesByDate = async (req, res) => {
     // Debug: Log the first delivery to check DepotProductVariant
     if (deliveries.length > 0) {
       console.log('First delivery item:', JSON.stringify(deliveries[0], null, 2));
-      console.log('depotProductVariant in first item:', deliveries[0].depotProductVariant);
+      console.log('DepotProductVariant in first item:', deliveries[0].DepotProductVariant);
     }
 
     res.status(200).json(deliveries);
