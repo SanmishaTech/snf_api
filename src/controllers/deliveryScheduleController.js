@@ -70,6 +70,7 @@ const getAgencyDeliveriesByDate = async (req, res) => {
           select: {
             id: true,
             name: true,
+            phoneNumber: true,
             user: {
               select: {
                 id: true,
@@ -80,6 +81,13 @@ const getAgencyDeliveriesByDate = async (req, res) => {
           },
         },
         deliveryAddress: true,
+        depotProductVariant: {
+          select: {
+            id: true,
+            name: true,
+            hsnCode: true,
+          },
+        },
         subscription: {
           select: {
             id: true,
@@ -95,6 +103,12 @@ const getAgencyDeliveriesByDate = async (req, res) => {
 
     if (!deliveries) {
       return res.status(404).json({ message: 'No deliveries found for this agency on the specified date.' });
+    }
+
+    // Debug: Log the first delivery to check DepotProductVariant
+    if (deliveries.length > 0) {
+      console.log('First delivery item:', JSON.stringify(deliveries[0], null, 2));
+      console.log('depotProductVariant in first item:', deliveries[0].depotProductVariant);
     }
 
     res.status(200).json(deliveries);
