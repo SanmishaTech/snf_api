@@ -214,6 +214,8 @@ const login = async (req, res, next) => {
             console.log(`[LOGIN_TRACE] User found via Supervisor email: ${user.id}`);
           }
         }
+        
+        // Note: Depot table doesn't have email field, only contactNumber
       }
     } else {
       // Mobile login - check User table mobile field first
@@ -254,6 +256,23 @@ const login = async (req, res, next) => {
           if (supervisor) {
             user = supervisor.user;
             console.log(`[LOGIN_TRACE] User found via Supervisor table: ${user.id}`);
+          }
+        }
+        
+        // Check Depot table for contactNumber (for DepotAdmin users)
+        if (!user) {
+          const depot = await prisma.depot.findFirst({
+            where: { contactNumber: identifier },
+            include: { 
+              members: {
+                where: { role: 'DepotAdmin' }
+              }
+            }
+          });
+          if (depot && depot.members.length > 0) {
+            // If multiple depot admins, take the first one
+            user = depot.members[0];
+            console.log(`[LOGIN_TRACE] User found via Depot contactNumber: ${user.id}`);
           }
         }
       }
