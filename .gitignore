@@ -6,4 +6,4 @@ bun.lockb
 .env.production
 /uploads/categories
 /uploads/products
-/src/invoices
+src/invoices/

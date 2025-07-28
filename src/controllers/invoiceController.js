@@ -4,6 +4,8 @@ const {
   getInvoicePath,
   invoiceExists 
 } = require('../services/invoiceService');
+const { regenerateAllInvoices } = require('../scripts/regenerateAllInvoices');
+const { regenerateAllInvoicesKeepNumbers } = require('../scripts/regenerateAllInvoicesKeepNumbers');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const path = require('path');
@@ -181,9 +183,87 @@ const getInvoiceBySubscription = asyncHandler(async (req, res) => {
   res.status(200).json(invoiceDetails);
 });
 
+// @desc    Regenerate all invoices (with new numbers)
+// @route   POST /api/invoices/regenerate-all
+// @access  Private (Admin only)
+const regenerateAllInvoicesEndpoint = asyncHandler(async (req, res) => {
+  // Check if user is admin
+  if (req.user.role !== 'ADMIN') {
+    res.status(403);
+    throw new Error('Only admins can regenerate all invoices');
+  }
+  
+  try {
+    console.log(`Admin ${req.user.name} (${req.user.email}) initiated full invoice regeneration`);
+    
+    // Run the regeneration process
+    await regenerateAllInvoices();
+    
+    // Get the count of successfully regenerated invoices
+    const invoiceCount = await prisma.productOrder.count({
+      where: {
+        paymentStatus: 'PAID',
+        invoiceNo: { not: null }
+      }
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: 'All invoices have been successfully regenerated with new numbers',
+      regeneratedCount: invoiceCount,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Invoice regeneration failed:', error);
+    res.status(500);
+    throw new Error(`Invoice regeneration failed: ${error.message}`);
+  }
+});
+
+// @desc    Regenerate all invoices (keeping existing numbers)
+// @route   POST /api/invoices/regenerate-all-keep-numbers
+// @access  Private (Admin only)
+const regenerateAllInvoicesKeepNumbersEndpoint = asyncHandler(async (req, res) => {
+  // Check if user is admin
+  if (req.user.role !== 'ADMIN') {
+    res.status(403);
+    throw new Error('Only admins can regenerate all invoices');
+  }
+  
+  try {
+    console.log(`Admin ${req.user.name} (${req.user.email}) initiated invoice regeneration (preserving numbers)`);
+    
+    // Run the regeneration process
+    await regenerateAllInvoicesKeepNumbers();
+    
+    // Get the count of successfully regenerated invoices
+    const invoiceCount = await prisma.productOrder.count({
+      where: {
+        paymentStatus: 'PAID',
+        invoiceNo: { not: null }
+      }
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: 'All invoices have been successfully regenerated preserving existing numbers',
+      regeneratedCount: invoiceCount,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Invoice regeneration failed:', error);
+    res.status(500);
+    throw new Error(`Invoice regeneration failed: ${error.message}`);
+  }
+});
+
 module.exports = {
   generateInvoice,
   downloadInvoiceByOrder,
   checkInvoiceExists,
-  getInvoiceBySubscription
+  getInvoiceBySubscription,
+  regenerateAllInvoicesEndpoint,
+  regenerateAllInvoicesKeepNumbersEndpoint
 };

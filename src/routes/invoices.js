@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { authorize } = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const { roleGuard } = require('../middleware/authorize');
 const {
   generateInvoice,
   downloadInvoiceByOrder,
   checkInvoiceExists,
-  getInvoiceBySubscription
+  getInvoiceBySubscription,
+  regenerateAllInvoicesEndpoint,
+  regenerateAllInvoicesKeepNumbersEndpoint
 } = require('../controllers/invoiceController');
 
 // Routes
@@ -24,5 +27,13 @@ router.route('/exists/order/:orderId')
 // Get invoice information by subscription ID
 router.route('/subscription/:subscriptionId')
   .get(getInvoiceBySubscription);
+
+// Regenerate all invoices with new numbers (Admin only)
+router.route('/regenerate-all')
+  .post(auth, roleGuard('ADMIN'), regenerateAllInvoicesEndpoint);
+
+// Regenerate all invoices keeping existing numbers (Admin only)
+router.route('/regenerate-all-keep-numbers')
+  .post(auth, roleGuard('ADMIN'), regenerateAllInvoicesKeepNumbersEndpoint);
 
 module.exports = router;
