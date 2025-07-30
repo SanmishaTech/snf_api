@@ -434,6 +434,7 @@ model Subscription {
   @@index([productOrderId], map: "subscriptions_productOrderId_fkey")
   @@map("subscriptions")
 }
+//New addition
 
 model WalletTransaction {
   id                 Int               @id @default(autoincrement())
