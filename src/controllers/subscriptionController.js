@@ -91,7 +91,8 @@ const createSubscription = asyncHandler(async (req, res) => {
     weekdays,
     qty,
     altQty,
-    startDate
+    startDate,
+    deliveryInstructions
   } = req.body;
 
   let deliverySchedule;
@@ -124,6 +125,7 @@ const createSubscription = asyncHandler(async (req, res) => {
   
   // Log the request body for debugging
   console.log('Request body:', req.body);
+  console.log('[DEBUG] deliveryInstructions from request:', deliveryInstructions);
 
   // Get current user's member ID
   const member = await prisma.member.findUnique({
@@ -309,7 +311,10 @@ const createSubscription = asyncHandler(async (req, res) => {
         payableamt,
         receivedamt: 0,
         paymentStatus: paymentStatus,
+        deliveryInstructions,
       };
+      
+      console.log('[DEBUG] subscriptionData being saved:', JSON.stringify(subscriptionData, null, 2));
 
       if (parsedDeliveryAddressId) {
         subscriptionData.deliveryAddress = { connect: { id: parsedDeliveryAddressId } };
@@ -418,6 +423,12 @@ const getSubscriptions = asyncHandler(async (req, res) => {
   let whereClause = {};
   const includeClause = {
     product: true,
+    depotProductVariant: {
+      select: {
+        id: true,
+        name: true
+      }
+    },
     deliveryAddress: true,
     agency: {
       include: {
@@ -460,7 +471,32 @@ const getSubscriptions = asyncHandler(async (req, res) => {
     }
   });
 
-  res.status(200).json(subscriptions);
+  // Transform subscriptions to include depot variant unit information
+  const transformedSubscriptions = subscriptions.map(subscription => {
+    const transformedSubscription = { ...subscription };
+    
+    // If there's a depot variant, extract unit from its name and add it to the product
+    if (subscription.depotProductVariant && subscription.depotProductVariant.name) {
+      const variantName = subscription.depotProductVariant.name;
+      const extractedUnit = variantName.includes('500ml') ? '500ml' : 
+                           variantName.includes('1L') ? '1L' : 
+                           variantName.includes('250ml') ? '250ml' : 
+                           variantName.includes('2L') ? '2L' : 'unit';
+      
+      transformedSubscription.product = {
+        ...subscription.product,
+        depotVariant: {
+          id: subscription.depotProductVariant.id,
+          name: subscription.depotProductVariant.name,
+          unit: extractedUnit
+        }
+      };
+    }
+    
+    return transformedSubscription;
+  });
+
+  res.status(200).json(transformedSubscriptions);
 });
 
 // @desc    Get subscription by ID
@@ -568,14 +604,22 @@ const updateSubscription = asyncHandler(async (req, res) => {
     paymentDate,
     paymentStatus,
     agencyId,
-    receivedAmount // <-- Add receivedAmount here
+    receivedAmount, // <-- Add receivedAmount here
+    deliveryInstructions
   } = req.body;
+  
+  console.log('[DEBUG] updateSubscription - req.body:', req.body);
+  console.log('[DEBUG] updateSubscription - deliveryInstructions:', deliveryInstructions);
 
   const updateData = {
     updatedAt: new Date(),
   };
 
   // Conditionally add fields to updateData
+  if (deliveryInstructions !== undefined) {
+    updateData.deliveryInstructions = deliveryInstructions;
+    console.log('[DEBUG] updateSubscription - Adding deliveryInstructions to updateData:', deliveryInstructions);
+  }
   if (paymentMode !== undefined) updateData.paymentMode = paymentMode;
   if (paymentReference !== undefined) updateData.paymentReferenceNo = paymentReference; // Ensure this matches your Prisma schema field name for payment reference
   if (paymentDate !== undefined) updateData.paymentDate = paymentDate ? new Date(paymentDate) : null;
@@ -652,10 +696,14 @@ const updateSubscription = asyncHandler(async (req, res) => {
     // For now, this is a placeholder if qty changes.
   }
 
+  console.log('[DEBUG] updateSubscription - Final updateData:', JSON.stringify(updateData, null, 2));
+  
   const updatedSubscription = await prisma.subscription.update({
     where: { id: subscriptionId },
     data: updateData,
   });
+  
+  console.log('[DEBUG] updateSubscription - Updated subscription result:', JSON.stringify(updatedSubscription, null, 2));
 
   // If agency assignment was updated, also update all related delivery schedule entries
   if (agencyId !== undefined) {

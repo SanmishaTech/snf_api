@@ -109,7 +109,7 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
 // @route   POST /api/product-orders/with-subscriptions
 // @access  Private
 const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
-  const { subscriptions, deliveryAddressId, walletamt } = req.body;
+  const { subscriptions, deliveryAddressId, walletamt, deliveryInstructions } = req.body;
   const member = req.user;
 
   // Input validation
@@ -194,6 +194,7 @@ if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
         sub,
         depotVariantMap,
         deliveryAddress,
+        deliveryInstructions, // Pass top-level instructions
         null // Pass null for tx since we're outside transaction
       );
 
@@ -274,6 +275,7 @@ if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
           walletamt: walletShare,
           payableamt: subscriptionPayable,
           paymentStatus: subPaymentStatus,
+          deliveryInstructions: subData.deliveryInstructions,
         };
 
         // Add delivery address for online depots
@@ -432,7 +434,7 @@ function calculateWalletDistribution(totalAmount, requestedWalletAmount, availab
   };
 }
 
-async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
+async function processSubscription(sub, depotVariantMap, deliveryAddress, deliveryInstructions, tx) {
   const {
     productId,
     period,
@@ -517,6 +519,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, tx) {
     amount: subscriptionAmount,
     agentId,
     deliveryScheduleDetails,
+    deliveryInstructions,
   };
 }
 

@@ -125,23 +125,30 @@ exports.createVendorOrder = async (req, res, next) => {
 
     // Validate depot variant if provided
     let depotVariantId = null;
+    let depotVariant = null;
     if (item.depotVariantId && item.depotVariantId !== '') {
-      const depotVariant = await prisma.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
+      depotVariant = await prisma.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
       if (!depotVariant) {
         return next(createError(404, `Depot variant with ID ${item.depotVariantId} not found.`));
       }
       depotVariantId = parseInt(item.depotVariantId);
     }
 
+    // Use depot variant purchasePrice if available, otherwise fall back to product price
+    let priceToUse = parseFloat(product.price);
+    if (depotVariant && depotVariant.purchasePrice) {
+      priceToUse = parseFloat(depotVariant.purchasePrice);
+    }
+
     itemsToCreate.push({
       productId: parseInt(item.productId),
       quantity: parseInt(item.quantity),
-      priceAtPurchase: parseFloat(product.price), // Ensure product.price is a number
+      priceAtPurchase: priceToUse,
       agencyId: parseInt(item.agencyId),
       depotId: depotId,
       depotVariantId: depotVariantId,
     });
-    totalAmount += parseFloat(product.price) * parseInt(item.quantity);
+    totalAmount += priceToUse * parseInt(item.quantity);
   }
 
     const newOrder = await prisma.$transaction(async (tx) => {
@@ -437,12 +444,19 @@ exports.updateVendorOrder = async (req, res, next) => {
 
             // Validate depot variant if provided in update
             let depotVariantId = null;
+            let depotVariant = null;
             if (item.depotVariantId && item.depotVariantId !== '') {
-              const depotVariant = await tx.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
+              depotVariant = await tx.depotProductVariant.findUnique({ where: { id: parseInt(item.depotVariantId) } });
               if (!depotVariant) {
                 throw createError(404, `Depot variant with ID ${item.depotVariantId} not found.`);
               }
               depotVariantId = parseInt(item.depotVariantId);
+            }
+
+            // Use depot variant purchasePrice if available, otherwise fall back to product price
+            let priceToUse = parseFloat(product.price);
+            if (depotVariant && depotVariant.purchasePrice) {
+              priceToUse = parseFloat(depotVariant.purchasePrice);
             }
 
             // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
@@ -450,13 +464,13 @@ exports.updateVendorOrder = async (req, res, next) => {
               itemsToCreateData.push({
                 productId: parseInt(item.productId),
                 quantity: parseInt(item.quantity),
-                priceAtPurchase: parseFloat(product.price),
+                priceAtPurchase: priceToUse,
                 agencyId: parseInt(item.agencyId),
                 depotId: depotId,
                 depotVariantId: depotVariantId,
                 vendorOrderId: orderId // ensure vendorOrderId is set for createMany
               });
-              newTotalAmount += parseFloat(product.price) * parseInt(item.quantity);
+              newTotalAmount += priceToUse * parseInt(item.quantity);
             }
           }
 

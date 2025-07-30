@@ -26,6 +26,10 @@ const depotProductVariantSchema = z.object({
     requiredNumber,
     z.number().nonnegative({ message: "MRP must be a non-negative number" })
   ),
+  purchasePrice: z.preprocess(
+    optionalNumber,
+    z.number().nonnegative().nullable()
+  ).optional(),
 
   minimumQty: z.preprocess(
     requiredNumber,
@@ -186,6 +190,7 @@ module.exports = {
           price15Day: true,
           price1Month: true,
           buyOncePrice: true,
+          purchasePrice: true,
           depot: { select: { id: true, name: true } },
         },
         orderBy: { name: "asc" },

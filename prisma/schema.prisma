@@ -410,6 +410,7 @@ model Subscription {
   paymentDate             DateTime?
   paymentStatus           PaymentStatus           @default(PENDING)
   agencyId                Int?
+  deliveryInstructions    String?                 @db.Text
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
   payableamt              Float                   @default(0)
@@ -617,6 +618,7 @@ model DepotProductVariant {
   price3Day               Decimal?                @db.Decimal(10, 2)
   price7Day               Decimal?                @db.Decimal(10, 2)
   mrp                     Decimal                 @default(0.00) @db.Decimal(10, 2)
+  purchasePrice           Decimal?                @db.Decimal(10, 2)
   PurchaseDetail          PurchaseDetail[]
   StockLedger             StockLedger[]
   VariantStock            VariantStock[]

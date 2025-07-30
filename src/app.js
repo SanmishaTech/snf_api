@@ -173,11 +173,7 @@ app.use(
   roleGuard("ADMIN", "MEMBER"),
   subscriptionRoutes
 );
-app.use(
-  "/api/invoices",
-  authMiddleware,
-  invoiceRoutes
-);
+app.use("/api/invoices", authMiddleware, invoiceRoutes);
 app.use("/api/admin", adminRoutes); // Added for admin routes
 
 app.use(

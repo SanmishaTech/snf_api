@@ -92,6 +92,7 @@ const getAgencyDeliveriesByDate = async (req, res) => {
             id: true,
             period: true,
             deliverySchedule: true,
+            deliveryInstructions: true,
           },
         },
       },
