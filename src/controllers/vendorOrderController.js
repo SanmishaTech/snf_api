@@ -1183,8 +1183,6 @@ exports.getMyAgencyOrders = async (req, res, next) => {
               select: { 
                 id: true, 
                 name: true, 
-                price: true, 
-                unit: true, 
                 description: true 
               } 
             },

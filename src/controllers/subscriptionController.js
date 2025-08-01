@@ -243,7 +243,8 @@ const createSubscription = asyncHandler(async (req, res) => {
   }
 
   const totalQty = deliveryScheduleDetails.reduce((sum, item) => sum + item.quantity, 0);
-  const amount = totalQty * product.rate;
+  // TODO: Calculate amount based on depot variant pricing or other logic
+  const amount = 0; // Default to 0, should be calculated based on actual pricing logic
 
   // --- New Wallet Logic ---
   const walletBalance = member.walletBalance; // Wallet was included in the member query
@@ -304,7 +305,7 @@ const createSubscription = asyncHandler(async (req, res) => {
         weekdays: dbDeliveryScheduleEnum === 'WEEKDAYS' ? JSON.stringify(weekdays) : null,
         qty: parsedQty,
         altQty: parsedAltQty,
-        rate: product.rate,
+        // rate field removed - product.rate doesn't exist
         totalQty,
         amount,
         walletamt,
@@ -687,11 +688,11 @@ const updateSubscription = asyncHandler(async (req, res) => {
       res.status(404);
       throw new Error('Product associated with subscription not found for rate calculation');
     }
-    updateData.rate = product.rate;
+    // rate field removed - product.rate doesn't exist
     // Add robust logic here to recalculate totalQty based on potentially changed qty, altQty, schedule, period
     // For instance, if only qty changes for a DAILY schedule:
     // updateData.totalQty = qty * subscription.period; // Or remaining period if that's the intent
-    // updateData.amount = updateData.totalQty * product.rate;
+    // updateData.amount = updateData.totalQty * [pricing logic needed];
     // The original logic for daysRemaining and recalculating totalQty was complex and might be needed if schedules change.
     // For now, this is a placeholder if qty changes.
   }
@@ -834,9 +835,9 @@ const renewSubscription = asyncHandler(async (req, res) => {
       weekdays: subscription.weekdays,
       qty: subscription.qty,
       altQty: subscription.altQty,
-      rate: subscription.product.rate, // Use current product rate
+      // rate field removed - product.rate doesn't exist
       totalQty: subscription.totalQty,
-      amount: subscription.totalQty * subscription.product.rate,
+      amount: 0, // TODO: Calculate amount based on actual pricing logic
       paymentMode: subscription.paymentMode,
       paymentReferenceNo: req.body.paymentReferenceNo || null,
       paymentDate: new Date(),
