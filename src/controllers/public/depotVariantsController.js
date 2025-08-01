@@ -56,8 +56,7 @@ const getPublicDepotVariantsByProduct = asyncHandler(async (req, res) => {
         product: {
           select: {
             id: true,
-            name: true,
-            unit: true
+            name: true
           }
         }
       },
@@ -151,7 +150,6 @@ const getAllPublicDepotVariants = asyncHandler(async (req, res) => {
           select: {
             id: true,
             name: true,
-            unit: true,
             isDairyProduct: true
           }
         }
@@ -275,7 +273,6 @@ const getPublicDepotVariantsByDepot = asyncHandler(async (req, res) => {
           select: {
             id: true,
             name: true,
-            unit: true,
             isDairyProduct: true
           }
         }
