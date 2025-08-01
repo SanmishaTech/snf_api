@@ -154,7 +154,6 @@ if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
           select: {
             id: true,
             name: true,
-            unit: true,
           }
         },
       }
