@@ -24,6 +24,9 @@ const productSchema = z.object({
     (val) => (val ? parseInt(String(val), 10) : null),
     z.number().int().positive().nullable().optional()
   ), // Changed to categoryId
+  // Legacy fields - marked as optional to prevent validation errors
+  price: z.number().optional(),
+  rate: z.number().optional(),
 });
 
 /**
