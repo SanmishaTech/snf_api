@@ -63,7 +63,6 @@ const getAgencyDeliveriesByDate = async (req, res) => {
           select: {
             id: true,
             name: true,
-            unit: true,
           },
         },
         member: {
@@ -172,7 +171,6 @@ const updateDeliveryStatus = async (req, res) => {
           select: {
             id: true,
             name: true,
-            unit: true,
           },
         },
         member: {

@@ -17,21 +17,6 @@ const express = require("express");
  *           nullable: true
  *           description: A URL related to the product (e.g., manufacturer's page).
  *           example: "https://example.com/organic-apples"
- *         price:
- *           type: number
- *           format: float
- *           description: Price of the product. Controller expects string, converts to float.
- *           example: 2.99
- *         rate:
- *           type: number
- *           format: float
- *           description: Rate of the product (e.g., price per unit/kg). Controller expects string, converts to float.
- *           example: 2.99
- *         unit:
- *           type: string
- *           nullable: true
- *           description: Unit of measurement (e.g., kg, piece, pack).
- *           example: "kg"
  *         description:
  *           type: string
  *           nullable: true
@@ -63,9 +48,6 @@ const express = require("express");
  *           type: integer
  *         name:
  *           type: string
- *         rate:
- *           type: number
- *           format: float
  *         attachmentUrl:
  *           type: string
  *           format: url
@@ -73,9 +55,6 @@ const express = require("express");
  *         url:
  *           type: string
  *           format: url
- *           nullable: true
- *         unit:
- *           type: string
  *           nullable: true
  *     ProductListResponse:
  *       type: object
@@ -161,8 +140,6 @@ router.get("/public", allowPublic(), getPublicProducts);
  *             type: object
  *             required:
  *               - name
- *               - price
- *               - rate
  *             properties:
  *               name:
  *                 type: string
@@ -172,16 +149,6 @@ router.get("/public", allowPublic(), getPublicProducts);
  *                 format: url
  *                 nullable: true
  *                 description: A URL related to the product.
- *               price:
- *                 type: string # Controller expects string, converts to float
- *                 description: Price of the product.
- *               rate:
- *                 type: string # Controller expects string, converts to float
- *                 description: Rate of the product (e.g., price per unit/kg).
- *               unit:
- *                 type: string
- *                 nullable: true
- *                 description: Unit of measurement.
  *               description:
  *                 type: string
  *                 nullable: true
@@ -241,7 +208,7 @@ router.post(
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [name, url, price, unit, rate, createdAt, updatedAt]
+ *           enum: [name, url, createdAt, updatedAt]
  *           default: createdAt
  *         description: Field to sort by.
  *       - in: query
@@ -335,16 +302,7 @@ router.get("/:id", getProductById); // Note: authMiddleware is not on this route
  *                 format: url
  *                 nullable: true
  *                 description: A URL related to the product.
- *               price:
- *                 type: string # Controller expects string, converts to float
- *                 description: Price of the product.
- *               rate:
- *                 type: string # Controller expects string, converts to float
- *                 description: Rate of the product (e.g., price per unit/kg).
- *               unit:
- *                 type: string
- *                 nullable: true
- *                 description: Unit of measurement.
+
  *               description:
  *                 type: string
  *                 nullable: true

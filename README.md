@@ -91,7 +91,7 @@ A simple Node.js REST API project built with Express, Prisma, and JWT.
 
 ## API Documentation
 
-API documentation is available at `http://https://www.indraai.in/api-docs` when the server is running. off
+API documentation is available at `http://https://www.indraai.inn/api-docs` when the server is running. off
 
 ## Environment Variables
 

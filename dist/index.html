@@ -2,16 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/assets/indaai-D61rx8S1.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
     <title>Loading ...</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=Fira+Sans:wght@400;500&family=Playfair+Display:wght@400;500;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-UZrw_keG.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BNfKTWQc.css">
+    <script type="module" crossorigin src="/assets/index-BHtQjZNy.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C_k-du4s.css">
   </head>
   <body>
+    <script>
+      // Force light mode on mobile devices before React loads
+      (function() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase()) ||
+          ('ontouchstart' in window) ||
+          (navigator.maxTouchPoints > 0) ||
+          (window.matchMedia('(pointer: coarse)').matches) ||
+          (window.matchMedia('(hover: none)').matches) ||
+          (window.innerWidth <= 768);
+        
+        if (isMobile) {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+          document.documentElement.style.colorScheme = 'light';
+          localStorage.setItem('theme', 'light');
+        }
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

@@ -8,7 +8,6 @@ const transformOrderItems = (items) => {
     ...item,
     productId: item.product.id, // Ensure productId is the direct ID
     productName: item.product.name,
-    unit: item.product.unit,
     // Remove the nested product object to avoid redundancy if not needed further by frontend for this specific view
     // product: undefined, // Or selectively pick fields if the full product object is sometimes needed
   }));
@@ -134,10 +133,12 @@ exports.createVendorOrder = async (req, res, next) => {
       depotVariantId = parseInt(item.depotVariantId);
     }
 
-    // Use depot variant purchasePrice if available, otherwise fall back to product price
-    let priceToUse = parseFloat(product.price);
+    // Use depot variant purchasePrice if available, otherwise use priceAtPurchase from request or default to 0
+    let priceToUse = 0;
     if (depotVariant && depotVariant.purchasePrice) {
       priceToUse = parseFloat(depotVariant.purchasePrice);
+    } else if (item.priceAtPurchase) {
+      priceToUse = parseFloat(item.priceAtPurchase);
     }
 
     itemsToCreate.push({
@@ -453,10 +454,12 @@ exports.updateVendorOrder = async (req, res, next) => {
               depotVariantId = parseInt(item.depotVariantId);
             }
 
-            // Use depot variant purchasePrice if available, otherwise fall back to product price
-            let priceToUse = parseFloat(product.price);
+            // Use depot variant purchasePrice if available, otherwise use priceAtPurchase from request or default to 0
+            let priceToUse = 0;
             if (depotVariant && depotVariant.purchasePrice) {
               priceToUse = parseFloat(depotVariant.purchasePrice);
+            } else if (item.priceAtPurchase) {
+              priceToUse = parseFloat(item.priceAtPurchase);
             }
 
             // Only add item if quantity > 0, effectively allowing removal by setting quantity to 0
@@ -1180,8 +1183,6 @@ exports.getMyAgencyOrders = async (req, res, next) => {
               select: { 
                 id: true, 
                 name: true, 
-                price: true, 
-                unit: true, 
                 description: true 
               } 
             },
@@ -1338,9 +1339,6 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
       dpv.price1Month AS variantPrice1Month,
       p.id AS productId,
       p.name AS productName,
-      p.unit AS productUnit,
-      p.price AS productPrice,
-      p.rate AS productRate,
       p.isDairyProduct,
       cat.name AS categoryName,
       AVG(s.rate) AS avgSubscriptionRate,
@@ -1467,9 +1465,6 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
         product: {
           id: item.productId,
           name: item.productName,
-          unit: item.productUnit,
-          price: item.productPrice ? parseFloat(item.productPrice) : null,
-          rate: item.productRate ? parseFloat(item.productRate) : null,
           isDairyProduct: item.isDairyProduct,
           category: item.categoryName
         },
