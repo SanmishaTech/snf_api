@@ -117,7 +117,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('User not authenticated');
   }
-if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
+  if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
     res.status(400);
     throw new Error('Subscriptions array is required and cannot be empty.');
   }
@@ -248,7 +248,7 @@ if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
 
       // Create subscriptions with distributed wallet amounts
       const createdSubscriptions = [];
-      
+
       for (let i = 0; i < processedSubscriptions.length; i++) {
         const subData = processedSubscriptions[i];
         const walletShare = walletCalculation.subscriptionWalletShares[i];
@@ -291,7 +291,7 @@ if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
         const newSubscription = await tx.subscription.create({
           data: subscriptionDbData,
         });
-        
+
         createdSubscriptions.push(newSubscription);
 
         // Prepare delivery schedule entries for this subscription
@@ -462,18 +462,18 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
   // The frontend creates dates like "2025-07-31T18:30:00.000Z" when user selects Aug 1 in IST
   // This happens because frontend creates midnight local time, then converts to UTC
   // We need to determine the user's intended calendar date
-  
+
   const sDate = new Date(startDate);
-  
+
   // Simple approach: Add 12 hours to the received timestamp to account for timezone differences
   // This ensures we get the correct calendar date that the user intended
   const adjustedDate = new Date(sDate.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
-  
+
   const year = adjustedDate.getUTCFullYear();
-  const month = adjustedDate.getUTCMonth(); 
+  const month = adjustedDate.getUTCMonth();
   const day = adjustedDate.getUTCDate();
   const startDateOnly = new Date(year, month, day);
-  
+
   console.log(`[Date Processing] Frontend sent: ${startDate}`);
   console.log(`[Date Processing] Parsed as: ${sDate.toString()}`);
   console.log(`[Date Processing] Adjusted date (+12h): ${adjustedDate.toString()}`);
@@ -856,10 +856,285 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Cancel all subscriptions in an order
+// @route   PATCH /api/product-orders/:id/cancel-subscriptions
+// @access  Private
+const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+
+  if (!orderId) {
+    return res.status(400).json({ message: 'Order ID is required' });
+  }
+
+  // Get current user's member ID for authorization (if not admin)
+  let member;
+  if (req.user.role !== 'ADMIN') {
+    member = await prisma.member.findUnique({
+      where: { userId: req.user.id }
+    });
+
+    if (!member) {
+      res.status(400);
+      throw new Error('Member profile not found');
+    }
+  }
+
+  // Find the order and its subscriptions
+  const order = await prisma.productOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      subscriptions: {
+        include: {
+          product: true
+        }
+      },
+      member: {
+        include: {
+          user: true
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // Check authorization: user must own the order (if not admin)
+  if (req.user.role !== 'ADMIN' && order.memberId !== member.id) {
+    res.status(403);
+    throw new Error('Not authorized to cancel subscriptions in this order');
+  }
+
+  if (!order.subscriptions || order.subscriptions.length === 0) {
+    return res.status(400).json({ message: 'No subscriptions found in this order' });
+  }
+
+  // Check if any subscription in the order can be cancelled based on payment status
+  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', null];
+  const cancellableSubscriptions = order.subscriptions.filter(sub =>
+    allowedPaymentStatuses.includes(sub.paymentStatus)
+  );
+
+  if (cancellableSubscriptions.length === 0) {
+    return res.status(400).json({
+      message: 'No subscriptions in this order can be cancelled. Only subscriptions with unpaid, pending, failed, or cancelled payment status can be cancelled.'
+    });
+  }
+
+  // If some subscriptions can't be cancelled, inform the user
+  if (cancellableSubscriptions.length < order.subscriptions.length) {
+    const nonCancellableCount = order.subscriptions.length - cancellableSubscriptions.length;
+    console.warn(`${nonCancellableCount} subscription(s) in order ${order.orderNo} cannot be cancelled due to payment status`);
+  }
+
+  try {
+    // Cancel only the subscriptions that are allowed to be cancelled
+    const result = await prisma.$transaction(async (tx) => {
+      const cancellableSubscriptionIds = cancellableSubscriptions.map(sub => sub.id);
+
+      const updatedSubscriptions = await tx.subscription.updateMany({
+        where: {
+          id: { in: cancellableSubscriptionIds }
+        },
+        data: {
+          expiryDate: new Date(),
+          paymentStatus: 'CANCELLED',
+          updatedAt: new Date()
+        }
+      });
+
+      // Also update any pending delivery schedule entries for cancelled subscriptions
+      await tx.deliveryScheduleEntry.updateMany({
+        where: {
+          subscriptionId: { in: cancellableSubscriptionIds },
+          status: 'PENDING',
+          deliveryDate: {
+            gte: new Date() // Only future deliveries
+          }
+        },
+        data: {
+          status: 'CANCELLED',
+          updatedAt: new Date()
+        }
+      });
+
+      return updatedSubscriptions;
+    });
+
+    // Fetch the updated order to return
+    const updatedOrder = await prisma.productOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        subscriptions: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    const message = cancellableSubscriptions.length === order.subscriptions.length
+      ? `Successfully cancelled all ${result.count} subscription(s) in order ${order.orderNo}`
+      : `Successfully cancelled ${result.count} out of ${order.subscriptions.length} subscription(s) in order ${order.orderNo}. Some subscriptions could not be cancelled due to payment status.`;
+
+    res.status(200).json({
+      message,
+      order: updatedOrder,
+      cancelledCount: result.count,
+      totalSubscriptions: order.subscriptions.length
+    });
+
+  } catch (error) {
+    console.error('Error cancelling order subscriptions:', error);
+    res.status(500).json({
+      message: 'Failed to cancel order subscriptions. Please try again.'
+    });
+  }
+});
+
+// @desc    Assign agent to all subscriptions in an order
+// @route   PUT /api/product-orders/:id/assign-agent
+// @access  Private
+const assignAgentToOrder = asyncHandler(async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+  const { agencyId, deliveryInstructions } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ message: 'Order ID is required' });
+  }
+
+  // Get current user's member ID for authorization (if not admin)
+  let member;
+  if (req.user.role !== 'ADMIN') {
+    member = await prisma.member.findUnique({
+      where: { userId: req.user.id }
+    });
+
+    if (!member) {
+      res.status(400);
+      throw new Error('Member profile not found');
+    }
+  }
+
+  // Find the order and its subscriptions
+  const order = await prisma.productOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      subscriptions: {
+        include: {
+          product: true
+        }
+      },
+      member: {
+        include: {
+          user: true
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // Check authorization: user must own the order (if not admin)
+  if (req.user.role !== 'ADMIN' && order.memberId !== member.id) {
+    res.status(403);
+    throw new Error('Not authorized to modify this order');
+  }
+
+  if (!order.subscriptions || order.subscriptions.length === 0) {
+    return res.status(400).json({ message: 'No subscriptions found in this order' });
+  }
+
+  // Validate agency exists if agencyId is provided
+  if (agencyId) {
+    const agency = await prisma.agency.findUnique({
+      where: { id: parseInt(agencyId, 10) }
+    });
+
+    if (!agency) {
+      res.status(404);
+      throw new Error('Agency not found');
+    }
+  }
+
+  try {
+    // Update all subscriptions in the order with the same agent and delivery instructions
+    const result = await prisma.$transaction(async (tx) => {
+      const subscriptionIds = order.subscriptions.map(sub => sub.id);
+      
+      const updatedSubscriptions = await tx.subscription.updateMany({
+        where: {
+          id: { in: subscriptionIds }
+        },
+        data: {
+          agencyId: agencyId ? parseInt(agencyId, 10) : null,
+          deliveryInstructions: deliveryInstructions || null,
+          updatedAt: new Date()
+        }
+      });
+
+      // Also update delivery schedule entries if they exist
+      await tx.deliveryScheduleEntry.updateMany({
+        where: {
+          subscriptionId: { in: subscriptionIds }
+        },
+        data: {
+          agentId: agencyId ? parseInt(agencyId, 10) : null,
+          updatedAt: new Date()
+        }
+      });
+
+      return updatedSubscriptions;
+    });
+
+    // Fetch the updated order to return
+    const updatedOrder = await prisma.productOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        subscriptions: {
+          include: {
+            product: true,
+            agency: {
+              include: {
+                user: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const agencyName = agencyId ? 
+      (await prisma.agency.findUnique({ 
+        where: { id: parseInt(agencyId, 10) },
+        include: { user: true }
+      }))?.user?.name || 'Selected Agency' : 'Unassigned';
+
+    res.status(200).json({
+      message: `Successfully ${agencyId ? 'assigned' : 'unassigned'} agent ${agencyName} to ${result.count} subscription(s) in order ${order.orderNo}`,
+      order: updatedOrder,
+      updatedCount: result.count
+    });
+
+  } catch (error) {
+    console.error('Error assigning agent to order:', error);
+    res.status(500).json({ 
+      message: 'Failed to assign agent to order subscriptions. Please try again.'
+    });
+  }
+});
+
 module.exports = {
   createOrderWithSubscriptions,
   getAllProductOrders,
   getProductOrderById,
   updateProductOrder,
   updateProductOrderPayment,
+  cancelOrderSubscriptions,
+  assignAgentToOrder,
 };

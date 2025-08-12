@@ -74,6 +74,63 @@ const generateInvoiceNumber = async () => {
 };
 
 /**
+ * Generate financial year based SNF invoice number in format: SNF-YYNN-NNNNN
+ * Where YYNN is the financial year (e.g., 2526 for FY 2025-26)
+ * And NNNNN is the incrementing sequence number specific to SNF orders
+ * 
+ * @returns {Promise<string>} Generated SNF invoice number
+ */
+const generateSNFInvoiceNumber = async () => {
+  try {
+    // Get current financial year
+    const financialYear = getCurrentFinancialYear();
+    const prefix = `SNF-${financialYear}`;
+
+    // Use a transaction to ensure atomicity and prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Get the last SNF invoice number for this financial year
+      const lastInvoice = await tx.sNFOrder.findFirst({
+        where: {
+          invoiceNo: {
+            startsWith: `${prefix}-`
+          }
+        },
+        orderBy: {
+          invoiceNo: 'desc'
+        },
+        select: {
+          invoiceNo: true
+        }
+      });
+
+      let sequenceNumber = 1;
+
+      if (lastInvoice && lastInvoice.invoiceNo) {
+        // Extract sequence number from last invoice (SNF-YYNN-NNNNN)
+        const parts = lastInvoice.invoiceNo.split('-');
+        if (parts.length >= 3) {
+          const lastSequence = parts[2]; // Get the NNNNN part
+          sequenceNumber = parseInt(lastSequence, 10) + 1;
+        }
+      }
+
+      // Format sequence number with leading zeros (5 digits)
+      const formattedSequence = sequenceNumber.toString().padStart(5, '0');
+
+      // Generate final invoice number
+      const invoiceNumber = `${prefix}-${formattedSequence}`;
+
+      return invoiceNumber;
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error generating SNF invoice number:', error);
+    throw new Error('Failed to generate SNF invoice number');
+  }
+};
+
+/**
  * Get current financial year in YYNN format
  * Financial year runs from April 1st to March 31st
  * Examples:
@@ -141,6 +198,7 @@ const extractSequenceNumber = (invoiceNo) => {
 
 module.exports = {
   generateInvoiceNumber,
+  generateSNFInvoiceNumber,
   getCurrentFinancialYear,
   validateInvoiceNumber,
   extractFinancialYear,

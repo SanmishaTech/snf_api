@@ -16,6 +16,7 @@ const productSchema = z.object({
   name: z.string().min(1, { message: "Product name is required" }),
   url: z.string().url({ message: "Invalid URL format" }).optional().nullable(),
   description: z.string().optional().nullable(), // Added description field
+  tags: z.string().optional().nullable(), // Comma-separated tags
   isDairyProduct: z
     .string()
     .optional()
@@ -112,6 +113,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       name,
       url,
       description,
+      tags,
       isDairyProduct,
       categoryId,
       maintainStock,
@@ -122,6 +124,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       url,
       attachmentUrl,
       description,
+      tags,
       isDairyProduct,
       categoryId,
       maintainStock,
@@ -244,22 +247,187 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
  */
 const getPublicProducts = asyncHandler(async (req, res, next) => {
   try {
-    const products = await prisma.product.findMany({
-      take: 10, // Limit to 10 products for the landing page
-      orderBy: {
-        createdAt: "desc", // Get the latest products
-      },
-      select: {
-        id: true,
-        name: true,
-        attachmentUrl: true,
-        url: true, // Using 'url' as a proxy for image or product detail link
-      },
-    });
-    res.status(200).json(products);
+    const { depotId } = req.query;
+    
+    if (depotId) {
+      // If depotId is provided, get products with variants for the specified depot
+      const dId = parseInt(depotId, 10);
+      if (isNaN(dId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid depotId parameter",
+          timestamp: new Date(),
+        });
+      }
+      
+      // Get depot information
+      const depot = await prisma.depot.findUnique({
+        where: { id: dId },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          isOnline: true,
+        },
+      });
+      
+      if (!depot) {
+        return res.status(404).json({
+          success: false,
+          message: "Depot not found",
+          timestamp: new Date(),
+        });
+      }
+      
+      // Get products with variants for the depot
+      const productsWithVariants = await prisma.product.findMany({
+        where: {
+          depotProductVariants: {
+            some: {
+              depotId: dId,
+              notInStock: false,
+              isHidden: false,
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          attachmentUrl: true,
+          url: true,
+          isDairyProduct: true,
+          maintainStock: true,
+          categoryId: true,
+          tags: true,
+          createdAt: true,
+          updatedAt: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              isDairy: true,
+              imageUrl: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          depotProductVariants: {
+            where: {
+              depotId: dId,
+              notInStock: false,
+              isHidden: false,
+            },
+            select: {
+              id: true,
+              name: true,
+              hsnCode: true,
+              mrp: true,
+              buyOncePrice: true,
+              price3Day: true,
+              price7Day: true,
+              price15Day: true,
+              price1Month: true,
+              minimumQty: true,
+              closingQty: true,
+              notInStock: true,
+              isHidden: true,
+            },
+            orderBy: {
+              name: "asc",
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 50, // Increase limit for depot-specific queries
+      });
+      
+      // Transform the data to match the expected Product interface
+      const transformedProducts = productsWithVariants.map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        attachmentUrl: product.attachmentUrl,
+        url: product.url,
+        isDairyProduct: product.isDairyProduct,
+        maintainStock: product.maintainStock,
+        categoryId: product.categoryId,
+        tags: product.tags,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+        category: product.category,
+        variants: product.depotProductVariants.map((variant) => ({
+          id: variant.id,
+          name: variant.name,
+          hsnCode: variant.hsnCode,
+          mrp: parseFloat(variant.mrp),
+          buyOncePrice: variant.buyOncePrice ? parseFloat(variant.buyOncePrice) : parseFloat(variant.mrp),
+          price3Day: variant.price3Day ? parseFloat(variant.price3Day) : null,
+          price7Day: variant.price7Day ? parseFloat(variant.price7Day) : null,
+          price15Day: variant.price15Day ? parseFloat(variant.price15Day) : null,
+          price1Month: variant.price1Month ? parseFloat(variant.price1Month) : null,
+          minimumQty: variant.minimumQty,
+          closingQty: variant.closingQty,
+          notInStock: variant.notInStock,
+          isHidden: variant.isHidden,
+          unit: variant.name.includes('500ml') ? '500ml' : variant.name.includes('1L') ? '1L' : 'unit',
+          isAvailable: !variant.notInStock && !variant.isHidden,
+        })),
+      }));
+      
+      // Return in the format expected by the frontend
+      res.status(200).json({
+        success: true,
+        data: transformedProducts,
+        timestamp: new Date(),
+      });
+    } else {
+      // If no depotId, return general products (original behavior)
+      const products = await prisma.product.findMany({
+        take: 10, // Limit to 10 products for the landing page
+        orderBy: {
+          createdAt: "desc", // Get the latest products
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          attachmentUrl: true,
+          url: true,
+          isDairyProduct: true,
+          maintainStock: true,
+          categoryId: true,
+          tags: true,
+          createdAt: true,
+          updatedAt: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              isDairy: true,
+              imageUrl: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+      
+      res.status(200).json({
+        success: true,
+        data: products,
+        timestamp: new Date(),
+      });
+    }
   } catch (error) {
     console.error("Error fetching public products:", error);
-    next(createError(500, "Failed to fetch products for public display"));
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch products for public display",
+      timestamp: new Date(),
+    });
   }
 });
 
@@ -330,6 +498,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       name,
       url,
       description,
+      tags,
       isDairyProduct,
       categoryId,
       maintainStock,
@@ -339,6 +508,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       name,
       url,
       description,
+      tags,
       isDairyProduct,
       categoryId,
       maintainStock,
@@ -595,10 +765,156 @@ const getDepotVariantPricing = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * @desc    Get all products with their variants for a specific depot (Public API)
+ * @route   GET /api/products/public
+ * @access  Public
+ */
+const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
+  try {
+    const { depotId } = req.query;
+    
+    if (!depotId) {
+      return res.status(400).json({
+        success: false,
+        message: "depotId parameter is required",
+      });
+    }
+    
+    const dId = parseInt(depotId, 10);
+    if (isNaN(dId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid depotId parameter",
+      });
+    }
+    
+    // First, get the depot information
+    const depot = await prisma.depot.findUnique({
+      where: { id: dId },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        isOnline: true,
+      },
+    });
+    
+    if (!depot) {
+      return res.status(404).json({
+        success: false,
+        message: "Depot not found",
+      });
+    }
+    
+    // Get products for the depot. Do NOT require variants to exist so that
+    // non-dairy or not-yet-varianted products are included in the listing.
+    const productsWithVariants = await prisma.product.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        attachmentUrl: true,
+        url: true,
+        isDairyProduct: true,
+        maintainStock: true,
+        categoryId: true,
+        createdAt: true,
+        updatedAt: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            isDairy: true,
+            imageUrl: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        depotProductVariants: {
+          where: {
+            depotId: dId,
+            notInStock: false,
+            isHidden: false,
+          },
+          select: {
+            id: true,
+            name: true,
+            hsnCode: true,
+            mrp: true,
+            buyOncePrice: true,
+            price3Day: true,
+            price7Day: true,
+            price15Day: true,
+            price1Month: true,
+            minimumQty: true,
+            closingQty: true,
+            notInStock: true,
+            isHidden: true,
+          },
+          orderBy: {
+            name: "asc",
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    
+    // Transform the data to match the desired response structure
+    const transformedProducts = productsWithVariants.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      attachmentUrl: product.attachmentUrl,
+      url: product.url,
+      isDairyProduct: product.isDairyProduct,
+      maintainStock: product.maintainStock,
+      categoryId: product.categoryId,
+      category: product.category,
+      tags: product.tags,
+      variants: product.depotProductVariants.map((variant) => ({
+        id: variant.id,
+        name: variant.name,
+        hsnCode: variant.hsnCode,
+        mrp: parseFloat(variant.mrp),
+        buyOncePrice: variant.buyOncePrice ? parseFloat(variant.buyOncePrice) : parseFloat(variant.mrp),
+        price3Day: variant.price3Day ? parseFloat(variant.price3Day) : null,
+        price7Day: variant.price7Day ? parseFloat(variant.price7Day) : null,
+        price15Day: variant.price15Day ? parseFloat(variant.price15Day) : null,
+        price1Month: variant.price1Month ? parseFloat(variant.price1Month) : null,
+        minimumQty: variant.minimumQty,
+        closingQty: variant.closingQty,
+        notInStock: variant.notInStock,
+        isHidden: variant.isHidden,
+        unit: variant.name.includes('500ml') ? '500ml' : variant.name.includes('1L') ? '1L' : 'unit',
+        isAvailable: !variant.notInStock && !variant.isHidden,
+      })),
+    }));
+    
+    // Calculate total number of variants across all products
+    const totalVariants = transformedProducts.reduce((sum, product) => sum + product.variants.length, 0);
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        depot,
+        products: transformedProducts,
+      },
+      total: totalVariants,
+    });
+  } catch (error) {
+    console.error("Error fetching public products with variants:", error);
+    next(createError(500, "Failed to fetch products with variants for public display"));
+  }
+});
+
 module.exports = {
   createProduct,
   getAllProducts,
   getPublicProducts,
+  getPublicProductsWithVariants,
   getProductById,
   updateProduct,
   deleteProduct,

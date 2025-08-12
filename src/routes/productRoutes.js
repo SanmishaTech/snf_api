@@ -85,7 +85,8 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
-  getPublicProducts, // Import the new controller function
+  getPublicProducts,
+  getPublicProductsWithVariants,
   bulkUpdateVariants,
   getDepotVariantPricing,
 } = require("../controllers/productController");
@@ -121,7 +122,7 @@ const productUploadMiddleware = createUploadMiddleware("products", [
  *       500:
  *         description: Internal server error.
  */
-router.get("/public", allowPublic(), getPublicProducts);
+router.get("/public", allowPublic(), getPublicProductsWithVariants);
 
 // POST /api/products - Create a new product
 /**

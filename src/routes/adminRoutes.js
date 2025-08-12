@@ -104,6 +104,17 @@ const {
   updateLocation,
   deleteLocation,
 } = require('../controllers/admin/locationController');
+const {
+  getAllSNFOrders,
+  getSNFOrderById,
+  markSNFOrderAsPaid,
+  updateSNFOrder,
+  generateSNFOrderInvoice,
+  downloadSNFOrderInvoice,
+} = require('../controllers/admin/snfOrderAdminController');
+
+// Import admin delivery routes
+const adminDeliveryRoutes = require('./adminDeliveryRoutes');
 const authMiddleware = require('../middleware/auth'); // Corrected path to auth middleware
 const createUploadMiddleware = require('../middleware/uploadMiddleware');
 
@@ -169,6 +180,40 @@ router.route('/banners/:id')
   .put(authMiddleware, ...bannerUploadMiddleware, updateBanner)
   .delete(authMiddleware, deleteBanner);
 
+// Public Categories Route (NO AUTHENTICATION)
+// Returns minimal public fields for categories
+router.get('/categories/public/AllCategories', async (req, res, next) => {
+  try {
+    const prisma = require('../config/db');
+    const categories = await prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+        isDairy: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // Standardized public response wrapper
+    res.status(200).json({
+      success: true,
+      data: categories,
+      message: 'Categories fetched successfully',
+      timestamp: new Date(),
+    });
+  } catch (err) {
+    console.error('Public categories fetch failed:', err);
+    res.status(500).json({
+      success: false,
+      data: [],
+      message: 'Failed to fetch categories',
+      error: err?.message || 'Internal Server Error',
+      timestamp: new Date(),
+    });
+  }
+});
+
 // Depot Product Variant Routes
 router.route('/depot-product-variants')
   .post(authMiddleware, createDepotProductVariant)
@@ -220,6 +265,21 @@ router.route('/locations/:id')
   .put(authMiddleware, updateLocation)
   .delete(authMiddleware, deleteLocation);
 
+// SNF Orders (Admin)
+router.route('/snf-orders')
+  .get(authMiddleware, getAllSNFOrders);
+
+router.route('/snf-orders/:id')
+  .get(authMiddleware, getSNFOrderById)
+  .patch(authMiddleware, updateSNFOrder);
+
+// Explicit mark-paid endpoint (preferred if available)
+router.patch('/snf-orders/:id/mark-paid', authMiddleware, markSNFOrderAsPaid);
+
+// Invoice generation and download for SNF orders
+router.post('/snf-orders/:id/generate-invoice', authMiddleware, generateSNFOrderInvoice);
+router.get('/snf-orders/:id/download-invoice', authMiddleware, downloadSNFOrderInvoice);
+
 // Admin Delivery Address Routes
 router.route('/delivery-addresses')
   .get(authMiddleware, getAdminDeliveryAddresses)
@@ -231,5 +291,8 @@ router.route('/delivery-addresses/:id')
   .delete(authMiddleware, deleteAdminDeliveryAddress);
 
 router.patch('/delivery-addresses/:id/set-default', authMiddleware, setAdminDefaultAddress);
+
+// Admin Delivery Management Routes
+router.use('/deliveries', adminDeliveryRoutes);
 
 module.exports = router;

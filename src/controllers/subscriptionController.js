@@ -3,6 +3,7 @@ const { PrismaClient, TransactionStatus, TransactionType } = require('@prisma/cl
 const prisma = new PrismaClient();
 const { isAfter, startOfDay } = require('date-fns');
 const { createInvoiceForOrder } = require('../services/invoiceService');
+const walletService = require('../services/walletService');
 
 // Helper function to get day key from day index (0 for Sunday, 1 for Monday, etc.)
 const getDayKey = (dayIndex) => {
@@ -243,8 +244,72 @@ const createSubscription = asyncHandler(async (req, res) => {
   }
 
   const totalQty = deliveryScheduleDetails.reduce((sum, item) => sum + item.quantity, 0);
-  // TODO: Calculate amount based on depot variant pricing or other logic
-  const amount = 0; // Default to 0, should be calculated based on actual pricing logic
+  
+  // Calculate amount based on depot variant pricing and subscription period
+  let unitPrice = 0;
+  let amount = 0;
+  let depotProductVariantId; // Store depot variant ID for later use
+  
+  if (parsedDeliveryAddressId) {
+    // For home delivery subscriptions, fetch depot product variant pricing
+    try {
+      // First, get the delivery address to find the pincode
+      const deliveryAddress = await prisma.deliveryAddress.findUnique({
+        where: { id: parsedDeliveryAddressId }
+      });
+      
+      if (deliveryAddress) {
+        // Find depot product variant based on pincode area mapping
+        const depotProductVariant = await prisma.depotProductVariant.findFirst({
+          where: {
+            productId: parsedProductId,
+            depot: {
+              areas: {
+                some: {
+                  pincodes: {
+                    contains: deliveryAddress.pincode
+                  }
+                }
+              }
+            }
+          }
+        });
+        
+        if (depotProductVariant) {
+          // Determine unit price based on subscription period
+          switch (parsedPeriod) {
+            case 1:
+              unitPrice = parseFloat(depotProductVariant.buyOncePrice) || 0;
+              break;
+            case 3:
+              unitPrice = parseFloat(depotProductVariant.price3Day) || 0;
+              break;
+            case 7:
+              unitPrice = parseFloat(depotProductVariant.price7Day) || 0;
+              break;
+            case 15:
+              unitPrice = parseFloat(depotProductVariant.price15Day) || 0;
+              break;
+            case 30:
+              unitPrice = parseFloat(depotProductVariant.price1Month) || 0;
+              break;
+            default:
+              // For other periods, use MRP or buyOncePrice as fallback
+              unitPrice = parseFloat(depotProductVariant.mrp) || parseFloat(depotProductVariant.buyOncePrice) || 0;
+          }
+          
+          // Store the depot variant ID to be used in subscription creation
+          depotProductVariantId = depotProductVariant.id;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching depot product variant for pricing:', error);
+      // Continue with amount = 0 if pricing lookup fails
+    }
+  }
+  
+  // Calculate total amount: unit price * total quantity
+  amount = unitPrice * totalQty;
 
   // --- New Wallet Logic ---
   const walletBalance = member.walletBalance; // Wallet was included in the member query
@@ -305,7 +370,7 @@ const createSubscription = asyncHandler(async (req, res) => {
         weekdays: dbDeliveryScheduleEnum === 'WEEKDAYS' ? JSON.stringify(weekdays) : null,
         qty: parsedQty,
         altQty: parsedAltQty,
-        // rate field removed - product.rate doesn't exist
+        rate: unitPrice, // Store the unit price in the rate field
         totalQty,
         amount,
         walletamt,
@@ -314,6 +379,11 @@ const createSubscription = asyncHandler(async (req, res) => {
         paymentStatus: paymentStatus,
         deliveryInstructions,
       };
+      
+      // Connect depot product variant if found
+      if (typeof depotProductVariantId !== 'undefined' && depotProductVariantId) {
+        subscriptionData.depotProductVariant = { connect: { id: depotProductVariantId } };
+      }
       
       console.log('[DEBUG] subscriptionData being saved:', JSON.stringify(subscriptionData, null, 2));
 
@@ -759,13 +829,21 @@ const cancelSubscription = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to cancel this subscription');
   }
 
-  // Set expiry date to now to effectively cancel the subscription
+  // Check if subscription can be cancelled based on payment status
+  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', null];
+  if (!allowedPaymentStatuses.includes(subscription.paymentStatus)) {
+    res.status(400);
+    throw new Error('Only subscriptions with unpaid, pending, failed, or cancelled payment status can be cancelled');
+  }
+
+  // Set expiry date to now and update payment status to cancelled
   const updatedSubscription = await prisma.subscription.update({
     where: {
       id: parseInt(req.params.id)
     },
     data: {
       expiryDate: new Date(),
+      paymentStatus: 'CANCELLED',
       updatedAt: new Date()
     }
   });
@@ -1004,14 +1082,20 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
     include: {
       subscription: {
         select: { // Select only necessary fields from subscription
+          id: true,
           memberId: true,
+          rate: true, // Include rate for refund calculation
+          qty: true,
           member: { // To verify ownership via user ID
-            select: { userId: true }
+            select: { 
+              userId: true,
+              walletBalance: true
+            }
           }
         }
       },
-      product: { // Include product directly to get its price
-        select: { id: true, price: true, name: true, unit: true, rate:true } // Ensure price is selected
+      product: { // Include product for basic info
+        select: { id: true, name: true } // Only select fields that exist
       }
     },
   });
@@ -1042,71 +1126,59 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
   }
 
   let updatedDeliveryEntryResult;
+  let walletTransaction = null;
   let refundMessage = '';
   let finalMessage = 'Delivery skipped successfully.';
 
   try {
     await prisma.$transaction(async (tx) => {
-      // 1. Update Delivery Schedule Entry status
+      // 1. Update Delivery Schedule Entry status to SKIP_BY_CUSTOMER
       updatedDeliveryEntryResult = await tx.deliveryScheduleEntry.update({
         where: { id: entryId },
         data: {
-          status: 'SKIPPED', // Using 'SKIPPED' as per previous logs, adjust if SKIPPED_BY_MEMBER is preferred and an enum value
+          status: 'SKIP_BY_CUSTOMER', // Use proper status for customer-initiated skip
           updatedAt: new Date(),
         },
-        include: { // Keep the include for the response, but product details are already in deliveryEntry
+        include: { // Keep the include for the response
           product: {
-            select: { name: true, unit: true }
+            select: { name: true }
+          },
+          subscription: {
+            select: {
+              id: true,
+              rate: true,
+              memberId: true
+            }
           }
         }
       });
       console.log('Updated Delivery Entry in backend:', updatedDeliveryEntryResult);
 
-      // 2. Process Refund
-
-      const productPrice = deliveryEntry.product?.rate; // Price from the initially fetched deliveryEntry
-      const deliveryQuantity = deliveryEntry.quantity;
-      const memberIdForWallet = deliveryEntry.subscription.memberId;
-
-      if (typeof productPrice !== 'number' || productPrice < 0) {
-        console.warn(`Product price not found or invalid for productId: ${deliveryEntry.productId}. Cannot process refund.`);
-        refundMessage = ' Product details for refund are missing or invalid.';
-        // Do not throw error here, skip was successful.
+      // 2. Process Refund - Calculate refund amount and credit to wallet
+      const refundAmount = walletService.calculateRefundAmount({
+        subscription: { rate: deliveryEntry.subscription.rate },
+        quantity: deliveryEntry.quantity
+      });
+      
+      console.log(`Calculated refund amount: ${refundAmount} for delivery entry ${entryId}`);
+      
+      if (refundAmount > 0) {
+        const referenceNumber = `SKIP_DELIVERY_${entryId}`;
+        const notes = `Refund for skipped delivery - ${deliveryEntry.product?.name || 'Product'} on ${new Date(deliveryEntry.deliveryDate).toLocaleDateString()}`;
+        
+        walletTransaction = await walletService.creditWallet(
+          deliveryEntry.subscription.memberId,
+          refundAmount,
+          referenceNumber,
+          notes,
+          null // No admin ID for member-initiated skip
+        );
+        
+        refundMessage = ` Refund of ₹${refundAmount.toFixed(2)} has been credited to your wallet.`;
+        console.log(`Wallet credited successfully for member ${deliveryEntry.subscription.memberId}: ₹${refundAmount}`);
       } else {
-        const refundAmount = productPrice * deliveryQuantity;
-
-        if (refundAmount > 0) {
-          if (!memberIdForWallet) {
-            console.warn('Member ID not found on delivery entry subscription, cannot process refund.');
-            refundMessage = ' Member information for refund is missing.';
-          } else {
-            // Create WalletTransaction credit
-            await tx.walletTransaction.create({
-              data: {
-                memberId: memberIdForWallet,
-                type: TransactionType.CREDIT,
-                amount: refundAmount,
-                status: TransactionStatus.PAID,
-                paymentMethod: 'TOPUP',
-                notes: `Refund for skipped delivery (Entry ID: ${entryId})`,
-                processedByAdminId: null,
-              },
-            });
-
-            // Update member wallet balance
-            await tx.member.update({
-              where: { id: memberIdForWallet },
-              data: {
-                walletBalance: { increment: refundAmount },
-              },
-            });
-            refundMessage = ` ₹${refundAmount.toFixed(2)} has been refunded to your wallet.`;
-            console.log(`Refund of ${refundAmount.toFixed(2)} processed for member ${memberIdForWallet}, delivery entry ${entryId}`);
-          }
-        } else {
-          refundMessage = ' No refund was applicable for this skipped delivery (amount is zero or less).';
-          console.log(`Refund amount is ${refundAmount} for delivery entry ${entryId}. No refund processed.`);
-        }
+        refundMessage = ' No refund applicable for this delivery.';
+        console.log('No refund amount calculated for this delivery skip.');
       }
     }); // End of Prisma transaction
 

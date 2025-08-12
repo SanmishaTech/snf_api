@@ -44,6 +44,7 @@ const {
 const publicDepotVariantRoutes = require("./routes/public/depotVariantsRoutes");
 const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
 const leadRoutes = require("./routes/leadRoutes");
+const snfOrderRoutes = require("./routes/snfOrderRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -65,7 +66,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "https://www.indraai.in/"];
+  : ["http://localhost:5173", "https://www.indraai.in"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -107,6 +108,7 @@ app.get("/api/public/locations", getPublicLocations);
 app.use("/api/public/depot-variants", publicDepotVariantRoutes);
 app.use("/api/public/area-masters", publicAreaMasterRoutes);
 app.use("/api/leads", leadRoutes);
+app.use("/api/snf-orders", snfOrderRoutes);
 app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);
@@ -174,6 +176,8 @@ app.use(
   subscriptionRoutes
 );
 app.use("/api/invoices", authMiddleware, invoiceRoutes);
+// Mount admin routes WITHOUT global auth so that any public endpoints defined inside (like /categories/public) remain public.
+// Individual admin endpoints already apply authMiddleware at the route level where needed.
 app.use("/api/admin", adminRoutes); // Added for admin routes
 
 app.use(

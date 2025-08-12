@@ -703,9 +703,6 @@ exports.recordDelivery = async (req, res, next) => {
           throw createError(404, `OrderItem with ID ${deliveryItem.orderItemId} not found in this order.`);
         }
 
-        if (deliveryItem.deliveredQuantity > orderItemToUpdate.quantity) {
-          throw createError(400, `Delivered quantity (${deliveryItem.deliveredQuantity}) for item ${orderItemToUpdate.productId} cannot exceed ordered quantity (${orderItemToUpdate.quantity}).`);
-        }
 
         await tx.orderItem.update({
           where: { id: parseInt(deliveryItem.orderItemId) },
@@ -831,9 +828,6 @@ exports.recordReceipt = async (req, res, next) => {
           throw createError(400, `Cannot record receipt for item ${orderItemToUpdate.productId} as it has no delivered quantity recorded.`);
         }
 
-        if (receiptItem.receivedQuantity > orderItemToUpdate.deliveredQuantity) {
-          throw createError(400, `Received quantity (${receiptItem.receivedQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed delivered quantity (${orderItemToUpdate.deliveredQuantity}).`);
-        }
 
         await tx.orderItem.update({
           where: { id: parseInt(receiptItem.orderItemId) },
@@ -933,14 +927,6 @@ exports.recordSupervisorQuantity = async (req, res, next) => {
           throw createError(404, `OrderItem with ID ${supervisorItem.orderItemId} not found in this order.`);
         }
 
-        // Supervisor quantity should not exceed delivered quantity (if available)
-        // If no delivered quantity is recorded, supervisor can record up to the ordered quantity
-        const maxAllowedQuantity = orderItemToUpdate.deliveredQuantity || orderItemToUpdate.quantity;
-
-        if (supervisorItem.supervisorQuantity > maxAllowedQuantity) {
-          const limitType = orderItemToUpdate.deliveredQuantity ? 'delivered' : 'ordered';
-          throw createError(400, `Supervisor quantity (${supervisorItem.supervisorQuantity}) for item ID ${orderItemToUpdate.id} cannot exceed ${limitType} quantity (${maxAllowedQuantity}).`);
-        }
 
         await tx.orderItem.update({
           where: { id: parseInt(supervisorItem.orderItemId) },

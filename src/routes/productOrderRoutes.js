@@ -7,6 +7,8 @@ const {
     getProductOrderById,
     updateProductOrder,
     updateProductOrderPayment,
+    cancelOrderSubscriptions,
+    assignAgentToOrder,
 } = require('../controllers/productOrderController');
 const { roleGuard } = require('../middleware/authorize');
 
@@ -45,6 +47,21 @@ router.put(
   authMiddleware,
   roleGuard('ADMIN'),
   updateProductOrderPayment
+);
+
+// Cancel all subscriptions in an order
+router.patch(
+  '/:id/cancel-subscriptions',
+  authMiddleware,
+  cancelOrderSubscriptions
+);
+
+// Assign agent to all subscriptions in an order
+router.put(
+  '/:id/assign-agent',
+  authMiddleware,
+  roleGuard('ADMIN', 'SUPERVISOR'),
+  assignAgentToOrder
 );
 
 module.exports = router;
