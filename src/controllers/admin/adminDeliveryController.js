@@ -117,10 +117,10 @@ const updateDeliveryStatus = async (req, res) => {
         console.log(`Admin ${req.user.name} marked delivery ${id} as INDRAAI_DELIVERY`);
         break;
 
-      case 'DELIVER_TO_AGENT':
+      case 'TRANSFER_TO_AGENT':
         // Special handling for agent delivery
         // Could include agent assignment, notifications, etc.
-        console.log(`Admin ${req.user.name} marked delivery ${id} as DELIVER_TO_AGENT`);
+        console.log(`Admin ${req.user.name} marked delivery ${id} as TRANSFER_TO_AGENT`);
         break;
 
       default:

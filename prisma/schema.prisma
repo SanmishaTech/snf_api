@@ -864,7 +864,7 @@ enum DeliveryStatus {
   SKIPPED
   SKIP_BY_CUSTOMER
   INDRAAI_DELIVERY
-  DELIVER_TO_AGENT
+  TRANSFER_TO_AGENT
 }
 
 enum TransactionType {

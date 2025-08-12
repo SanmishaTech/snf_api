@@ -15,7 +15,7 @@ const adminDeliveryController = require('../controllers/admin/adminDeliveryContr
  *       properties:
  *         status:
  *           type: string
- *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, DELIVER_TO_AGENT]
+ *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, TRANSFER_TO_AGENT]
  *           description: New delivery status
  *         notes:
  *           type: string
@@ -34,7 +34,7 @@ const adminDeliveryController = require('../controllers/admin/adminDeliveryContr
  *           type: integer
  *         status:
  *           type: string
- *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, DELIVER_TO_AGENT]
+ *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, TRANSFER_TO_AGENT]
  *         walletTransaction:
  *           type: object
  *           nullable: true
@@ -141,7 +141,7 @@ router.patch('/:id/status', auth, isAdmin, adminDeliveryController.updateDeliver
  *         name: status
  *         schema:
  *           type: string
- *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, DELIVER_TO_AGENT]
+ *           enum: [PENDING, DELIVERED, NOT_DELIVERED, CANCELLED, SKIPPED, SKIP_BY_CUSTOMER, INDRAAI_DELIVERY, TRANSFER_TO_AGENT]
  *         description: Filter by delivery status
  *       - in: query
  *         name: memberId

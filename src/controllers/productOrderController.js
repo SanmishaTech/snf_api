@@ -564,7 +564,15 @@ function getConsistentAgentId(processedSubscriptions) {
   return uniqueAgentIds.length === 1 ? uniqueAgentIds[0] : null;
 }
 const getAllProductOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, search = '', paymentStatus = '', supervisorAgencyId = '' } = req.query;
+  const { 
+    page = 1, 
+    limit = 10, 
+    search = '', 
+    paymentStatus = '', 
+    supervisorAgencyId = '',
+    unassignedOnly = '',
+    expiryStatus = 'NOT_EXPIRED'
+  } = req.query;
 
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
@@ -576,22 +584,62 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     where.paymentStatus = paymentStatus;
   }
 
+  // Build subscription filters
+  const subscriptionWhere = {};
+  
   // Add supervisor filtering - only show orders with subscriptions assigned to supervisor's agency
-  if (supervisorAgencyId) {
-    where.subscriptions = {
-      some: {
-        agencyId: parseInt(supervisorAgencyId, 10)
-      }
-    };
+  if (supervisorAgencyId && unassignedOnly !== 'true') {
+    subscriptionWhere.agencyId = parseInt(supervisorAgencyId, 10);
+  }
+
+  // Add unassigned filter - only show orders with unassigned subscriptions
+  // This takes precedence over supervisor filtering
+  if (unassignedOnly === 'true') {
+    subscriptionWhere.agencyId = null;
+  }
+
+  // Add expiry status filtering
+  // Note: expiryDate is the subscription end date (startDate + period - 1)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (expiryStatus === 'EXPIRED') {
+    // Show only orders with expired subscriptions (end date has passed)
+    subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
+    subscriptionWhere.expiryDate = { lt: today };
+    // Also exclude cancelled orders at order level
+    where.paymentStatus = { not: 'CANCELLED' };
+  } else if (expiryStatus === 'NOT_EXPIRED') {
+    // Show only orders with active subscriptions (end date is today or future)
+    subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
+    subscriptionWhere.expiryDate = { gte: today };
+    // Also exclude cancelled orders at order level
+    where.paymentStatus = { not: 'CANCELLED' };
+  }
+
+  // Apply subscription filters if any exist
+  if (Object.keys(subscriptionWhere).length > 0) {
+    where.subscriptions = { some: subscriptionWhere };
   }
 
   if (search) {
     where.OR = [
       { orderNo: { contains: search } },
-      { member: { name: { contains: search } } },
+      { member: { user: { name: { contains: search } } } },
       { member: { user: { email: { contains: search } } } },
       { member: { user: { mobile: { contains: search } } } },
     ];
+  }
+
+  // Debug logging (can be removed in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('getAllProductOrders - Filters:', {
+      page: pageNum,
+      limit: limitNum,
+      expiryStatus,
+      unassignedOnly,
+      hasSubscriptionFilters: where.subscriptions ? true : false
+    });
   }
 
   try {
@@ -691,7 +739,18 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching product orders:', error);
-    res.status(500).json({ message: 'Failed to fetch product orders' });
+    console.error('Query parameters:', { page: pageNum, limit: limitNum, expiryStatus, unassignedOnly });
+    console.error('Where clause:', JSON.stringify(where, null, 2));
+    
+    // Check if it's a Prisma validation error
+    if (error.name === 'PrismaClientValidationError') {
+      console.error('Prisma validation error - likely invalid query structure');
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to fetch product orders',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -1078,10 +1137,18 @@ const assignAgentToOrder = asyncHandler(async (req, res) => {
         }
       });
 
-      // Also update delivery schedule entries if they exist
+      // Get today's date at start of day for comparison
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Only update delivery schedule entries for FUTURE dates (after today)
+      // This preserves historical agent assignments for past and current deliveries
       await tx.deliveryScheduleEntry.updateMany({
         where: {
-          subscriptionId: { in: subscriptionIds }
+          subscriptionId: { in: subscriptionIds },
+          deliveryDate: {
+            gt: today // Only update entries with deliveryDate > today
+          }
         },
         data: {
           agentId: agencyId ? parseInt(agencyId, 10) : null,
@@ -1116,7 +1183,7 @@ const assignAgentToOrder = asyncHandler(async (req, res) => {
       }))?.user?.name || 'Selected Agency' : 'Unassigned';
 
     res.status(200).json({
-      message: `Successfully ${agencyId ? 'assigned' : 'unassigned'} agent ${agencyName} to ${result.count} subscription(s) in order ${order.orderNo}`,
+      message: `Successfully ${agencyId ? 'assigned' : 'unassigned'} agent ${agencyName} to ${result.count} subscription(s) in order ${order.orderNo}. Future deliveries will use the new agent assignment.`,
       order: updatedOrder,
       updatedCount: result.count
     });
