@@ -571,7 +571,7 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     paymentStatus = '', 
     supervisorAgencyId = '',
     unassignedOnly = '',
-    expiryStatus = 'NOT_EXPIRED'
+    expiryStatus = 'ALL'  // Default to ALL to show everything
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -603,7 +603,7 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Handle expiry filtering differently based on the requirement
+  // Handle expiry filtering based on the requirement
   if (expiryStatus === 'EXPIRED') {
     // Show orders that have at least one expired subscription
     subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
@@ -615,7 +615,8 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     subscriptionWhere.expiryDate = { gte: today };
     where.paymentStatus = { not: 'CANCELLED' };
   }
-  // If expiryStatus is 'ALL' or anything else, don't add expiry filters
+  // If expiryStatus is 'ALL', don't add any expiry-related filters
+  // This will show all orders including cancelled and expired ones
 
   // Apply subscription filters if any exist
   if (Object.keys(subscriptionWhere).length > 0) {
