@@ -603,19 +603,19 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Handle expiry filtering differently based on the requirement
   if (expiryStatus === 'EXPIRED') {
-    // Show only orders with expired subscriptions (end date has passed)
+    // Show orders that have at least one expired subscription
     subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
     subscriptionWhere.expiryDate = { lt: today };
-    // Also exclude cancelled orders at order level
     where.paymentStatus = { not: 'CANCELLED' };
   } else if (expiryStatus === 'NOT_EXPIRED') {
-    // Show only orders with active subscriptions (end date is today or future)
+    // Show orders that have at least one active (non-expired) subscription
     subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
     subscriptionWhere.expiryDate = { gte: today };
-    // Also exclude cancelled orders at order level
     where.paymentStatus = { not: 'CANCELLED' };
   }
+  // If expiryStatus is 'ALL' or anything else, don't add expiry filters
 
   // Apply subscription filters if any exist
   if (Object.keys(subscriptionWhere).length > 0) {
@@ -638,7 +638,10 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
       limit: limitNum,
       expiryStatus,
       unassignedOnly,
-      hasSubscriptionFilters: where.subscriptions ? true : false
+      hasSubscriptionFilters: where.subscriptions ? true : false,
+      today: today.toISOString(),
+      subscriptionWhere: JSON.stringify(subscriptionWhere, null, 2),
+      where: JSON.stringify(where, null, 2)
     });
   }
 
@@ -701,6 +704,19 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
       }),
       prisma.productOrder.count({ where }),
     ]);
+
+    // Debug: Log expiry dates for the first few orders
+    if (process.env.NODE_ENV === 'development' && expiryStatus && expiryStatus !== 'ALL') {
+      console.log('Sample order expiry data:');
+      productOrders.slice(0, 3).forEach((order, index) => {
+        console.log(`Order ${index + 1} (${order.orderNo}):`);
+        order.subscriptions.forEach((sub, subIndex) => {
+          const expiryDate = new Date(sub.expiryDate);
+          const isExpired = expiryDate < today;
+          console.log(`  Sub ${subIndex + 1}: expiryDate=${sub.expiryDate}, isExpired=${isExpired}, paymentStatus=${sub.paymentStatus}`);
+        });
+      });
+    }
 
     // Debug: Log the first order's subscription data
     if (productOrders.length > 0 && productOrders[0].subscriptions.length > 0) {
