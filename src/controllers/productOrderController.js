@@ -1036,7 +1036,37 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
         }
       });
 
-      return updatedSubscriptions;
+      // Process wallet refund if wallet amount was used in this order
+      let walletTransaction = null;
+      if (order.walletamt && order.walletamt > 0) {
+        console.log(`Processing wallet refund of ₹${order.walletamt} for order ${order.orderNo}`);
+        
+        // Credit the wallet amount back to member's wallet
+        await tx.member.update({
+          where: { id: order.memberId },
+          data: {
+            walletBalance: {
+              increment: order.walletamt
+            }
+          }
+        });
+
+        // Create wallet transaction record for the refund
+        walletTransaction = await tx.walletTransaction.create({
+          data: {
+            memberId: order.memberId,
+            amount: order.walletamt,
+            type: 'CREDIT',
+            status: 'PAID',
+            paymentMethod: 'SYSTEM_REFUND',
+            referenceNumber: `ORDER-${order.orderNo}`,
+            notes: `Refund for cancelled order #${order.orderNo}`,
+            processedByAdminId: req.user.role === 'ADMIN' ? req.user.id : null
+          }
+        });
+      }
+
+      return { updatedSubscriptions, walletTransaction };
     });
 
     // Fetch the updated order to return
@@ -1051,15 +1081,30 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
       }
     });
 
-    const message = cancellableSubscriptions.length === order.subscriptions.length
-      ? `Successfully cancelled all ${result.count} subscription(s) in order ${order.orderNo}`
-      : `Successfully cancelled ${result.count} out of ${order.subscriptions.length} subscription(s) in order ${order.orderNo}. Some subscriptions could not be cancelled due to payment status.`;
+    let message = cancellableSubscriptions.length === order.subscriptions.length
+      ? `Successfully cancelled all ${result.updatedSubscriptions.count} subscription(s) in order ${order.orderNo}`
+      : `Successfully cancelled ${result.updatedSubscriptions.count} out of ${order.subscriptions.length} subscription(s) in order ${order.orderNo}. Some subscriptions could not be cancelled due to payment status.`;
+
+    // Add wallet refund information to the message
+    if (result.walletTransaction) {
+      message += ` ₹${order.walletamt.toFixed(2)} has been refunded to your wallet.`;
+    }
 
     res.status(200).json({
       message,
       order: updatedOrder,
-      cancelledCount: result.count,
-      totalSubscriptions: order.subscriptions.length
+      cancelledCount: result.updatedSubscriptions.count,
+      totalSubscriptions: order.subscriptions.length,
+      walletRefund: result.walletTransaction ? {
+        success: true,
+        refundAmount: order.walletamt,
+        transactionId: result.walletTransaction.id,
+        message: `₹${order.walletamt.toFixed(2)} refunded to wallet`
+      } : {
+        success: true,
+        refundAmount: 0,
+        message: 'No wallet refund applicable'
+      }
     });
 
   } catch (error) {

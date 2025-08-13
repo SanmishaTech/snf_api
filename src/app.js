@@ -80,7 +80,7 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-      path.resolve(__dirname, "..", "..", "snf", "dist")
+    path.resolve(__dirname, "..", "..", "snf", "dist")
     : path.resolve(__dirname, "..", "..", "snf", "dist");
 
 console.log(`snf bui ld path: ${frontendDistPath}`);
