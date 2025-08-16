@@ -549,7 +549,7 @@ async function determineAgentId(depot, deliveryAddress, tx = null) {
     return deliveryAddress?.location?.agencyId || null;
   } else if (depot) {
     const dbClient = tx || prisma;
-    const agency = await dbClient.agency.findUnique({ where: { depotId: depot.id } });
+    const agency = await dbClient.agency.findFirst({ where: { depotId: depot.id } });
     return agency?.id || null;
   }
   return null;

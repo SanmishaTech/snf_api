@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 // --- Zod Schemas Definition ---
 // Base schema for common agency fields
-const agencyBaseSchema = z.object({
+const baseAgencySchema = z.object({
   name: z.string().min(2, { message: 'Agency name must be at least 2 characters long' }),
   contactPersonName: z.string().optional(),
   address1: z.string().min(5, { message: 'Address line 1 must be at least 5 characters long' }),
@@ -19,10 +19,11 @@ const agencyBaseSchema = z.object({
   mobile: z.string().regex(/^\d{10}$/, { message: 'Mobile number must be 10 digits' }),
   alternateMobile: z.any().optional().nullable(),
   email: z.string().optional().nullable(),
+  depotId: z.coerce.number().int().positive().optional(), // Optional depot assignment
 });
 
 // Schema for creating a new agency, including user details for the agency's primary user
-const createAgencySchema = agencyBaseSchema.extend({
+const createAgencySchema = baseAgencySchema.extend({
   userFullName: z.string().min(2, { message: 'User full name must be at least 2 characters long' }),
   userLoginEmail: z.string().optional().nullable(),
   userPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' })
@@ -90,8 +91,16 @@ const createAgency = asyncHandler(async (req, res, next) => {
           user: {
             connect: { id: newUser.id },
           },
+          ...(agencyDataInput.depotId && {
+            depot: {
+              connect: { id: agencyDataInput.depotId }
+            }
+          }),
         },
-        include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+        include: { 
+          user: { select: { id: true, name: true, email: true, role: true, active: true } },
+          depot: { select: { id: true, name: true, address: true, city: true } }
+        },
       });
       return newAgency;
     });
@@ -159,7 +168,10 @@ const getAllAgencies = asyncHandler(async (req, res, next) => {
       orderBy: {
         [orderByField]: orderByDirection,
       },
-      include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+      include: { 
+        user: { select: { id: true, name: true, email: true, role: true, active: true } },
+        depot: { select: { id: true, name: true, address: true, city: true } }
+      },
     });
 
     const totalRecords = await prisma.agency.count({ where: whereConditions });
@@ -190,7 +202,10 @@ const getAgencyById = asyncHandler(async (req, res, next) => {
 
   const agency = await prisma.agency.findUnique({
     where: { id: agencyId },
-    include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+    include: { 
+      user: { select: { id: true, name: true, email: true, role: true, active: true } },
+      depot: { select: { id: true, name: true, address: true, city: true } }
+    },
   });
 
   if (!agency) {
@@ -215,7 +230,7 @@ const updateAgency = asyncHandler(async (req, res, next) => {
     return next(createError(400, 'Invalid agency ID format'));
   }
 
-  const validationResult = await validateRequest(agencyBaseSchema, req.body, req.files || {});
+  const validationResult = await validateRequest(baseAgencySchema, req.body, req.files || {});
 
   if (validationResult.errors) {
     return res.status(400).json(validationResult);
@@ -226,6 +241,7 @@ const updateAgency = asyncHandler(async (req, res, next) => {
     email,
     contactPersonName,
     alternateMobile,
+    depotId,
     ...otherAgencyFields
   } = validationResult;
 
@@ -252,8 +268,20 @@ const updateAgency = asyncHandler(async (req, res, next) => {
       email,              // Explicitly include email
       contactPersonName,  // Explicitly include
       alternateMobile,    // Explicitly include
+      ...(depotId ? {
+        depot: {
+          connect: { id: depotId }
+        }
+      } : {
+        depot: {
+          disconnect: true
+        }
+      }),
     },
-    include: { user: { select: { id: true, name: true, email: true, role: true, active: true } } },
+    include: { 
+      user: { select: { id: true, name: true, email: true, role: true, active: true } },
+      depot: { select: { id: true, name: true, address: true, city: true } }
+    },
   });
 
   res.status(200).json(updatedAgency);

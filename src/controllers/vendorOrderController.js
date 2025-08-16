@@ -6,10 +6,10 @@ const transformOrderItems = (items) => {
   if (!items) return [];
   return items.map(item => ({
     ...item,
-    productId: item.product.id, // Ensure productId is the direct ID
-    productName: item.product.name,
-    // Remove the nested product object to avoid redundancy if not needed further by frontend for this specific view
-    // product: undefined, // Or selectively pick fields if the full product object is sometimes needed
+    productId: item.product?.id ?? item.productId, // Ensure productId is the direct ID
+    productName: item.product?.name ?? item.productName,
+    depotCityName: item.depot?.city || undefined,
+    // Keep nested product/depot/agency as included by the caller's select/include
   }));
 };
 const createError = require('http-errors');
@@ -236,7 +236,7 @@ exports.getAllVendorOrders = async (req, res, next) => {
           include: { 
             product: true, 
             agency: true,
-            depot: { select: { id: true, name: true } },
+            depot: { select: { id: true, name: true, city: true } },
             depotVariant: { select: { id: true, name: true } }
           } 
         },
@@ -337,7 +337,7 @@ exports.getVendorOrderById = async (req, res, next) => {
           include: { 
             product: true, 
             agency: true,
-            depot: { select: { id: true, name: true } },
+            depot: { select: { id: true, name: true, city: true } },
             depotVariant: { select: { id: true, name: true } }
           } 
         },
@@ -1190,7 +1190,8 @@ exports.getMyAgencyOrders = async (req, res, next) => {
                 name: true,
                 address: true,
                 contactPerson: true,
-                contactNumber: true
+                contactNumber: true,
+                city: true
               }
             }
           },

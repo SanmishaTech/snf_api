@@ -9,10 +9,10 @@ const validateRequest = require('../../utils/validateRequest');
 const depotSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   address: z.string().min(1, 'Address is required'),
+  city: z.string().min(1, 'City is required').max(255),
   contactPerson: z.string().max(255).optional().nullable(),
   contactNumber: z.string().max(20).optional().nullable(),
   isOnline: z.boolean().optional(),
-  agencyId: z.number().int().optional().nullable(),
 });
 
 // Schema to create depot along with admin user details
@@ -34,7 +34,6 @@ exports.createDepot = async (req, res, next) => {
       userFullName,
       userLoginEmail,
       userPassword,
-      agencyId,
       ...depotInput
     } = validationResult;
 
@@ -58,10 +57,7 @@ exports.createDepot = async (req, res, next) => {
     // Transaction: create depot then user linked via depotId
     const { newDepot, newUser } = await prisma.$transaction(async (tx) => {
       const newDepot = await tx.depot.create({
-        data: {
-          ...depotInput,
-          agency: agencyId ? { connect: { id: agencyId } } : undefined,
-        },
+        data: depotInput,
       });
 
       const newUser = await tx.user.create({
@@ -110,13 +106,13 @@ exports.getAllDepots = async (req, res, next) => {
         OR: [
             { name: { contains: search, mode: 'insensitive' } },
             { address: { contains: search, mode: 'insensitive' } },
+            { city: { contains: search, mode: 'insensitive' } },
         ],
     } : {};
 
     try {
         const [depots, totalRecords] = await prisma.$transaction([
             prisma.depot.findMany({
-                include: { agency: true },
                 where: whereClause,
                 skip,
                 take: limit,
@@ -187,15 +183,9 @@ exports.updateDepot = async (req, res, next) => {
       }
     }
 
-    const { isOnline, agencyId, ...otherData } = validatedData;
-
     const updatedDepot = await prisma.depot.update({
       where: { id: parseInt(id) },
-      data: {
-        ...otherData,
-        isOnline: isOnline,
-        agency: agencyId ? { connect: { id: agencyId } } : { disconnect: true },
-      },
+      data: validatedData,
     });
     res.status(200).json(updatedDepot);
   } catch (error) {
