@@ -253,7 +253,7 @@ model OrderItem {
   vendorOrder        VendorOrder          @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
 
   @@index([agencyId], map: "vendor_order_items_agencyId_fkey")
-  @@index([productId], map: "vendor_order_items_productId_fkey")
+  @@index([productId], map: "vendor_order_items_product_idx")
   @@index([vendorOrderId], map: "vendor_order_items_vendorOrderId_fkey")
   @@index([depotId], map: "vendor_order_items_depotId_fkey")
   @@index([depotVariantId], map: "vendor_order_items_depotVariantId_fkey")
