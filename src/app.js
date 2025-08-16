@@ -45,6 +45,7 @@ const publicDepotVariantRoutes = require("./routes/public/depotVariantsRoutes");
 const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -223,6 +224,12 @@ app.use(
   authMiddleware,
   allowRoles("ADMIN", "DepotAdmin"),
   stockLedgerRoutes
+);
+app.use(
+  "/api/reports",
+  authMiddleware,
+  roleGuard("ADMIN"),
+  reportRoutes
 );
 app.use(swaggerRouter);
 

@@ -53,7 +53,7 @@ const createAgency = asyncHandler(async (req, res, next) => {
     ...agencyDataInput 
   } = validationResult;
 
-  const { email: agencyEmail, contactPersonName, alternateMobile, ...otherAgencyFields } = agencyDataInput;
+  const { email: agencyEmail, contactPersonName, alternateMobile, depotId, ...otherAgencyFields } = agencyDataInput;
 
   const existingUserByLoginEmail = await prisma.user.findUnique({ where: { email: userLoginEmail } });
   if (existingUserByLoginEmail) {
@@ -91,9 +91,9 @@ const createAgency = asyncHandler(async (req, res, next) => {
           user: {
             connect: { id: newUser.id },
           },
-          ...(agencyDataInput.depotId && {
+          ...(depotId && {
             depot: {
-              connect: { id: agencyDataInput.depotId }
+              connect: { id: depotId }
             }
           }),
         },
