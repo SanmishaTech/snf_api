@@ -14,6 +14,11 @@ const getPriceForPeriod = (depotVariant, periodInDays) => {
 
   let periodPrice;
   switch (periodInDays) {
+    case 0:
+      // Buy-once order: use buyOncePrice directly
+      periodPrice = toNumber(depotVariant.buyOncePrice);
+      console.log(`[getPriceForPeriod] Buy-once order (period=0): buyOncePrice=${depotVariant.buyOncePrice}, parsed=${periodPrice}`);
+      break;
     case 3:
       periodPrice = toNumber(depotVariant.price3Day);
       break;
@@ -24,6 +29,13 @@ const getPriceForPeriod = (depotVariant, periodInDays) => {
       periodPrice = toNumber(depotVariant.price1Month);
       break;
   }
+
+  console.log(`[getPriceForPeriod] Period: ${periodInDays}, Variant: ${depotVariant.id}, Price calc:`, {
+    periodPrice,
+    buyOncePrice: depotVariant.buyOncePrice,
+    mrp: depotVariant.mrp,
+    finalPrice: periodPrice ?? toNumber(depotVariant.buyOncePrice) ?? toNumber(depotVariant.mrp) ?? 0
+  });
 
   // Fallback chain: period price -> buyOncePrice -> MRP
   return periodPrice ?? toNumber(depotVariant.buyOncePrice) ?? toNumber(depotVariant.mrp) ?? 0;
@@ -39,6 +51,11 @@ const getDayKey = (dayIndex) => {
 const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qty, altQty, selectedWeekdays = []) => {
   console.log(`[generateDeliveryDates ENTRY] StartDate: ${new Date(startDate).toISOString()}, Period: ${periodInDays}, ScheduleType: ${deliveryScheduleType}, Qty: ${qty}, AltQty: ${altQty}, SelectedWeekdays: ${JSON.stringify(selectedWeekdays)}`);
   const deliveries = [];
+  
+  // For buy-once orders (period = 0), we need exactly one delivery on the start date
+  if (periodInDays === 0) {
+    console.log(`[generateDeliveryDates] Buy-once order detected (period=0), will create single delivery`);
+  }
   const baseStartDate = new Date(startDate);
 
   const lowerSelectedWeekdays = Array.isArray(selectedWeekdays) ? selectedWeekdays.map(day => day.toLowerCase()) : [];
@@ -59,7 +76,10 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
 
   let deliveryCountForAlternating = 0; // Used for VARYING_ALTERNATING and ALTERNATE_DAYS_LOGIC with altQty
 
-  for (let i = 0; i < periodInDays; i++) {
+  // Special handling for buy-once orders (period = 0)
+  const actualPeriodInDays = periodInDays === 0 ? 1 : periodInDays;
+
+  for (let i = 0; i < actualPeriodInDays; i++) {
     // Construct currentDate at midnight UTC for the target day
     const currentDate = new Date(Date.UTC(
       baseStartDate.getUTCFullYear(),
@@ -549,6 +569,16 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
   const rateForPeriod = getPriceForPeriod(depotVariant, subscriptionPeriod);
 
   const subscriptionAmount = rateForPeriod * subscriptionTotalQty;
+
+  console.log(`[processSubscription] Amount calculation:`, {
+    productId,
+    subscriptionPeriod,
+    parsedQty,
+    deliveryScheduleDetailsCount: deliveryScheduleDetails.length,
+    subscriptionTotalQty,
+    rateForPeriod,
+    subscriptionAmount
+  });
 
   // Determine agent
   const agentId = await determineAgentId(depotVariant.depot, deliveryAddress, tx);
