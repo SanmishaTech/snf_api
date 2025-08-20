@@ -81,7 +81,7 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-    path.resolve(__dirname, "..", "..", "snf", "dist")
+      path.resolve(__dirname, "..", "..", "snf", "dist")
     : path.resolve(__dirname, "..", "..", "snf", "dist");
 
 console.log(`snf bui ld path: ${frontendDistPath}`);
@@ -225,12 +225,7 @@ app.use(
   allowRoles("ADMIN", "DepotAdmin"),
   stockLedgerRoutes
 );
-app.use(
-  "/api/reports",
-  authMiddleware,
-  roleGuard("ADMIN"),
-  reportRoutes
-);
+app.use("/api/reports", authMiddleware, roleGuard("ADMIN"), reportRoutes);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {
