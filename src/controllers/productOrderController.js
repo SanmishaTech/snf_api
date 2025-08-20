@@ -513,7 +513,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
     console.log(`[DATE DEBUG - BACKEND] Frontend sent YYYY-MM-DD format: ${startDate}`);
     console.log(`[DATE DEBUG - BACKEND] Split parts:`, { part0: parts[0], part1: parts[1], part2: parts[2] });
     console.log(`[DATE DEBUG - BACKEND] Parsed integers:`, { year, monthZeroIndexed: month, day });
-    console.log(`[DATE DEBUG - BACKEND] Will create Date with: new Date(${year}, ${month}, ${day})`);
+    console.log(`[DATE DEBUG - BACKEND] Will create Date with: new Date(Date.UTC(${year}, ${month}, ${day}))`);
   } else {
     // Fallback for ISO datetime strings (legacy support)
     const sDate = new Date(startDate);
