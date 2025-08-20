@@ -444,8 +444,27 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
     altQty,
   } = sub;
 
-  // Validation
-  if (!productId || !period || !startDate || !rawDeliverySchedule || !qty) {
+  // Debug logging
+  console.log('[processSubscription] Received subscription data:', {
+    productId,
+    period,
+    startDate,
+    rawDeliverySchedule,
+    qty,
+    altQty
+  });
+
+  // Validation - Note: period can be 0 for buy-once orders
+  if (!productId || period === undefined || period === null || !startDate || !rawDeliverySchedule || !qty) {
+    console.log('[processSubscription] Validation failed:', {
+      hasProductId: !!productId,
+      periodValue: period,
+      periodUndefined: period === undefined,
+      periodNull: period === null,
+      hasStartDate: !!startDate,
+      hasDeliverySchedule: !!rawDeliverySchedule,
+      hasQty: !!qty
+    });
     throw new Error('Missing required fields for subscription.');
   }
 
@@ -458,29 +477,60 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
   const parsedQty = parseInt(qty, 10);
   const parsedAltQty = altQty ? parseInt(altQty, 10) : null;
   const subscriptionPeriod = parseInt(period, 10);
-  // Extract the user's intended date from the ISO string
-  // The frontend creates dates like "2025-07-31T18:30:00.000Z" when user selects Aug 1 in IST
-  // This happens because frontend creates midnight local time, then converts to UTC
-  // We need to determine the user's intended calendar date
-
-  const sDate = new Date(startDate);
-
-  // Simple approach: Add 12 hours to the received timestamp to account for timezone differences
-  // This ensures we get the correct calendar date that the user intended
-  const adjustedDate = new Date(sDate.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
-
-  const year = adjustedDate.getUTCFullYear();
-  const month = adjustedDate.getUTCMonth();
-  const day = adjustedDate.getUTCDate();
-  const startDateOnly = new Date(year, month, day);
-
-  console.log(`[Date Processing] Frontend sent: ${startDate}`);
-  console.log(`[Date Processing] Parsed as: ${sDate.toString()}`);
-  console.log(`[Date Processing] Adjusted date (+12h): ${adjustedDate.toString()}`);
-  console.log(`[Date Processing] Final date parts: ${year}-${month + 1}-${day}`);
-  console.log(`[Date Processing] Final startDate for storage: ${startDateOnly.toString()}`);
+  // Frontend now sends dates in YYYY-MM-DD format to avoid timezone issues
+  // We need to parse this correctly
+  
+  let year, month, day;
+  
+  // Check if the date is in YYYY-MM-DD format (no time component)
+  if (typeof startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    // Parse YYYY-MM-DD format directly
+    const parts = startDate.split('-');
+    year = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in JavaScript
+    day = parseInt(parts[2], 10);
+    
+    console.log(`[DATE DEBUG - BACKEND] Frontend sent YYYY-MM-DD format: ${startDate}`);
+    console.log(`[DATE DEBUG - BACKEND] Split parts:`, { part0: parts[0], part1: parts[1], part2: parts[2] });
+    console.log(`[DATE DEBUG - BACKEND] Parsed integers:`, { year, monthZeroIndexed: month, day });
+    console.log(`[DATE DEBUG - BACKEND] Will create Date with: new Date(${year}, ${month}, ${day})`);
+  } else {
+    // Fallback for ISO datetime strings (legacy support)
+    const sDate = new Date(startDate);
+    
+    // For ISO strings with timezone, add 12 hours as before (legacy behavior)
+    const adjustedDate = new Date(sDate.getTime() + (12 * 60 * 60 * 1000));
+    
+    year = adjustedDate.getUTCFullYear();
+    month = adjustedDate.getUTCMonth();
+    day = adjustedDate.getUTCDate();
+    
+    console.log(`[DATE DEBUG - BACKEND] Frontend sent ISO format: ${startDate}`);
+    console.log(`[DATE DEBUG - BACKEND] Parsed as Date object: ${sDate.toString()}`);
+    console.log(`[DATE DEBUG - BACKEND] Adjusted date (+12h): ${adjustedDate.toString()}`);
+    console.log(`[DATE DEBUG - BACKEND] Final date parts from UTC: Year=${year}, Month=${month + 1}, Day=${day}`);
+  }
+  
+  const startDateOnly = new Date(Date.UTC(year, month, day));
+  console.log(`[DATE DEBUG - BACKEND] Created final startDate object: ${startDateOnly.toString()}`);
+  console.log(`[DATE DEBUG - BACKEND] startDate.getFullYear(): ${startDateOnly.getFullYear()}`);
+  console.log(`[DATE DEBUG - BACKEND] startDate.getMonth(): ${startDateOnly.getMonth()} (0-indexed)`);
+  console.log(`[DATE DEBUG - BACKEND] startDate.getDate(): ${startDateOnly.getDate()}`);
+  console.log(`[DATE DEBUG - BACKEND] startDate.toISOString(): ${startDateOnly.toISOString()}`);
+  console.log(`[DATE DEBUG - BACKEND] startDate.toDateString(): ${startDateOnly.toDateString()}`);
+  
   const expiryDate = new Date(startDateOnly);
-  expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
+  // For buy-once orders (period = 0), start and expiry date should be the same
+  // For subscription orders, expiry = start + period - 1
+  if (subscriptionPeriod === 0) {
+    // Buy-once: expiry date = start date (same day)
+    console.log(`[DATE DEBUG - BACKEND] Buy-once order: expiryDate = startDate`);
+  } else {
+    // Subscription: expiry date = start date + period - 1
+    expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
+    console.log(`[DATE DEBUG - BACKEND] Subscription order: expiryDate = startDate + ${subscriptionPeriod} - 1`);
+  }
+  console.log(`[DATE DEBUG - BACKEND] Calculated expiryDate: ${expiryDate.toString()}`, expiryDate.toDateString());
 
   // Process delivery schedule
   const { internalScheduleLogicType, dbDeliveryScheduleEnum } = mapDeliverySchedule(rawDeliverySchedule);

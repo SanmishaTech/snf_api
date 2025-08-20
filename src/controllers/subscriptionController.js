@@ -176,7 +176,7 @@ const createSubscription = asyncHandler(async (req, res) => {
   const year = adjustedDate.getUTCFullYear();
   const month = adjustedDate.getUTCMonth();
   const day = adjustedDate.getUTCDate();
-  const startDateOnly = new Date(year, month, day);
+  const startDateOnly = new Date(Date.UTC(year, month, day));
   
   console.log(`[Date Processing] Frontend sent: ${startDate}`);
   console.log(`[Date Processing] Parsed as: ${baseDate.toString()}`);
@@ -184,7 +184,16 @@ const createSubscription = asyncHandler(async (req, res) => {
   console.log(`[Date Processing] Final date parts: ${year}-${month + 1}-${day}`);
   console.log(`[Date Processing] Final startDate for storage: ${startDateOnly.toString()}`);
   let expiryDate = new Date(startDateOnly);
-  expiryDate.setDate(expiryDate.getDate() + parsedPeriod - 1);
+  // For buy-once orders (period = 0), start and expiry date should be the same
+  // For subscription orders, expiry = start + period - 1
+  if (parsedPeriod === 0) {
+    // Buy-once: expiry date = start date (same day)
+    console.log(`[Date Processing] Buy-once order: expiryDate = startDate`);
+  } else {
+    // Subscription: expiry date = start date + period - 1
+    expiryDate.setDate(expiryDate.getDate() + parsedPeriod - 1);
+    console.log(`[Date Processing] Subscription order: expiryDate = startDate + ${parsedPeriod} - 1`);
+  }
 
   // Map deliverySchedule string to Prisma enum
   let internalScheduleLogicType; // For generateDeliveryDates logic
