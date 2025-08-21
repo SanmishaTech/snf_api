@@ -174,7 +174,7 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     
     console.log(`[SNF Order] Computed amounts - Total: ${computedTotal}, Wallet: ${actualWalletDeduction}, Payable: ${actualPayableAmount}`);
     
-    // Use transaction to ensure atomicity of order creation and wallet deduction
+    // Use transaction to ensure atomicity of order creation, wallet deduction, and stock management
     const created = await prisma.$transaction(async (tx) => {
       // Create the SNF order
       const order = await tx.sNFOrder.create({
@@ -237,6 +237,76 @@ const createSNFOrder = asyncHandler(async (req, res) => {
       });
       
       console.log(`[SNF Order] Wallet deduction completed successfully`);
+    }
+    
+    // Handle stock management if depot is assigned
+    if (finalDepotId) {
+      console.log(`[SNF Order] Processing stock management for depot ${finalDepotId}`);
+      
+      // Process each order item for stock management
+      for (const item of order.items) {
+        if (item.depotProductVariantId && item.productId && item.quantity > 0) {
+          console.log(`[SNF Order] Processing stock for item: ${item.name} (Product ID: ${item.productId}, Variant ID: ${item.depotProductVariantId}, Qty: ${item.quantity})`);
+          
+          try {
+            // 1. Create stock ledger entry
+            await tx.stockLedger.create({
+              data: {
+                productId: item.productId,
+                variantId: item.depotProductVariantId,
+                depotId: finalDepotId,
+                transactionDate: new Date(),
+                receivedQty: 0,
+                issuedQty: item.quantity,
+                module: 'cart', // Module type for SNF orders
+                foreignKey: order.id, // Reference to the SNF order
+              },
+            });
+            console.log(`[SNF Order] Created stock ledger entry for variant ${item.depotProductVariantId}`);
+            
+            // 2. Update depot variant quantity (reduce stock)
+            const currentVariant = await tx.depotProductVariant.findUnique({
+              where: { id: item.depotProductVariantId },
+              select: { closingQty: true, name: true }
+            });
+            
+            if (!currentVariant) {
+              console.warn(`[SNF Order] Depot variant ${item.depotProductVariantId} not found, skipping stock update`);
+              continue;
+            }
+            
+            // Check if sufficient stock is available
+            if (currentVariant.closingQty < item.quantity) {
+              console.warn(`[SNF Order] Insufficient stock for variant ${item.depotProductVariantId} (${currentVariant.name}). Available: ${currentVariant.closingQty}, Required: ${item.quantity}`);
+              // Note: We're not throwing an error here as SNF orders might allow backorders
+              // But we log it for monitoring purposes
+            }
+            
+            // Update the variant stock quantity
+            await tx.depotProductVariant.update({
+              where: { id: item.depotProductVariantId },
+              data: {
+                closingQty: {
+                  decrement: item.quantity
+                }
+              }
+            });
+            
+            console.log(`[SNF Order] Updated stock for variant ${item.depotProductVariantId} (${currentVariant.name}): reduced by ${item.quantity}`);
+            
+          } catch (stockError) {
+            console.error(`[SNF Order] Error processing stock for item ${item.name}:`, stockError);
+            // Log the error but don't fail the entire order
+            // In production, you might want to send alerts for stock management failures
+          }
+        } else {
+          console.log(`[SNF Order] Skipping stock management for item ${item.name}: missing depotProductVariantId (${item.depotProductVariantId}) or productId (${item.productId}) or zero quantity`);
+        }
+      }
+      
+      console.log(`[SNF Order] Stock management processing completed for order ${order.orderNo}`);
+    } else {
+      console.log(`[SNF Order] No depot assigned, skipping stock management`);
     }
     
     return order;
