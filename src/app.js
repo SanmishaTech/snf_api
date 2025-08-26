@@ -46,6 +46,7 @@ const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const testPermissionRoutes = require("./routes/testPermissionRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -226,6 +227,10 @@ app.use(
   stockLedgerRoutes
 );
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN"), reportRoutes);
+
+// Test Permission Routes - for testing the new permission system
+app.use("/api/test-permissions", testPermissionRoutes);
+
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {
