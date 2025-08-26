@@ -142,9 +142,16 @@ exports.listPurchases = async (req, res, next) => {
   const limit = parseInt(req.query.limit || '10', 10);
   const search = req.query.search || '';
   const date = req.query.date || '';
+  const vendorId = req.query.vendorId ? parseInt(req.query.vendorId, 10) : null;
+  const depotId = req.query.depotId ? parseInt(req.query.depotId, 10) : null;
+  const startDate = req.query.startDate || '';
+  const endDate = req.query.endDate || '';
 
   // Build dynamic filters ---------------------------------------------------
   const filters = [];
+  
+  // Get current user for role-based filtering
+  const currentUser = req.user;
 
   // Search filter (purchaseNo or vendor name)
   if (search) {
@@ -170,11 +177,60 @@ exports.listPurchases = async (req, res, next) => {
     end.setUTCHours(23, 59, 59, 999);
     filters.push({ purchaseDate: { gte: start, lte: end } });
   }
+  
+  // Date range filters (startDate and endDate)
+  if (startDate || endDate) {
+    const dateFilter = {};
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = start;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setUTCHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+    filters.push({ purchaseDate: dateFilter });
+  }
+  
+  // Vendor filter (from query params - only apply for non-VENDOR users)
+  // VENDOR users will have their vendorId auto-detected in role-based filters below
+  if (vendorId && !isNaN(vendorId) && currentUser?.role !== 'VENDOR') {
+    filters.push({ vendorId });
+  }
+  
+  // Depot filter (from query params - will be overridden by role-based filters if user is DepotAdmin)
+  if (depotId && !isNaN(depotId)) {
+    filters.push({ depotId });
+  }
 
+  // Role-based scope filters
+  
   // Depot scope filter for DepotAdmin
-  const currentUser = req.user;
   if (currentUser?.role === 'DepotAdmin' && currentUser.depotId) {
     filters.push({ depotId: currentUser.depotId });
+  }
+  
+  // Vendor scope filter for VENDOR role users
+  if (currentUser?.role === 'VENDOR') {
+    // Find the vendor record associated with this user
+    const vendor = await prisma.vendor.findUnique({
+      where: { userId: currentUser.id },
+      select: { id: true }
+    });
+    
+    if (vendor) {
+      filters.push({ vendorId: vendor.id });
+    } else {
+      // If no vendor record found for VENDOR role user, return empty results
+      return res.json({
+        totalPages: 0,
+        totalRecords: 0,
+        currentPage: page,
+        data: []
+      });
+    }
   }
 
   const where = filters.length > 0 ? { AND: filters } : undefined;

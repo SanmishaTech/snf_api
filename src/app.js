@@ -155,7 +155,7 @@ app.use(
 app.use(
   "/api/purchases",
   authMiddleware,
-  roleGuard("ADMIN", "DepotAdmin"),
+  roleGuard("ADMIN", "DepotAdmin", "VENDOR"),
   purchaseRoutes
 );
 app.use(
@@ -225,7 +225,12 @@ app.use(
   allowRoles("ADMIN", "DepotAdmin"),
   stockLedgerRoutes
 );
-app.use("/api/reports", authMiddleware, roleGuard("ADMIN"), reportRoutes);
+app.use(
+  "/api/reports",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin", "VENDOR", "AGENCY", "SUPERVISOR"),
+  reportRoutes
+);
 app.use(swaggerRouter);
 
 app.get("*", (req, res, next) => {

@@ -20,6 +20,33 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
     // Build where clause for filtering
     const where = {};
     
+    // Role-based filtering: If user is VENDOR (farmer), restrict to their own orders
+    const currentUser = req.user;
+    if (currentUser && currentUser.role === 'VENDOR') {
+      // Find the vendor record for this user
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: currentUser.id },
+        select: { id: true }
+      });
+      
+      if (vendor) {
+        where.vendorId = vendor.id; // Lock to this farmer's orders only
+        console.log(`[getPurchaseOrderReport] Farmer user ${currentUser.id} restricted to vendor ID ${vendor.id}`);
+      } else {
+        console.warn(`[getPurchaseOrderReport] User role is VENDOR but no vendor record found for userId: ${currentUser.id}`);
+        // Return empty result if no vendor record found
+        return res.json({
+          success: true,
+          data: {
+            report: [],
+            totals: { totalPurchases: 0, totalItems: 0, totalQuantity: 0, totalAmount: 0, avgPurchaseValue: 0 },
+            filters: { startDate, endDate, farmerId, depotId, variantId, status, groupBy },
+            recordCount: 0
+          }
+        });
+      }
+    }
+    
     // Date range filter
     if (startDate || endDate) {
       where.orderDate = {};
@@ -191,30 +218,51 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
   try {
     const { startDate, endDate, agencyId, areaId, status, groupBy = 'agency,area,status' } = req.query;
 
-    // Build where clause for delivery schedule entries
-    const where = {};
+    // Build base where clause for delivery schedule entries
+    const baseWhere = {};
     if (startDate || endDate) {
-      where.deliveryDate = {};
-      if (startDate) where.deliveryDate.gte = new Date(startDate);
+      baseWhere.deliveryDate = {};
+      if (startDate) baseWhere.deliveryDate.gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.deliveryDate.lte = end;
+        baseWhere.deliveryDate.lte = end;
       }
     }
-    if (status) where.status = status;
-    if (agencyId) where.agentId = parseInt(agencyId, 10);
-    
-    // For area filtering, we need to filter through the delivery address location
+    if (status) baseWhere.status = status;
+
+    // For area filtering, filter through the delivery address location
     if (areaId) {
-      where.deliveryAddress = {
+      baseWhere.deliveryAddress = {
         locationId: parseInt(areaId, 10)
       };
     }
 
+    // Enforce agency scoping
+    let agencyScope = null;
+    if (req.user?.role === 'AGENCY' && req.user?.agencyId) {
+      // Lock to the logged-in agent's agency
+      agencyScope = {
+        OR: [
+          { subscription: { agencyId: parseInt(req.user.agencyId, 10) } },
+          { agentId: parseInt(req.user.agencyId, 10) }
+        ]
+      };
+    } else if (agencyId) {
+      // Admin provided agency filter
+      agencyScope = {
+        OR: [
+          { subscription: { agencyId: parseInt(agencyId, 10) } },
+          { agentId: parseInt(agencyId, 10) }
+        ]
+      };
+    }
+
+    const finalWhere = agencyScope ? { AND: [baseWhere, agencyScope] } : baseWhere;
+
     // Fetch delivery schedule entries with all related data
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
-      where,
+      where: finalWhere,
       include: {
         subscription: {
           include: {
@@ -247,6 +295,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       },
       orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }]
     });
+    
 
     // Transform to flat structure expected by frontend exporter
     const flat = [];
@@ -329,89 +378,247 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
   }
 };
 
-// Delivery Summaries Report (agency-wise status counts in tabular format)
+// Delivery Summaries Report (agency-wise and variant-wise status counts in tabular format)
 exports.getDeliverySummariesReport = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, groupBy = 'agency', agencyId } = req.query; // Added groupBy and optional agencyId parameter
 
-    // Build where clause for delivery schedule entries
-    const where = {};
+    // Build base where clause for delivery schedule entries
+    const baseWhere = {};
     if (startDate || endDate) {
-      where.deliveryDate = {};
-      if (startDate) where.deliveryDate.gte = new Date(startDate);
+      baseWhere.deliveryDate = {};
+      if (startDate) baseWhere.deliveryDate.gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.deliveryDate.lte = end;
+        baseWhere.deliveryDate.lte = end;
       }
     }
 
-    // Fetch delivery schedule entries with agency and status information
+    // Enforce agency scoping similar to delivery agencies report
+    let agencyScope = null;
+    if (req.user?.role === 'AGENCY' && req.user?.agencyId) {
+      agencyScope = {
+        OR: [
+          { subscription: { agencyId: parseInt(req.user.agencyId, 10) } },
+          { agentId: parseInt(req.user.agencyId, 10) }
+        ]
+      };
+    } else if (agencyId) {
+      agencyScope = {
+        OR: [
+          { subscription: { agencyId: parseInt(agencyId, 10) } },
+          { agentId: parseInt(agencyId, 10) }
+        ]
+      };
+    }
+
+    const finalWhere = agencyScope ? { AND: [baseWhere, agencyScope] } : baseWhere;
+
+    // Fetch delivery schedule entries with agency, variant, and product information
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
-      where,
+      where: finalWhere,
       include: {
         subscription: {
           include: {
-            agency: { select: { id: true, name: true, city: true } }
+            agency: { select: { id: true, name: true, city: true } },
+            product: { select: { id: true, name: true } },
+            depotProductVariant: { select: { id: true, name: true } }
           }
         },
-        agent: { select: { id: true, name: true, city: true } }
+        agent: { select: { id: true, name: true, city: true } },
+        DepotProductVariant: { select: { id: true, name: true } },
+        product: { select: { id: true, name: true } }
       },
       orderBy: [{ deliveryDate: 'desc' }]
     });
+    
+    console.log(`\n=== DELIVERY SUMMARIES DEBUG ===`);
+    console.log(`GroupBy parameter: ${groupBy}`);
+    console.log(`Total deliveries found: ${deliveries.length}`);
+    
+    // Sample first few deliveries to understand data structure
+    if (deliveries.length > 0) {
+      console.log(`\nSample delivery data (first 3):`);
+      deliveries.slice(0, 3).forEach((d, idx) => {
+        console.log(`Delivery ${idx + 1}:`);
+        console.log(`  - ID: ${d.id}`);
+        console.log(`  - Status: ${d.status}`);
+        console.log(`  - Quantity: ${d.quantity}`);
+        console.log(`  - Direct DepotProductVariant: ${JSON.stringify(d.DepotProductVariant)}`);
+        console.log(`  - Direct Product: ${JSON.stringify(d.product)}`);
+        console.log(`  - Subscription Product: ${JSON.stringify(d.subscription?.product)}`);
+        console.log(`  - Subscription DepotProductVariant: ${JSON.stringify(d.subscription?.depotProductVariant)}`);
+        console.log(`  ---`);
+      });
+    }
 
-    // Group by agency and count status-wise
-    const agencySummary = new Map();
+    let summaryData = [];
     const statusSet = new Set();
-
-    deliveries.forEach(d => {
-      const agencyId = d.agent?.id || d.subscription?.agency?.id;
-      const agencyName = d.agent?.name || d.subscription?.agency?.name || 'Unknown Agency';
-      const agencyCity = d.agent?.city || d.subscription?.agency?.city || '';
-      const status = d.status || 'UNKNOWN';
-      
-      statusSet.add(status);
-      
-      if (!agencySummary.has(agencyId)) {
-        agencySummary.set(agencyId, {
-          id: agencyId,
-          name: agencyName,
-          city: agencyCity,
-          statusCounts: {},
-          totalCount: 0
-        });
-      }
-      
-      const agency = agencySummary.get(agencyId);
-      agency.statusCounts[status] = (agency.statusCounts[status] || 0) + 1;
-      agency.totalCount += 1;
-    });
-
-    // Convert to array format
-    const summaryData = Array.from(agencySummary.values());
-    const statusList = Array.from(statusSet).sort();
-
-    // Calculate totals
     const totals = {
       totalDeliveries: deliveries.length,
-      totalAgencies: summaryData.length,
       statusTotals: {}
     };
+
+    // Group by specified criteria (agency, variant, or both)
+    if (groupBy === 'variant') {
+      // Group by variant and count status-wise
+      const variantSummary = new Map();
+      
+      console.log('Processing deliveries for variant grouping:', deliveries.length);
+      
+      deliveries.forEach(d => {
+        // More robust variant ID extraction
+        const variantId = d.DepotProductVariant?.id || 
+                         d.subscription?.depotProductVariant?.id || 
+                         d.subscription?.depotVariantId || 
+                         'unknown-variant';
+        
+        const variantName = d.DepotProductVariant?.name || 
+                           d.subscription?.depotProductVariant?.name || 
+                           'Unknown Variant';
+        
+        const productName = d.product?.name || 
+                           d.subscription?.product?.name || 
+                           'Unknown Product';
+        
+        const status = d.status || 'UNKNOWN';
+        const quantity = d.quantity || 1;
+        
+        statusSet.add(status);
+        
+        // Use a combination of product and variant for unique identification
+        const uniqueKey = `${productName}_${variantName}_${variantId}`;
+        const displayKey = `${productName} - ${variantName}`;
+        
+        console.log(`Processing delivery ${d.id}: Product=${productName}, Variant=${variantName}, Status=${status}, Qty=${quantity}`);
+        
+        if (!variantSummary.has(uniqueKey)) {
+          variantSummary.set(uniqueKey, {
+            id: uniqueKey,
+            name: displayKey,
+            productName: productName,
+            variantName: variantName,
+            statusCounts: {},
+            quantityCounts: {},
+            totalCount: 0,
+            totalQuantity: 0
+          });
+          console.log(`Created new variant group: ${displayKey}`);
+        }
+        
+        const variant = variantSummary.get(uniqueKey);
+        variant.statusCounts[status] = (variant.statusCounts[status] || 0) + 1;
+        variant.quantityCounts[status] = (variant.quantityCounts[status] || 0) + quantity;
+        variant.totalCount += 1;
+        variant.totalQuantity += quantity;
+        
+        console.log(`Updated variant ${displayKey}: ${status} count=${variant.statusCounts[status]}, qty=${variant.quantityCounts[status]}`);
+      });
+      
+      summaryData = Array.from(variantSummary.values());
+      totals.totalVariants = summaryData.length;
+      
+      console.log('Final variant summary:', summaryData.map(v => ({ name: v.name, totalCount: v.totalCount, statusCounts: v.statusCounts })));
+      
+    } else if (groupBy === 'agency,variant' || groupBy === 'variant,agency') {
+      // Group by both agency and variant
+      const combinedSummary = new Map();
+      
+      deliveries.forEach(d => {
+        const agencyId = d.agent?.id || d.subscription?.agency?.id;
+        const agencyName = d.agent?.name || d.subscription?.agency?.name || 'Unknown Agency';
+        const agencyCity = d.agent?.city || d.subscription?.agency?.city || '';
+        const variantId = d.DepotProductVariant?.id || d.subscription?.depotProductVariant?.id;
+        const variantName = d.DepotProductVariant?.name || d.subscription?.depotProductVariant?.name || 'Unknown Variant';
+        const productName = d.product?.name || d.subscription?.product?.name || 'Unknown Product';
+        const status = d.status || 'UNKNOWN';
+        const quantity = d.quantity || 1;
+        
+        statusSet.add(status);
+        
+        const key = `${agencyName} - ${productName} - ${variantName}`;
+        const combinedId = `${agencyId}_${variantId}`;
+        
+        if (!combinedSummary.has(combinedId)) {
+          combinedSummary.set(combinedId, {
+            id: combinedId,
+            name: key,
+            agencyName: agencyName,
+            agencyCity: agencyCity,
+            productName: productName,
+            variantName: variantName,
+            statusCounts: {},
+            quantityCounts: {},
+            totalCount: 0,
+            totalQuantity: 0
+          });
+        }
+        
+        const combined = combinedSummary.get(combinedId);
+        combined.statusCounts[status] = (combined.statusCounts[status] || 0) + 1;
+        combined.quantityCounts[status] = (combined.quantityCounts[status] || 0) + quantity;
+        combined.totalCount += 1;
+        combined.totalQuantity += quantity;
+      });
+      
+      summaryData = Array.from(combinedSummary.values());
+      totals.totalCombinations = summaryData.length;
+      
+    } else {
+      // Default: Group by agency only
+      const agencySummary = new Map();
+      
+      deliveries.forEach(d => {
+        const agencyId = d.agent?.id || d.subscription?.agency?.id;
+        const agencyName = d.agent?.name || d.subscription?.agency?.name || 'Unknown Agency';
+        const agencyCity = d.agent?.city || d.subscription?.agency?.city || '';
+        const status = d.status || 'UNKNOWN';
+        const quantity = d.quantity || 1;
+        
+        statusSet.add(status);
+        
+        if (!agencySummary.has(agencyId)) {
+          agencySummary.set(agencyId, {
+            id: agencyId,
+            name: agencyName,
+            city: agencyCity,
+            statusCounts: {},
+            quantityCounts: {},
+            totalCount: 0,
+            totalQuantity: 0
+          });
+        }
+        
+        const agency = agencySummary.get(agencyId);
+        agency.statusCounts[status] = (agency.statusCounts[status] || 0) + 1;
+        agency.quantityCounts[status] = (agency.quantityCounts[status] || 0) + quantity;
+        agency.totalCount += 1;
+        agency.totalQuantity += quantity;
+      });
+      
+      summaryData = Array.from(agencySummary.values());
+      totals.totalAgencies = summaryData.length;
+    }
+
+    const statusList = Array.from(statusSet).sort();
     
+    // Calculate status totals
     statusList.forEach(status => {
-      totals.statusTotals[status] = summaryData.reduce((sum, agency) => 
-        sum + (agency.statusCounts[status] || 0), 0
+      totals.statusTotals[status] = summaryData.reduce((sum, item) => 
+        sum + (item.statusCounts[status] || 0), 0
       );
     });
 
-    return res.json({
+return res.json({
       success: true,
       data: {
         summary: summaryData,
         statusList: statusList,
         totals,
-        filters: { startDate, endDate },
-        recordCount: deliveries.length
+        filters: { startDate, endDate, groupBy, agencyId },
+        recordCount: deliveries.length,
+        groupBy: groupBy
       }
     });
   } catch (error) {
@@ -464,7 +671,22 @@ function processGroupedData(orders, groupByLevels) {
   
   orders.forEach(order => {
     order.items.forEach(item => {
-      flatData.push({
+          // Compute wastage based on supervisor quantity rules for delivered orders
+          // Prefer deliveredQuantity; if absent, fall back to receivedQuantity
+          const deliveredQtyVal = (item.deliveredQuantity ?? item.receivedQuantity ?? 0) || 0;
+          const supervisorQtyRaw = (item.supervisorQuantity === undefined ? null : item.supervisorQuantity);
+          let wastageVal = undefined;
+          // Consider an item "delivered" if delivered/received qty > 0
+          if (deliveredQtyVal > 0) {
+            const showWastage = (supervisorQtyRaw === null) || (typeof supervisorQtyRaw === 'number' && supervisorQtyRaw > 0);
+            if (showWastage) {
+              const supervisorForCalc = supervisorQtyRaw ?? 0;
+              const calc = deliveredQtyVal - supervisorForCalc;
+              wastageVal = calc >= 0 ? calc : 0; // Ensure non-negative
+            }
+          }
+
+          flatData.push({
         purchaseId: order.id,
         purchaseNo: order.poNumber || `ORD-${order.id}`,
         purchaseDate: order.orderDate,
@@ -492,9 +714,10 @@ function processGroupedData(orders, groupByLevels) {
         
         // Quantities and amounts
         quantity: item.quantity,
-        deliveredQuantity: item.deliveredQuantity || 0,
+        deliveredQuantity: deliveredQtyVal,
         receivedQuantity: item.receivedQuantity || 0,
-        supervisorQuantity: item.supervisorQuantity || 0,
+        supervisorQuantity: supervisorQtyRaw, // Preserve null to differentiate from 0
+        wastage: wastageVal,
         purchaseRate: item.priceAtPurchase,
         amount: item.quantity * item.priceAtPurchase,
         

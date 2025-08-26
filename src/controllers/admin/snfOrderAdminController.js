@@ -15,18 +15,59 @@ const getAllSNFOrders = asyncHandler(async (req, res) => {
   const search = (req.query.search || '').trim();
   const sortBy = req.query.sortBy || 'createdAt';
   const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+  const startDate = req.query.startDate || '';
+  const endDate = req.query.endDate || '';
 
-  const where = search
-    ? {
-        OR: [
-          { orderNo: { contains: search } },
-          { name: { contains: search } },
-          { mobile: { contains: search } },
-          { email: { contains: search } },
-          { city: { contains: search } },
-        ],
+  // Build dynamic where clause
+  const whereConditions = [];
+
+  // Search filter
+  if (search) {
+    whereConditions.push({
+      OR: [
+        { orderNo: { contains: search } },
+        { name: { contains: search } },
+        { mobile: { contains: search } },
+        { email: { contains: search } },
+        { city: { contains: search } },
+      ],
+    });
+  }
+
+  // Date range filters with validation
+  if (startDate || endDate) {
+    const dateFilter = {};
+    
+    if (startDate) {
+      const start = new Date(startDate);
+      if (isNaN(start.getTime())) {
+        res.status(400);
+        throw new Error(`Invalid startDate format: ${startDate}. Please use YYYY-MM-DD format.`);
       }
-    : {};
+      start.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = start;
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate);
+      if (isNaN(end.getTime())) {
+        res.status(400);
+        throw new Error(`Invalid endDate format: ${endDate}. Please use YYYY-MM-DD format.`);
+      }
+      end.setUTCHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+    
+    // Validate date range logic
+    if (dateFilter.gte && dateFilter.lte && dateFilter.gte > dateFilter.lte) {
+      res.status(400);
+      throw new Error('startDate cannot be after endDate.');
+    }
+    
+    whereConditions.push({ createdAt: dateFilter });
+  }
+
+  const where = whereConditions.length > 0 ? { AND: whereConditions } : {};
 
   const totalRecords = await prisma.sNFOrder.count({ where });
   const totalPages = Math.ceil(totalRecords / limit);
