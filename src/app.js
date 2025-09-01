@@ -46,6 +46,7 @@ const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const unitConversionRoutes = require("./routes/unitConversionRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -67,7 +68,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "http://localhost:3000"];
+  : ["http://localhost:5173", "https://snf.3.7.237.251.sslip.io/"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
@@ -155,7 +156,7 @@ app.use(
 app.use(
   "/api/purchases",
   authMiddleware,
-  roleGuard("ADMIN", "DepotAdmin", "VENDOR"),
+  // roleGuard("ADMIN", "DepotAdmin", "VENDOR"),
   purchaseRoutes
 );
 app.use(
@@ -230,6 +231,12 @@ app.use(
   authMiddleware,
   roleGuard("ADMIN", "DepotAdmin", "VENDOR", "AGENCY", "SUPERVISOR"),
   reportRoutes
+);
+app.use(
+  "/api/admin/unit-conversion",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  unitConversionRoutes
 );
 app.use(swaggerRouter);
 

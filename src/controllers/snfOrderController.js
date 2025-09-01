@@ -50,6 +50,7 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     paymentRefNo = null,
     paymentStatus = 'PENDING',
     paymentDate = null,
+    deliveryDate = null, // Selected delivery date from frontend
     depotId = null, // Optional depot association
   } = req.body || {};
 
@@ -199,6 +200,7 @@ const createSNFOrder = asyncHandler(async (req, res) => {
         paymentStatus,
         paymentRefNo,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
+        deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
         items: {
           create: preparedItems,
         },

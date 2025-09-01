@@ -1,6 +1,20 @@
 const asyncHandler = require('express-async-handler');
 const prisma = require('../../config/db'); // Prisma Client
 
+// Helper function to parse deliverySchedule JSON
+const parseDeliverySchedule = (areaMaster) => {
+  if (areaMaster.deliverySchedule) {
+    try {
+      areaMaster.deliverySchedule = JSON.parse(areaMaster.deliverySchedule);
+    } catch (error) {
+      areaMaster.deliverySchedule = [];
+    }
+  } else {
+    areaMaster.deliverySchedule = [];
+  }
+  return areaMaster;
+};
+
 /**
  * @desc    Get all AreaMasters for public use (frontend dropdown)
  * @route   GET /api/public/area-masters
@@ -15,6 +29,7 @@ const getPublicAreaMasters = asyncHandler(async (req, res) => {
         pincodes: true,
         deliveryType: true,
         isDairyProduct: true,
+        deliverySchedule: true,
         depot: {
           select: {
             id: true,
@@ -37,9 +52,12 @@ const getPublicAreaMasters = asyncHandler(async (req, res) => {
       },
     });
 
+    // Parse deliverySchedule for all area masters
+    const parsedAreaMasters = areaMasters.map(parseDeliverySchedule);
+
     res.status(200).json({
       success: true,
-      data: areaMasters,
+      data: parsedAreaMasters,
     });
   } catch (error) {
     console.error('Error fetching public area masters:', error);
@@ -76,6 +94,7 @@ const validateDairySupport = asyncHandler(async (req, res) => {
         name: true,
         isDairyProduct: true,
         deliveryType: true,
+        deliverySchedule: true,
         depot: {
           select: {
             id: true,
@@ -102,14 +121,18 @@ const validateDairySupport = asyncHandler(async (req, res) => {
     const dairySupportedAreas = areaMasters.filter(area => area.isDairyProduct);
     const hasSupport = dairySupportedAreas.length > 0;
 
+    // Parse deliverySchedule for all area masters
+    const parsedAreaMasters = areaMasters.map(parseDeliverySchedule);
+    const parsedDairySupportedAreas = dairySupportedAreas.map(parseDeliverySchedule);
+
     res.status(200).json({
       success: true,
       supported: hasSupport,
       message: hasSupport 
         ? 'Dairy products are available in your area' 
         : 'Dairy products are not currently available in your area',
-      areas: areaMasters,
-      dairySupportedAreas,
+      areas: parsedAreaMasters,
+      dairySupportedAreas: parsedDairySupportedAreas,
     });
   } catch (error) {
     console.error('Error validating dairy support:', error);
@@ -146,6 +169,7 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
         pincodes: true,
         deliveryType: true,
         isDairyProduct: true,
+        deliverySchedule: true,
         depot: {
           select: {
             id: true,
@@ -168,10 +192,13 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
       },
     });
 
+    // Parse deliverySchedule for all area masters
+    const parsedAreaMasters = areaMasters.map(parseDeliverySchedule);
+
     res.status(200).json({
       success: true,
-      data: areaMasters,
-      count: areaMasters.length,
+      data: parsedAreaMasters,
+      count: parsedAreaMasters.length,
     });
   } catch (error) {
     console.error('Error fetching area masters by pincode:', error);

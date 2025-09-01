@@ -44,6 +44,16 @@ module.exports = async (req, res, next) => {
       }
     }
 
+    // If user is a depot user, their depotId is already in the user record
+    const userRoleUpper = user.role?.toUpperCase();
+    if (userRoleUpper === 'DEPOTADMIN' || userRoleUpper === 'DEPOT_ADMIN' || userRoleUpper?.includes('DEPOT')) {
+      if (user.depotId) {
+        console.log(`[AuthMiddleware] Depot user. Depot ID: ${user.depotId} already attached to user.`);
+      } else {
+        console.warn(`[AuthMiddleware] User role is ${user.role} but no depotId found for userId: ${user.id}`);
+      }
+    }
+
     req.user = user;
     console.log('[AuthMiddleware] Authentication successful. User set on req.user.');
     next();

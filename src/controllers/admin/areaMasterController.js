@@ -2,13 +2,27 @@ const asyncHandler = require('express-async-handler');
 const prisma = require('../../config/db'); // Prisma Client
 const { DeliveryType } = require('@prisma/client'); // Import DeliveryType enum
 
+// Helper function to parse deliverySchedule JSON
+const parseDeliverySchedule = (areaMaster) => {
+  if (areaMaster.deliverySchedule) {
+    try {
+      areaMaster.deliverySchedule = JSON.parse(areaMaster.deliverySchedule);
+    } catch (error) {
+      areaMaster.deliverySchedule = [];
+    }
+  } else {
+    areaMaster.deliverySchedule = [];
+  }
+  return areaMaster;
+};
+
 /**
  * @desc    Create a new AreaMaster
  * @route   POST /api/admin/areamasters
  * @access  Private/Admin
  */
 const createAreaMaster = asyncHandler(async (req, res) => {
-  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId, deliverySchedule } = req.body;
 
   if (!name || !pincodes || !deliveryType) {
     res.status(400);
@@ -25,6 +39,7 @@ const createAreaMaster = asyncHandler(async (req, res) => {
     pincodes,
     deliveryType,
     isDairyProduct: Boolean(isDairyProduct),
+    deliverySchedule: deliverySchedule ? JSON.stringify(deliverySchedule) : null,
   };
 
   if (depotId) {
@@ -53,7 +68,7 @@ const createAreaMaster = asyncHandler(async (req, res) => {
     data,
   });
 
-  res.status(201).json(areaMaster);
+  res.status(201).json(parseDeliverySchedule(areaMaster));
 });
 
 /**
@@ -120,8 +135,11 @@ const getAllAreaMasters = asyncHandler(async (req, res) => {
     orderBy: orderByClause,
   });
 
+  // Parse deliverySchedule for all area masters
+  const parsedAreaMasters = areaMasters.map(parseDeliverySchedule);
+
   res.status(200).json({
-    areaMasters,
+    areaMasters: parsedAreaMasters,
     page,
     totalPages,
     totalRecords,
@@ -158,7 +176,7 @@ const getAreaMasterById = asyncHandler(async (req, res) => {
     throw new Error('AreaMaster not found');
   }
 
-  res.status(200).json(areaMaster);
+  res.status(200).json(parseDeliverySchedule(areaMaster));
 });
 
 /**
@@ -168,7 +186,7 @@ const getAreaMasterById = asyncHandler(async (req, res) => {
  */
 const updateAreaMaster = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId } = req.body;
+  const { name, pincodes, depotId, deliveryType, isDairyProduct, cityId, deliverySchedule } = req.body;
 
   if (deliveryType && !Object.values(DeliveryType).includes(deliveryType)) {
     res.status(400);
@@ -181,6 +199,7 @@ const updateAreaMaster = asyncHandler(async (req, res) => {
   if (pincodes !== undefined) dataToUpdate.pincodes = pincodes;
   if (deliveryType !== undefined) dataToUpdate.deliveryType = deliveryType;
   if (isDairyProduct !== undefined) dataToUpdate.isDairyProduct = Boolean(isDairyProduct);
+  if (deliverySchedule !== undefined) dataToUpdate.deliverySchedule = deliverySchedule ? JSON.stringify(deliverySchedule) : null;
 
   if (depotId !== undefined) {
     if (depotId === null || depotId === '') {
@@ -227,7 +246,7 @@ const updateAreaMaster = asyncHandler(async (req, res) => {
         },
       },
     });
-    res.status(200).json(updatedAreaMaster);
+    res.status(200).json(parseDeliverySchedule(updatedAreaMaster));
   } catch (error) {
     if (error.code === 'P2025') { // Prisma error code for record not found
       res.status(404);

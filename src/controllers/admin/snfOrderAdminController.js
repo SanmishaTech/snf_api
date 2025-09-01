@@ -93,6 +93,7 @@ const getAllSNFOrders = asyncHandler(async (req, res) => {
       paymentStatus: true,
       invoiceNo: true,
       invoicePath: true,
+      deliveryDate: true,
       createdAt: true,
       depot: {
         select: {

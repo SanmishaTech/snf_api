@@ -36,6 +36,7 @@ model User {
   processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions")
   wastagesCreated       Wastage[]           @relation("WastageCreatedBy")
   wastagesUpdated       Wastage[]           @relation("WastageUpdatedBy")
+  unitConversions       UnitConversionHistory[]
 
   @@index([depotId], map: "users_depotId_fkey")
   @@map("users")
@@ -312,6 +313,7 @@ model Depot {
   orderItems              OrderItem[]
   wastages                Wastage[]
   agencies                Agency[]
+  unitConversions         UnitConversionHistory[]
 
   @@map("depots")
 }
@@ -343,17 +345,18 @@ model DeliveryAddress {
 }
 
 model AreaMaster {
-  id             Int          @id @default(autoincrement())
-  name           String
-  pincodes       String       @db.LongText
-  deliveryType   DeliveryType
-  depotId        Int?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  isDairyProduct Boolean      @default(false)
-  cityId         Int?
-  city           City?        @relation(fields: [cityId], references: [id])
-  depot          Depot?       @relation(fields: [depotId], references: [id])
+  id              Int          @id @default(autoincrement())
+  name            String
+  pincodes        String       @db.LongText
+  deliveryType    DeliveryType
+  depotId         Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  isDairyProduct  Boolean      @default(false)
+  cityId          Int?
+  deliverySchedule String?     @db.Text
+  city            City?        @relation(fields: [cityId], references: [id])
+  depot           Depot?       @relation(fields: [depotId], references: [id])
 
   @@index([depotId])
   @@index([cityId])
@@ -639,6 +642,8 @@ model DepotProductVariant {
   transfersTo             TransferDetail[]        @relation("TransferToVariant")
   orderItems              OrderItem[]
   wastageDetails          WastageDetail[]
+  sourceConversions       UnitConversionHistory[] @relation("SourceVariant")
+  targetConversions       UnitConversionHistory[] @relation("TargetVariant")
 
   @@index([productId])
   @@index([depotId])
@@ -754,6 +759,7 @@ model SNFOrder {
   paymentStatus PaymentStatus  @default(PENDING)
   paymentRefNo  String?
   paymentDate   DateTime?
+  deliveryDate  DateTime?      @db.Date
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   depotId       Int?
@@ -885,4 +891,33 @@ enum LeadStatus {
   CONTACTED
   CONVERTED
   CLOSED
+}
+
+model UnitConversionHistory {
+  id                Int      @id @default(autoincrement())
+  depotId           Int
+  sourceVariantId   Int
+  targetVariantId   Int
+  sourceQuantity    Float
+  targetQuantity    Float
+  sourceVariantName String
+  targetVariantName String
+  performedBy       String
+  performedById     Int?
+  notes             String?  @db.Text
+  performedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  depot         Depot                @relation(fields: [depotId], references: [id])
+  sourceVariant DepotProductVariant @relation("SourceVariant", fields: [sourceVariantId], references: [id])
+  targetVariant DepotProductVariant @relation("TargetVariant", fields: [targetVariantId], references: [id])
+  performer     User?               @relation(fields: [performedById], references: [id])
+
+  @@index([depotId])
+  @@index([sourceVariantId])
+  @@index([targetVariantId])
+  @@index([performedAt])
+  @@map("unit_conversion_history")
 }

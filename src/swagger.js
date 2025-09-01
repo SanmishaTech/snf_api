@@ -14,7 +14,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000",
+        url: "https://snf.3.7.237.251.sslip.io/",
       },
     ],
     components: {

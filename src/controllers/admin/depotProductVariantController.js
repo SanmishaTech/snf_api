@@ -83,6 +83,7 @@ module.exports = {
       const {
         productId,
         depotId: queryDepotId,
+        search,
         page = 1,
         limit = 1000,
       } = req.query;
@@ -92,9 +93,12 @@ module.exports = {
 
       const where = {};
       // ------------------------------
-      // Depot filter handling
+      // Depot filter handling - Handle multiple role formats
       // ------------------------------
-      if (req.user?.role === "DEPOT_ADMIN" && req.user.depotId) {
+      const userRole = req.user?.role?.toUpperCase();
+      const isDepotUser = userRole === "DEPOT_ADMIN" || userRole === "DEPOTADMIN" || userRole?.includes("DEPOT");
+      
+      if (isDepotUser && req.user.depotId) {
         // Depot Admins are tied to their own depot; ignore query param
         where.depotId = req.user.depotId;
       } else if (queryDepotId) {
@@ -113,6 +117,36 @@ module.exports = {
           return next(createError(400, "Invalid productId query param"));
         where.productId = pId;
       }
+
+      // ------------------------------
+      // Search filter handling
+      // ------------------------------
+      if (search && search.trim()) {
+        const searchTerm = search.trim();
+        where.OR = [
+          {
+            name: {
+              contains: searchTerm
+            }
+          },
+          {
+            product: {
+              name: {
+                contains: searchTerm
+              }
+            }
+          },
+          {
+            depot: {
+              name: {
+                contains: searchTerm
+              }
+            }
+          }
+        ];
+      }
+
+      console.log('DepotProductVariant query params:', { userRole, isDepotUser, depotId: req.user?.depotId, search, where });
 
       const [variants, totalRecords] = await prisma.$transaction([
         prisma.depotProductVariant.findMany({

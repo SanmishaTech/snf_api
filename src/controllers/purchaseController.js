@@ -207,9 +207,13 @@ exports.listPurchases = async (req, res, next) => {
 
   // Role-based scope filters
   
-  // Depot scope filter for DepotAdmin
-  if (currentUser?.role === 'DepotAdmin' && currentUser.depotId) {
+  // Depot scope filter for DepotAdmin - Handle multiple role formats
+  const userRole = currentUser?.role?.toUpperCase();
+  const isDepotUser = userRole === 'DEPOTADMIN' || userRole === 'DEPOT_ADMIN' || userRole?.includes('DEPOT');
+  
+  if (isDepotUser && currentUser.depotId) {
     filters.push({ depotId: currentUser.depotId });
+    console.log(`[listPurchases] Applying depot filter for user role: ${currentUser.role}, depotId: ${currentUser.depotId}`);
   }
   
   // Vendor scope filter for VENDOR role users
