@@ -1,0 +1,746 @@
+nohup: ignoring input
+
+> node-star@1.0.0 start
+> node server.js
+
+snf bui ld path: /home/sanmisha/workdir/SNF/snf/dist
+Serving frontend static files from: /home/sanmisha/workdir/SNF/snf/dist
+Serving uploads from: /home/sanmisha/workdir/SNF/snf_api/uploads
+Serving invoices from: /home/sanmisha/workdir/SNF/snf_api/src/invoices
+Server is running on port 3006
+[AuthMiddleware] Attempting to authenticate for URL: /api/admin/reports/delivery-date-orders?deliveryDate=2025-01-02
+[AuthMiddleware] Authorization header: Bearer dummy-token
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Error during authentication: jwt malformed
+[ERROR HANDLER]: 401 Unauthorized: Invalid token 
+[0mGET /api/admin/reports/delivery-date-orders?deliveryDate=2025-01-02 [33m401[0m 11.280 ms - 64[0m
+[0mOPTIONS /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc [32m204[0m 0.629 ms - 0[0m
+[0mOPTIONS /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc [32m204[0m 3.342 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTE5NTMsImV4cCI6MTc4ODM0OTU1M30.LiB6akWNEYERWJLwc4SIv2_fZDeySfy497VJWD6ZkHw
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] Attempting to authenticate for URL: /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTE5NTMsImV4cCI6MTc4ODM0OTU1M30.LiB6akWNEYERWJLwc4SIv2_fZDeySfy497VJWD6ZkHw
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc [32m200[0m 185.930 ms - 61[0m
+[0mGET /api/admin/snf-orders?page=1&limit=10&search=&sortBy=createdAt&sortOrder=desc [32m200[0m 175.524 ms - 61[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 105.812 ms - 278[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 124.887 ms - 278[0m
+[0mGET /api/products/1 [32m200[0m 166.085 ms - 541[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/banners/bannerImage/1e286adc-ebcb-48ec-b415-32dd37e746b7/Mainpage.png [33m404[0m 7.321 ms - 74[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 212.251 ms - 681[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 10.372 ms - 74[0m
+[0mGET /api/public/area-masters [32m200[0m 80.566 ms - 1050[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 102.044 ms - 1380[0m
+[0mOPTIONS /api/auth/login [32m204[0m 0.177 ms - 0[0m
+[LOGIN_TRACE] Attempting login...
+[LOGIN_TRACE] Validating request body...
+[LOGIN_TRACE] Attempting to fetch user: testing@gmail.com
+[LOGIN_TRACE] User fetched: 51
+[LOGIN_TRACE] Comparing password...
+[LOGIN_TRACE] Password valid: true
+[LOGIN_TRACE] Checking if user active: true
+[LOGIN_TRACE] Updating lastLogin...
+[LOGIN_TRACE] lastLogin updated.
+[LOGIN_TRACE] Base token payload created.
+[LOGIN_TRACE] Signing JWT token...
+[LOGIN_TRACE] JWT token signed.
+[LOGIN_TRACE] Preparing to send response...
+[LOGIN_TRACE] Response should have been sent.
+[0mPOST /api/auth/login [32m200[0m 342.768 ms - 552[0m
+[0mOPTIONS /api/depots?limit=1000 [32m204[0m 0.165 ms - 0[0m
+[0mOPTIONS /api/products/1 [32m204[0m 0.157 ms - 0[0m
+[0mGET /api/products/1 [32m200[0m 17.104 ms - 541[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 25.087 ms - 681[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.217 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.170 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 122.975 ms - 108[0m
+[0mGET /api/wallet [32m200[0m 131.846 ms - 108[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 10.270 ms - 74[0m
+[0mOPTIONS /api/public/area-masters [32m204[0m 0.319 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1 [32m204[0m 0.146 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.176 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.146 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/public/area-masters [32m200[0m 57.739 ms - 1050[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 75.959 ms - 1380[0m
+[0mGET /api/users/me [32m200[0m 94.175 ms - 89[0m
+[0mGET /api/users/me [32m200[0m 130.808 ms - 89[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.125 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUxNDUsImV4cCI6MTc4ODM1Mjc0NX0.cq5nMIedWD98qWe1mtF7ahr2hi3t8-qaDG_OLBz9dSM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 67.529 ms - 108[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 1.813 ms - 74[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 1.147 ms - 74[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 39.638 ms - 278[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 38.688 ms - 278[0m
+[0mGET /api/products/1 [32m200[0m 46.537 ms - 541[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 63.030 ms - 681[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 72.104 ms - 1380[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/banners/bannerImage/1e286adc-ebcb-48ec-b415-32dd37e746b7/Mainpage.png [33m404[0m 0.872 ms - 74[0m
+[0mOPTIONS /api/auth/login [32m204[0m 0.142 ms - 0[0m
+[LOGIN_TRACE] Attempting login...
+[LOGIN_TRACE] Validating request body...
+[LOGIN_TRACE] Attempting to fetch user: admin@snf.com
+[LOGIN_TRACE] User fetched: 1
+[LOGIN_TRACE] Comparing password...
+[LOGIN_TRACE] Password valid: false
+[LOGIN_TRACE] Invalid password.
+[ERROR HANDLER]: 401 Invalid credentials 
+[0mPOST /api/auth/login [33m401[0m 184.185 ms - 56[0m
+[0mOPTIONS /api/auth/login [32m204[0m 0.148 ms - 0[0m
+[LOGIN_TRACE] Attempting login...
+[LOGIN_TRACE] Validating request body...
+[LOGIN_TRACE] Attempting to fetch user: admin@snf.com
+[LOGIN_TRACE] User fetched: 1
+[LOGIN_TRACE] Comparing password...
+[LOGIN_TRACE] Password valid: true
+[LOGIN_TRACE] Checking if user active: true
+[LOGIN_TRACE] Updating lastLogin...
+[LOGIN_TRACE] lastLogin updated.
+[LOGIN_TRACE] Base token payload created.
+[LOGIN_TRACE] Signing JWT token...
+[LOGIN_TRACE] JWT token signed.
+[LOGIN_TRACE] Preparing to send response...
+[LOGIN_TRACE] Response should have been sent.
+[0mPOST /api/auth/login [32m200[0m 252.231 ms - 566[0m
+[0mOPTIONS /api/product-orders?page=1&limit=10 [32m204[0m 0.605 ms - 0[0m
+[0mOPTIONS /api/agencies [32m204[0m 0.137 ms - 0[0m
+[0mOPTIONS /api/product-orders?page=1&limit=10 [32m204[0m 0.257 ms - 0[0m
+[0mOPTIONS /api/agencies [32m204[0m 0.113 ms - 0[0m
+[0mOPTIONS /api/product-orders?page=1&limit=10 [32m204[0m 0.147 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/product-orders?page=1&limit=10
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] Attempting to authenticate for URL: /api/product-orders?page=1&limit=10
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] Attempting to authenticate for URL: /api/agencies
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] Attempting to authenticate for URL: /api/agencies
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] Attempting to authenticate for URL: /api/product-orders?page=1&limit=10
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/agencies
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/agencies
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBTTkYuY29tIiwicm9sZSI6IkFETUlOIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE3NTY3OTUxODUsImV4cCI6MTc4ODM1Mjc4NX0.BlXzJeF07ko4Rp7jEWdmiAMYMomrfHvY1t3nsBr9SGM
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 1
+[AuthMiddleware] User fetched from DB: User ID: 1, Role: ADMIN
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/agencies [32m200[0m 161.862 ms - 1557[0m
+[0mGET /api/agencies [32m200[0m 205.713 ms - 1557[0m
+Debug - First subscription data: {
+  subscriptionId: 178,
+  depotProductVariantId: 3,
+  depotProductVariant: { id: 3, name: '500ml', mrp: 55 },
+  productId: 1,
+  product: 'Indraai A2 Desi Gir Cow Milk'
+}
+[0mGET /api/product-orders?page=1&limit=10 [32m200[0m 299.582 ms - 36461[0m
+Debug - First subscription data: {
+  subscriptionId: 178,
+  depotProductVariantId: 3,
+  depotProductVariant: { id: 3, name: '500ml', mrp: 55 },
+  productId: 1,
+  product: 'Indraai A2 Desi Gir Cow Milk'
+}
+[0mGET /api/product-orders?page=1&limit=10 [32m200[0m 320.400 ms - 36461[0m
+Debug - First subscription data: {
+  subscriptionId: 178,
+  depotProductVariantId: 3,
+  depotProductVariant: { id: 3, name: '500ml', mrp: 55 },
+  productId: 1,
+  product: 'Indraai A2 Desi Gir Cow Milk'
+}
+[0mGET /api/product-orders?page=1&limit=10 [32m200[0m 334.132 ms - 36461[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 36.986 ms - 681[0m
+[0mGET /api/products/1 [32m200[0m 42.368 ms - 541[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 46.591 ms - 278[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 43.520 ms - 278[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/banners/bannerImage/1e286adc-ebcb-48ec-b415-32dd37e746b7/Mainpage.png [33m404[0m 3.904 ms - 74[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 6.088 ms - 74[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 28.499 ms - 1380[0m
+[0mGET /api/public/area-masters [32m200[0m 52.012 ms - 1050[0m
+[0mOPTIONS /api/auth/login [32m204[0m 0.125 ms - 0[0m
+[LOGIN_TRACE] Attempting login...
+[LOGIN_TRACE] Validating request body...
+[LOGIN_TRACE] Attempting to fetch user: testing@gmail.com
+[LOGIN_TRACE] User fetched: 51
+[LOGIN_TRACE] Comparing password...
+[LOGIN_TRACE] Password valid: false
+[LOGIN_TRACE] Invalid password.
+[ERROR HANDLER]: 401 Invalid credentials 
+[0mPOST /api/auth/login [33m401[0m 173.399 ms - 56[0m
+[0mOPTIONS /api/auth/login [32m204[0m 0.136 ms - 0[0m
+[LOGIN_TRACE] Attempting login...
+[LOGIN_TRACE] Validating request body...
+[LOGIN_TRACE] Attempting to fetch user: testing@gmail.com
+[LOGIN_TRACE] User fetched: 51
+[LOGIN_TRACE] Comparing password...
+[LOGIN_TRACE] Password valid: true
+[LOGIN_TRACE] Checking if user active: true
+[LOGIN_TRACE] Updating lastLogin...
+[LOGIN_TRACE] lastLogin updated.
+[LOGIN_TRACE] Base token payload created.
+[LOGIN_TRACE] Signing JWT token...
+[LOGIN_TRACE] JWT token signed.
+[LOGIN_TRACE] Preparing to send response...
+[LOGIN_TRACE] Response should have been sent.
+[0mPOST /api/auth/login [32m200[0m 229.226 ms - 552[0m
+[0mOPTIONS /api/depots?limit=1000 [32m204[0m 0.130 ms - 0[0m
+[0mOPTIONS /api/products/1 [32m204[0m 0.132 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.131 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.126 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/products/1 [32m200[0m 34.364 ms - 541[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/depots?limit=1000 [32m200[0m 40.021 ms - 681[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 81.878 ms - 108[0m
+[0mGET /api/wallet [32m200[0m 80.475 ms - 108[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 2.924 ms - 74[0m
+[0mOPTIONS /api/public/area-masters [32m204[0m 0.127 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1 [32m204[0m 0.122 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.147 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.139 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/public/area-masters [32m200[0m 32.360 ms - 1050[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 34.483 ms - 1380[0m
+[0mGET /api/users/me [32m200[0m 51.645 ms - 89[0m
+[0mGET /api/users/me [32m200[0m 58.340 ms - 89[0m
+[0mOPTIONS /api/public/depot-variants/1?depotId=1 [32m204[0m 0.138 ms - 0[0m
+[0mOPTIONS /api/public/area-masters [32m204[0m 0.125 ms - 0[0m
+[0mOPTIONS /api/admin/cities?limit=1000 [32m204[0m 0.106 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1?depotId=1 [32m204[0m 0.088 ms - 0[0m
+[0mOPTIONS /api/wallet/balance [32m204[0m 0.113 ms - 0[0m
+[0mOPTIONS /api/delivery-addresses [32m204[0m 0.119 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/admin/cities?limit=1000
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet/balance
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/delivery-addresses
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/public/depot-variants/1?depotId=1 [32m200[0m 48.478 ms - 695[0m
+[0mGET /api/public/area-masters [32m200[0m 35.353 ms - 1050[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet/balance
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/delivery-addresses
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/public/depot-variants/1?depotId=1 [32m200[0m 61.883 ms - 695[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/admin/cities?limit=1000 [32m200[0m 105.304 ms - 165[0m
+[0mGET /api/wallet/balance [32m200[0m 105.568 ms - 54[0m
+[0mGET /api/delivery-addresses [32m200[0m 114.328 ms - 334[0m
+[0mOPTIONS /api/public/depot-variants/1?depotId=1 [32m204[0m 0.150 ms - 0[0m
+[0mOPTIONS /api/public/area-masters [32m204[0m 0.153 ms - 0[0m
+[0mOPTIONS /api/admin/cities?limit=1000 [32m204[0m 0.123 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1?depotId=1 [32m204[0m 0.124 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/admin/cities?limit=1000
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/public/area-masters [32m200[0m 37.304 ms - 1050[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/public/depot-variants/1?depotId=1 [32m200[0m 31.472 ms - 695[0m
+[0mGET /api/public/depot-variants/1?depotId=1 [32m200[0m 52.319 ms - 695[0m
+[0mGET /api/admin/cities?limit=1000 [32m200[0m 45.425 ms - 165[0m
+[0mOPTIONS /api/product-orders/with-subscriptions [32m204[0m 0.123 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/product-orders/with-subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[processSubscription] Received subscription data: {
+  productId: 1,
+  period: 3,
+  startDate: '2025-09-04',
+  rawDeliverySchedule: 'daily',
+  qty: 1,
+  altQty: undefined
+}
+[DATE DEBUG - BACKEND] Frontend sent YYYY-MM-DD format: 2025-09-04
+[DATE DEBUG - BACKEND] Split parts: { part0: '2025', part1: '09', part2: '04' }
+[DATE DEBUG - BACKEND] Parsed integers: { year: 2025, monthZeroIndexed: 8, day: 4 }
+[DATE DEBUG - BACKEND] Will create Date with: new Date(Date.UTC(2025, 8, 4))
+[DATE DEBUG - BACKEND] Created final startDate object: Thu Sep 04 2025 05:30:00 GMT+0530 (India Standard Time)
+[DATE DEBUG - BACKEND] startDate.getFullYear(): 2025
+[DATE DEBUG - BACKEND] startDate.getMonth(): 8 (0-indexed)
+[DATE DEBUG - BACKEND] startDate.getDate(): 4
+[DATE DEBUG - BACKEND] startDate.toISOString(): 2025-09-04T00:00:00.000Z
+[DATE DEBUG - BACKEND] startDate.toDateString(): Thu Sep 04 2025
+[DATE DEBUG - BACKEND] Subscription order: expiryDate = startDate + 3 - 1
+[DATE DEBUG - BACKEND] Calculated expiryDate: Sat Sep 06 2025 05:30:00 GMT+0530 (India Standard Time) Sat Sep 06 2025
+[generateDeliveryDates ENTRY] StartDate: 2025-09-04T00:00:00.000Z, Period: 3, ScheduleType: DAILY, Qty: 1, AltQty: null, SelectedWeekdays: []
+[generateDeliveryDates] Computed effectiveScheduleType: DAILY
+[getPriceForPeriod] Period: 3, Variant: 1, Price calc: { periodPrice: 90, buyOncePrice: 100, mrp: 110, finalPrice: 90 }
+[processSubscription] Amount calculation: {
+  productId: 1,
+  subscriptionPeriod: 3,
+  parsedQty: 1,
+  deliveryScheduleDetailsCount: 3,
+  subscriptionTotalQty: 3,
+  rateForPeriod: 90,
+  subscriptionAmount: 270
+}
+Wallet calculation: {
+  walletAmountUsed: 0,
+  totalPayableAmount: 270,
+  subscriptionWalletShares: [ 0 ]
+}
+Using delivery address from subscription: Found
+Invoice created successfully: 2526-00039
+[0mPOST /api/product-orders/with-subscriptions [32m201[0m 1646.417 ms - 2479[0m
+[0mOPTIONS /api/subscriptions [32m204[0m 0.253 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/subscriptions [32m200[0m 214.266 ms - 24156[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.125 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 52.123 ms - 108[0m
+[0mOPTIONS /api/product-orders/168/cancel-subscriptions [32m204[0m 0.126 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/product-orders/168/cancel-subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mPATCH /api/product-orders/168/cancel-subscriptions [32m200[0m 185.158 ms - 1570[0m
+[0mOPTIONS /api/subscriptions [32m204[0m 0.166 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/subscriptions
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/subscriptions [32m200[0m 86.216 ms - 24158[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 1.413 ms - 74[0m
+[0mOPTIONS /api/public/depot-variants/1 [32m204[0m 0.135 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.123 ms - 0[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 0.958 ms - 74[0m
+[0mOPTIONS /api/depots?limit=1000 [32m204[0m 0.124 ms - 0[0m
+[0mOPTIONS /api/products/1 [32m204[0m 0.134 ms - 0[0m
+[0mOPTIONS /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m204[0m 0.122 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.129 ms - 0[0m
+[0mOPTIONS /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m204[0m 0.248 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.119 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.126 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/public/depot-variants/1 [32m200[0m 57.928 ms - 1380[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 33.949 ms - 278[0m
+[0mGET /api/products/1 [32m200[0m 50.044 ms - 541[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 69.781 ms - 681[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 40.424 ms - 278[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/users/me [32m200[0m 107.820 ms - 89[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/banners/bannerImage/1e286adc-ebcb-48ec-b415-32dd37e746b7/Mainpage.png [33m404[0m 7.369 ms - 74[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 73.606 ms - 108[0m
+[0mGET /api/users/me [32m200[0m 156.640 ms - 89[0m
+[0mGET /api/wallet [32m200[0m 88.522 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.240 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 58.376 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.130 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 72.527 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.127 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 53.498 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.117 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 64.368 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.141 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 47.550 ms - 108[0m
+[0mOPTIONS /api/depots?limit=1000 [32m204[0m 0.128 ms - 0[0m
+[0mOPTIONS /api/products/1 [32m204[0m 0.125 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1 [32m204[0m 0.149 ms - 0[0m
+[0mGET /api/depots?limit=1000 [32m200[0m 50.858 ms - 681[0m
+[0mGET /api/products/1 [32m200[0m 51.677 ms - 541[0m
+[0mGET /api/public/depot-variants/1 [32m200[0m 57.342 ms - 1380[0m
+[0mOPTIONS /api/depots?limit=1000 [32m204[0m 0.138 ms - 0[0m
+[0mOPTIONS /api/products/1 [32m204[0m 0.136 ms - 0[0m
+[0mOPTIONS /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m204[0m 2.348 ms - 0[0m
+[0mOPTIONS /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m204[0m 0.135 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.130 ms - 0[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.120 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/products/1 [32m200[0m 22.102 ms - 541[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[0mGET /api/depots?limit=1000 [32m200[0m 42.128 ms - 681[0m
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 60.235 ms - 278[0m
+[0mGET /api/admin/public/banners?sortBy=listOrder&sortOrder=asc&limit=7 [32m200[0m 71.791 ms - 278[0m
+[0mGET /api/wallet [32m200[0m 81.939 ms - 108[0m
+[0mGET /api/wallet [32m200[0m 80.647 ms - 108[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/banners/bannerImage/1e286adc-ebcb-48ec-b415-32dd37e746b7/Mainpage.png [33m404[0m 0.841 ms - 74[0m
+[0mOPTIONS /api/public/area-masters [32m204[0m 0.120 ms - 0[0m
+[0mOPTIONS /api/public/depot-variants/1 [32m204[0m 0.118 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 7.376 ms - 0[0m
+[0mOPTIONS /api/users/me [32m204[0m 0.105 ms - 0[0m
+[ERROR HANDLER]: 404 The requested resource was not found. 
+[0mGET //uploads/products/productAttachment/f94cf76e-49a5-49bb-8a58-616c24882c3c/7893620e-3005-4ffc-a39d-5f2136f30e08.jfif [33m404[0m 4.687 ms - 74[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] Attempting to authenticate for URL: /api/users/me
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/public/depot-variants/1 [32m200[0m 40.786 ms - 1380[0m
+[0mGET /api/public/area-masters [32m200[0m 43.069 ms - 1050[0m
+[0mGET /api/users/me [32m200[0m 39.473 ms - 89[0m
+[0mGET /api/users/me [32m200[0m 50.847 ms - 89[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.122 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 43.482 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.308 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 55.312 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.114 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 43.900 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.112 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 50.917 ms - 108[0m
+[0mOPTIONS /api/wallet [32m204[0m 0.116 ms - 0[0m
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[AuthMiddleware] Attempting to authenticate for URL: /api/wallet
+[AuthMiddleware] Authorization header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTEsImVtYWlsIjoidGVzdGluZ0BnbWFpbC5jb20iLCJyb2xlIjoiTUVNQkVSIiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NTY3OTUyMDksImV4cCI6MTc4ODM1MjgwOX0.741K_MPShq-kdebu_Jmvoi_b73Ry0zPOTykPWcWQO0U
+[AuthMiddleware] Token extracted: Token present
+[AuthMiddleware] Token decoded. User ID from token: 51
+[AuthMiddleware] User fetched from DB: User ID: 51, Role: MEMBER
+[AuthMiddleware] Authentication successful. User set on req.user.
+[0mGET /api/wallet [32m200[0m 35.914 ms - 108[0m
+Killed

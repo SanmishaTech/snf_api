@@ -115,6 +115,13 @@ const {
 
 // Import admin delivery routes
 const adminDeliveryRoutes = require('./adminDeliveryRoutes');
+const { 
+  getDeliveryDateOrdersReport, 
+  getReportFilters 
+} = require('../controllers/admin/deliveryReportController');
+const {
+  getDeliveryLabelingReport
+} = require('../controllers/admin/deliveryLabelingController');
 const authMiddleware = require('../middleware/auth'); // Corrected path to auth middleware
 const createUploadMiddleware = require('../middleware/uploadMiddleware');
 
@@ -294,5 +301,10 @@ router.patch('/delivery-addresses/:id/set-default', authMiddleware, setAdminDefa
 
 // Admin Delivery Management Routes
 router.use('/deliveries', adminDeliveryRoutes);
+
+// Delivery Date Orders Report Routes
+router.get('/reports/delivery-date-orders', authMiddleware, getDeliveryDateOrdersReport);
+router.get('/reports/delivery-labeling', authMiddleware, getDeliveryLabelingReport);
+router.get('/reports/filters', authMiddleware, getReportFilters);
 
 module.exports = router;

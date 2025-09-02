@@ -68,7 +68,7 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",")
-  : ["http://localhost:5173", "https://snf.3.7.237.251.sslip.io/"];
+  : ["http://localhost:5173", "https://snf.3.7.237.251.sslip.io"];
 
 const corsOptions = {
   origin: "*", // Specify the origin of your frontend application
