@@ -334,7 +334,82 @@ const getDeliveries = async (req, res) => {
   }
 };
 
+/**
+ * Admin-specific delivery date update
+ * Allows admin to change delivery date for a specific delivery entry
+ */
+const updateDeliveryDate = async (req, res) => {
+  const { id: idString } = req.params;
+  const { deliveryDate } = req.body;
+  const id = parseInt(idString, 10);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ID format. ID must be an integer.' });
+  }
+
+  // Ensure only ADMIN can use this endpoint
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden: Only admin users can use this endpoint.' });
+  }
+
+  if (!deliveryDate) {
+    return res.status(400).json({ error: 'deliveryDate is required.' });
+  }
+
+  // Validate date format
+  const targetDate = new Date(deliveryDate);
+  if (isNaN(targetDate.getTime())) {
+    return res.status(400).json({ error: 'Invalid date format. Please use YYYY-MM-DD.' });
+  }
+
+  try {
+    // Check if delivery entry exists
+    const deliveryEntry = await prisma.deliveryScheduleEntry.findUnique({
+      where: { id: id },
+      select: {
+        id: true,
+        deliveryDate: true,
+        status: true
+      }
+    });
+
+    if (!deliveryEntry) {
+      return res.status(404).json({ error: 'Delivery entry not found' });
+    }
+
+    // Update the delivery date
+    const updatedDeliveryEntry = await prisma.deliveryScheduleEntry.update({
+      where: { id: id },
+      data: {
+        deliveryDate: targetDate
+      },
+      select: {
+        id: true,
+        deliveryDate: true
+      }
+    });
+
+    console.log(`Admin ${req.user.name} updated delivery date for entry ${id} to ${deliveryDate}`);
+
+    res.status(200).json({
+      id: updatedDeliveryEntry.id,
+      deliveryDate: updatedDeliveryEntry.deliveryDate,
+      message: 'Delivery date updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating delivery date (Admin):', error);
+    
+    // Handle specific Prisma errors
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Delivery entry not found for update.' });
+    }
+    
+    res.status(500).json({ error: 'Failed to update delivery date', details: error.message });
+  }
+};
+
 module.exports = {
   updateDeliveryStatus,
   getDeliveries,
+  updateDeliveryDate,
 };

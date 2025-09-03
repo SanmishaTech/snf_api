@@ -115,6 +115,64 @@ const adminDeliveryController = require('../controllers/admin/adminDeliveryContr
  */
 router.patch('/:id/status', auth, isAdmin, adminDeliveryController.updateDeliveryStatus);
 
+// PATCH /api/admin/deliveries/:id/delivery-date - Admin update delivery date
+/**
+ * @swagger
+ * /admin/deliveries/{id}/delivery-date:
+ *   patch:
+ *     summary: Update delivery date (Admin only)
+ *     description: Allows admin to update the delivery date for a specific delivery entry
+ *     tags: [Admin - Deliveries]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Delivery entry ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - deliveryDate
+ *             properties:
+ *               deliveryDate:
+ *                 type: string
+ *                 format: date
+ *                 description: New delivery date (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Delivery date updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 deliveryDate:
+ *                   type: string
+ *                   format: date
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Bad request (invalid date format)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not an admin)
+ *       404:
+ *         description: Delivery entry not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch('/:id/delivery-date', auth, isAdmin, adminDeliveryController.updateDeliveryDate);
+
 // GET /api/admin/deliveries - Get deliveries with admin filters
 /**
  * @swagger
