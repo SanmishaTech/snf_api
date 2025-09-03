@@ -173,9 +173,12 @@ const generateInvoiceItems = async (productOrder) => {
     const scheduleType = getScheduleDescription(subscription.deliverySchedule, subscription.weekdays);
     const dateRange = `${formatDateShort(subscription.startDate)} to ${formatDateShort(subscription.expiryDate)}`;
     
+    // Handle buyonce orders (period = 0) differently
+    const periodDescription = subscription.period === 0 ? '1 day delivery' : `${subscription.period} days subscription`;
+    
     const description = [
       productName,
-      `${subscription.period} days subscription`,
+      periodDescription,
       `${scheduleType}`,
       `Dates: ${dateRange}`,
       `Rate: ₹${rate.toFixed(2)}/${unit} × ${subscription.totalQty} ${unit}`
