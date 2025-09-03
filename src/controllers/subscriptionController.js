@@ -845,14 +845,28 @@ const cancelSubscription = asyncHandler(async (req, res) => {
     throw new Error('Only subscriptions with unpaid, pending, failed, or cancelled payment status can be cancelled');
   }
 
-  // Set expiry date to now and update payment status to cancelled
+  // Mark subscription as cancelled without altering expiryDate
   const updatedSubscription = await prisma.subscription.update({
     where: {
       id: parseInt(req.params.id)
     },
     data: {
-      expiryDate: new Date(),
       paymentStatus: 'CANCELLED',
+      updatedAt: new Date()
+    }
+  });
+
+  // Also cancel any future pending delivery entries for this subscription
+  await prisma.deliveryScheduleEntry.updateMany({
+    where: {
+      subscriptionId: parseInt(req.params.id),
+      status: 'PENDING',
+      deliveryDate: {
+        gte: new Date() // Only future deliveries
+      }
+    },
+    data: {
+      status: 'CANCELLED',
       updatedAt: new Date()
     }
   });

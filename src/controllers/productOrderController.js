@@ -1095,7 +1095,6 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
           id: { in: cancellableSubscriptionIds }
         },
         data: {
-          expiryDate: new Date(),
           paymentStatus: 'CANCELLED',
           updatedAt: new Date()
         }
