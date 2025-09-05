@@ -184,10 +184,10 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
             ],
             // Items
             ...items.map(item => [
-              { text: item.srNo.toString(), style: 'tableCell', alignment: 'center' },
-              { text: item.description, style: 'tableCellDescription' },
+              { text: item.srNo.toString(), style: item.isCancelled ? 'tableCellCancelled' : 'tableCell', alignment: 'center' },
+              { text: item.description, style: item.isCancelled ? 'tableCellDescriptionCancelled' : 'tableCellDescription' },
               // { text: item.hsnSac || '', style: 'tableCell', alignment: 'center' },
-              { text: `₹ ${item.amount.toFixed(2)}`, style: 'tableCell', alignment: 'right' }
+              { text: `₹ ${item.amount.toFixed(2)}`, style: item.isCancelled ? 'tableCellCancelled' : 'tableCell', alignment: 'right' }
             ]),
             // Empty row for spacing
             [{ text: '', colSpan: 3, border: [false, false, false, false], margin: [0, 2] }, {}, {}],
@@ -310,6 +310,17 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
         fontSize: 8,
         color: '#000000',
         lineHeight: 1.3
+      },
+      tableCellCancelled: {
+        fontSize: 8,
+        color: '#999999',
+        decoration: 'lineThrough'
+      },
+      tableCellDescriptionCancelled: {
+        fontSize: 8,
+        color: '#999999',
+        lineHeight: 1.3,
+        decoration: 'lineThrough'
       },
       totalLabel: {
         fontSize: 9,

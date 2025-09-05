@@ -170,10 +170,10 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
             ],
             // Data Rows (map through items)
             ...items.map(item => [
-              { text: item.srNo, style: 'tableCell' },
-              { text: item.description, style: 'tableCell' },
-              { text: item.hsnSac || '', style: 'tableCell' }, // Optional HSN/SAC
-              { text: item.amount.toFixed(2), style: 'tableCell', alignment: 'right' }
+              { text: item.srNo, style: item.isCancelled ? 'tableCellCancelled' : 'tableCell' },
+              { text: item.description, style: item.isCancelled ? 'tableCellCancelled' : 'tableCell' },
+              { text: item.hsnSac || '', style: item.isCancelled ? 'tableCellCancelled' : 'tableCell' }, // Optional HSN/SAC
+              { text: item.amount.toFixed(2), style: item.isCancelled ? 'tableCellCancelled' : 'tableCell', alignment: 'right' }
             ]),
             // Totals integrated into the table
             [
@@ -281,6 +281,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
       boldText: { fontSize: 9, bold: true },
       tableHeader: { bold: true, fontSize: 10, color: 'black', fillColor: '#f2f2f2', alignment: 'center', margin: [0, 4, 0, 4] },
       tableCell: { fontSize: 9, margin: [5, 3, 5, 3] },
+      tableCellCancelled: { fontSize: 9, margin: [5, 3, 5, 3], decoration: 'lineThrough', color: '#999999' },
       tableTotalsLabel: { fontSize: 9, bold: false, margin: [5, 2, 5, 2] },
       tableTotalsValue: { fontSize: 9, bold: false, margin: [5, 2, 5, 2] },
       tableTotalsLabelBold: { fontSize: 9, bold: true, margin: [5, 2, 5, 2] },

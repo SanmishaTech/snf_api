@@ -256,7 +256,7 @@ const generateSNFOrderInvoice = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Download invoice for SNF order
+ * @desc    Download invoice for SNF order (regenerates with current data)
  * @route   GET /api/admin/snf-orders/:id/download-invoice
  * @access  Private/Admin
  */
@@ -267,47 +267,30 @@ const downloadSNFOrderInvoice = asyncHandler(async (req, res) => {
     throw new Error('Invalid id');
   }
 
-  // Get order with invoice details
-  const order = await prisma.sNFOrder.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      orderNo: true,
-      invoiceNo: true,
-      invoicePath: true
-    }
-  });
-
-  if (!order) {
-    res.status(404);
-    throw new Error('Order not found');
-  }
-
-  if (!order.invoiceNo || !order.invoicePath) {
-    res.status(400);
-    throw new Error('Invoice not generated for this order. Please generate invoice first.');
-  }
-
-  // Construct full path to invoice
-  const invoicesDir = path.join(__dirname, '..', '..', 'invoices');
-  const fullPath = path.join(invoicesDir, order.invoicePath);
-
   try {
+    // Always regenerate invoice with current data to include any cancelled items
+    console.log(`[SNF Download] Regenerating invoice for order ${id} with current data`);
+    const result = await generateAndAttachInvoiceToSNFOrder(id);
+    
+    // Construct full path to the newly generated invoice
+    const invoicesDir = path.join(__dirname, '..', '..', 'invoices');
+    const fullPath = path.join(invoicesDir, result.invoice.pdfPath);
+
     // Check if file exists
     const fs = require('fs').promises;
     await fs.access(fullPath);
 
     // Set response headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${order.invoiceNo}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${result.invoice.invoiceNo}.pdf"`);
     
     // Stream the file
     const fileStream = require('fs').createReadStream(fullPath);
     fileStream.pipe(res);
   } catch (error) {
     console.error('Error downloading invoice:', error);
-    res.status(404);
-    throw new Error('Invoice file not found');
+    res.status(500);
+    throw new Error(error.message || 'Failed to download invoice');
   }
 });
 

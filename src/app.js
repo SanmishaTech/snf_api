@@ -47,6 +47,7 @@ const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const unitConversionRoutes = require("./routes/unitConversionRoutes");
+const orderControlRoutes = require("./routes/admin/orderControlRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -237,6 +238,12 @@ app.use(
   authMiddleware,
   roleGuard("ADMIN", "DepotAdmin"),
   unitConversionRoutes
+);
+app.use(
+  "/api/admin/order-control",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  orderControlRoutes
 );
 app.use(swaggerRouter);
 

@@ -15,6 +15,44 @@ const parseDeliverySchedule = (areaMaster) => {
   return areaMaster;
 };
 
+// Helper function to parse pincodes from various formats
+const parsePincodes = (pincodes) => {
+  if (!pincodes || pincodes.trim() === '') return [];
+  
+  // Try to parse as JSON array first
+  try {
+    const parsed = JSON.parse(pincodes);
+    if (Array.isArray(parsed)) {
+      return parsed.map(p => String(p).trim()).filter(Boolean);
+    }
+  } catch {
+    // Not JSON, continue with string processing
+  }
+  
+  // Check if it contains commas or other separators
+  if (pincodes.includes(',')) {
+    return pincodes.split(',').map(p => p.trim()).filter(Boolean);
+  } else if (pincodes.includes(';')) {
+    return pincodes.split(';').map(p => p.trim()).filter(Boolean);
+  } else if (pincodes.includes('|')) {
+    return pincodes.split('|').map(p => p.trim()).filter(Boolean);
+  } else {
+    // Single pincode or space-separated
+    const spaceSeparated = pincodes.trim().split(/\s+/);
+    if (spaceSeparated.length > 1) {
+      return spaceSeparated.filter(Boolean);
+    }
+    // Single pincode
+    return [pincodes.trim()];
+  }
+};
+
+// Helper function to check if a pincode matches any in the area's pincode list
+const doesPincodeMatch = (searchPincode, areaPincodes) => {
+  const pincodeList = parsePincodes(areaPincodes);
+  return pincodeList.includes(searchPincode);
+};
+
 /**
  * @desc    Get all AreaMasters for public use (frontend dropdown)
  * @route   GET /api/public/area-masters
@@ -82,16 +120,12 @@ const validateDairySupport = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Find area masters that include this pincode
-    const areaMasters = await prisma.areaMaster.findMany({
-      where: {
-        pincodes: {
-          contains: pincode,
-        },
-      },
+    // Find all area masters first, then filter by exact pincode match
+    const allAreaMasters = await prisma.areaMaster.findMany({
       select: {
         id: true,
         name: true,
+        pincodes: true,
         isDairyProduct: true,
         deliveryType: true,
         deliverySchedule: true,
@@ -107,6 +141,11 @@ const validateDairySupport = asyncHandler(async (req, res) => {
         },
       },
     });
+
+    // Filter area masters that actually serve this pincode
+    const areaMasters = allAreaMasters.filter(area => 
+      doesPincodeMatch(pincode, area.pincodes)
+    );
 
     if (areaMasters.length === 0) {
       return res.status(200).json({
@@ -157,12 +196,8 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
   }
 
   try {
-    const areaMasters = await prisma.areaMaster.findMany({
-      where: {
-        pincodes: {
-          contains: pincode,
-        },
-      },
+    // Find all area masters first, then filter by exact pincode match
+    const allAreaMasters = await prisma.areaMaster.findMany({
       select: {
         id: true,
         name: true,
@@ -191,6 +226,11 @@ const getAreaMastersByPincode = asyncHandler(async (req, res) => {
         name: 'asc',
       },
     });
+
+    // Filter area masters that actually serve this pincode
+    const areaMasters = allAreaMasters.filter(area => 
+      doesPincodeMatch(pincode, area.pincodes)
+    );
 
     // Parse deliverySchedule for all area masters
     const parsedAreaMasters = areaMasters.map(parseDeliverySchedule);

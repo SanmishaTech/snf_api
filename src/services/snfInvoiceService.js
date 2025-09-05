@@ -137,13 +137,20 @@ const generateInvoiceForSNFOrder = async (snfOrder) => {
  */
 const generateInvoiceItemsFromSNFOrder = (snfOrder) => {
   const items = [];
+  const cancelledItems = [];
   let srNo = 1;
 
   if (!snfOrder.items || snfOrder.items.length === 0) {
     throw new Error('No items found in SNF order');
   }
 
+  // Separate active and cancelled items
+  console.log('[SNF Invoice] Processing items for order:', snfOrder.orderNo);
+  console.log('[SNF Invoice] Total items found:', snfOrder.items.length);
+  
   for (const item of snfOrder.items) {
+    console.log('[SNF Invoice] Item:', item.name, 'isCancelled:', item.isCancelled);
+    
     const description = [
       item.name,
       item.variantName ? `Variant: ${item.variantName}` : '',
@@ -151,16 +158,31 @@ const generateInvoiceItemsFromSNFOrder = (snfOrder) => {
       `Rate: ₹${item.price.toFixed(2)} per unit`
     ].filter(Boolean).join('\n');
     
-    items.push({
+    const invoiceItem = {
       srNo: srNo++,
       description,
       hsnSac: '', // SNF orders typically don't have HSN codes
       quantity: item.quantity,
       rate: item.price,
       unit: 'Unit',
-      amount: item.lineTotal
-    });
+      amount: item.lineTotal,
+      isCancelled: item.isCancelled || false
+    };
+
+    if (item.isCancelled) {
+      // Add cancelled items with strikethrough styling
+      invoiceItem.description = `[CANCELLED] ${invoiceItem.description}`;
+      invoiceItem.amount = 0; // Cancelled items don't contribute to total
+      cancelledItems.push(invoiceItem);
+      console.log('[SNF Invoice] Added to cancelled items:', item.name);
+    } else {
+      items.push(invoiceItem);
+      console.log('[SNF Invoice] Added to active items:', item.name);
+    }
   }
+
+  // Add cancelled items at the end for reference
+  items.push(...cancelledItems);
 
   // Add delivery fee as separate line item if applicable
   if (snfOrder.deliveryFee > 0) {
@@ -171,7 +193,8 @@ const generateInvoiceItemsFromSNFOrder = (snfOrder) => {
       quantity: 1,
       rate: snfOrder.deliveryFee,
       unit: 'Service',
-      amount: snfOrder.deliveryFee
+      amount: snfOrder.deliveryFee,
+      isCancelled: false
     });
   }
 
