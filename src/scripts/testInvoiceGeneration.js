@@ -14,7 +14,12 @@ async function testInvoiceGeneration() {
           include: {
             product: true,
             depotProductVariant: true,
-            deliveryAddress: true
+            deliveryAddress: true,
+            deliveryScheduleEntries: {
+              orderBy: {
+                deliveryDate: 'asc'
+              }
+            }
           }
         },
         member: {

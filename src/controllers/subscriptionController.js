@@ -510,6 +510,11 @@ const getSubscriptions = asyncHandler(async (req, res) => {
       }
     },
     deliveryAddress: true,
+    deliveryScheduleEntries: {
+      orderBy: {
+        deliveryDate: 'asc'
+      }
+    },
     agency: {
       include: {
         user: true,

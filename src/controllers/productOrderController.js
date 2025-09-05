@@ -367,6 +367,11 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         subscriptions: {
           include: {
             deliveryAddress: true,
+            deliveryScheduleEntries: {
+              orderBy: {
+                deliveryDate: 'asc'
+              }
+            },
             depotProductVariant: {
               include: {
                 depot: true,

@@ -19,7 +19,12 @@ async function generateMissingInvoices() {
         subscriptions: {
           include: {
             product: true,
-            depotProductVariant: true
+            depotProductVariant: true,
+            deliveryScheduleEntries: {
+              orderBy: {
+                deliveryDate: 'asc'
+              }
+            }
           }
         },
         member: {

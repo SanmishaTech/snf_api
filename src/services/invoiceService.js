@@ -138,6 +138,24 @@ const generateInvoiceForOrder = async (productOrder) => {
 };
 
 /**
+ * Get the effective expiry date - use last delivery date or fallback to subscription expiry
+ * @param {Object} subscription - The subscription with delivery schedule entries
+ * @returns {string} The effective expiry date
+ */
+const getEffectiveExpiryDate = (subscription) => {
+  if (subscription.deliveryScheduleEntries && subscription.deliveryScheduleEntries.length > 0) {
+    // Sort delivery entries by date and get the last one
+    const sortedEntries = subscription.deliveryScheduleEntries
+      .slice()
+      .sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+    const lastEntry = sortedEntries[sortedEntries.length - 1];
+    return lastEntry.deliveryDate;
+  }
+  // Fallback to subscription expiry date
+  return subscription.expiryDate;
+};
+
+/**
  * Generate invoice line items from product order
  * @param {Object} productOrder - The product order with subscriptions
  * @returns {Promise<Array>} Array of invoice line items
@@ -155,7 +173,12 @@ const generateInvoiceItems = async (productOrder) => {
           include: {
             product: true,
             depotProductVariant: true,
-            deliveryAddress: true
+            deliveryAddress: true,
+            deliveryScheduleEntries: {
+              orderBy: {
+                deliveryDate: 'asc'
+              }
+            }
           }
         }
       }
@@ -171,7 +194,8 @@ const generateInvoiceItems = async (productOrder) => {
     
     // Create detailed description with all subscription information
     const scheduleType = getScheduleDescription(subscription.deliverySchedule, subscription.weekdays);
-    const dateRange = `${formatDateShort(subscription.startDate)} to ${formatDateShort(subscription.expiryDate)}`;
+    const effectiveExpiryDate = getEffectiveExpiryDate(subscription);
+    const dateRange = `${formatDateShort(subscription.startDate)} to ${formatDateShort(effectiveExpiryDate)}`;
     
     // Handle buyonce orders (period = 0) differently
     const periodDescription = subscription.period === 0 ? '1 day delivery' : `${subscription.period} days subscription`;

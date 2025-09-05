@@ -98,7 +98,12 @@ const downloadInvoiceByOrder = asyncHandler(async (req, res) => {
         subscriptions: {
           include: {
             product: true,
-            depotProductVariant: true
+            depotProductVariant: true,
+            deliveryScheduleEntries: {
+              orderBy: {
+                deliveryDate: 'asc'
+              }
+            }
           }
         },
         member: {
