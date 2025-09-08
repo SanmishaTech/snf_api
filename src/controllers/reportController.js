@@ -19,6 +19,11 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
 
     // Build where clause for filtering
     const where = {};
+    const role = (req.user?.role || '').toUpperCase();
+    const userVendorId = req.user?.vendorId;
+    if (role === 'VENDOR' && !userVendorId) {
+      return next(createError(403, 'Vendor user is not linked to any farmer/vendor record'));
+    }
     
     // Date range filter
     if (startDate || endDate) {
@@ -34,7 +39,12 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
     }
 
     // Other filters
-    if (farmerId) where.vendorId = parseInt(farmerId, 10);
+    // Enforce vendor scoping for VENDOR role
+    if (role === 'VENDOR') {
+      where.vendorId = userVendorId;
+    } else if (farmerId) {
+      where.vendorId = parseInt(farmerId, 10);
+    }
     if (status) where.status = status;
 
     // Fetch vendor order data with details
@@ -136,10 +146,21 @@ exports.getDeliveryFilters = async (req, res, next) => {
     let agencies = [];
     let areas = [];
     try {
-      agencies = await prisma.agency.findMany({ 
-        select: { id: true, name: true, city: true }, 
-        orderBy: { name: 'asc' } 
-      });
+      // If the logged-in user is an AGENCY, only return their own agency
+      const role = (req.user?.role || '').toUpperCase();
+      const userAgencyId = req.user?.agencyId;
+      if (role === 'AGENCY' && userAgencyId) {
+        const agency = await prisma.agency.findUnique({
+          where: { id: userAgencyId },
+          select: { id: true, name: true, city: true }
+        });
+        agencies = agency ? [agency] : [];
+      } else {
+        agencies = await prisma.agency.findMany({ 
+          select: { id: true, name: true, city: true }, 
+          orderBy: { name: 'asc' } 
+        });
+      }
     } catch (e) {
       agencies = [];
     }
@@ -193,6 +214,11 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
 
     // Build where clause for delivery schedule entries
     const where = {};
+    const role = (req.user?.role || '').toUpperCase();
+    const userAgencyId = req.user?.agencyId;
+    if (role === 'AGENCY' && !userAgencyId) {
+      return next(createError(403, 'Agency user is not assigned to any agency'));
+    }
     if (startDate || endDate) {
       where.deliveryDate = {};
       if (startDate) where.deliveryDate.gte = new Date(startDate);
@@ -203,7 +229,18 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       }
     }
     if (status) where.status = status;
-    if (agencyId) where.agentId = parseInt(agencyId, 10);
+    // Determine effective agency filter:
+    // - If user is AGENCY, enforce their agencyId
+    // - Else if admin provided agencyId in query, use that
+    const parsedAgencyId = agencyId ? parseInt(agencyId, 10) : undefined;
+    const requestedAgencyId = role === 'AGENCY' ? userAgencyId : parsedAgencyId;
+    if (requestedAgencyId) {
+      // Use OR to cover both agentId and subscription.agencyId
+      where.OR = [
+        { agentId: requestedAgencyId },
+        { subscription: { agencyId: requestedAgencyId } }
+      ];
+    }
     
     // For area filtering, we need to filter through the delivery address location
     if (areaId) {
@@ -319,7 +356,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       data: {
         report: grouped,
         totals,
-        filters: { startDate, endDate, agencyId, areaId, status, groupBy },
+        filters: { startDate, endDate, agencyId: requestedAgencyId || agencyId, areaId, status, groupBy },
         recordCount: flat.length
       }
     });
@@ -332,10 +369,15 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
 // Delivery Summaries Report (agency-wise status counts in tabular format)
 exports.getDeliverySummariesReport = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, agencyId } = req.query;
 
     // Build where clause for delivery schedule entries
     const where = {};
+    const role = (req.user?.role || '').toUpperCase();
+    const userAgencyId = req.user?.agencyId;
+    if (role === 'AGENCY' && !userAgencyId) {
+      return next(createError(403, 'Agency user is not assigned to any agency'));
+    }
     if (startDate || endDate) {
       where.deliveryDate = {};
       if (startDate) where.deliveryDate.gte = new Date(startDate);
@@ -344,6 +386,15 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
         end.setHours(23, 59, 59, 999);
         where.deliveryDate.lte = end;
       }
+    }
+    // Apply agency scoping: enforce for AGENCY users; allow admin to filter by query param if provided
+    const parsedAgencyId = agencyId ? parseInt(agencyId, 10) : undefined;
+    const requestedAgencyId = role === 'AGENCY' ? userAgencyId : parsedAgencyId;
+    if (requestedAgencyId) {
+      where.OR = [
+        { agentId: requestedAgencyId },
+        { subscription: { agencyId: requestedAgencyId } }
+      ];
     }
 
     // Fetch delivery schedule entries with agency and status information
@@ -410,7 +461,7 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
         summary: summaryData,
         statusList: statusList,
         totals,
-        filters: { startDate, endDate },
+        filters: { startDate, endDate, agencyId: requestedAgencyId || agencyId },
         recordCount: deliveries.length
       }
     });
@@ -688,12 +739,23 @@ function calculateTotals(orders) {
 // Get report filters metadata (vendors, depots, variants for dropdowns)
 exports.getReportFilters = async (req, res, next) => {
   try {
+    const role = (req.user?.role || '').toUpperCase();
+    const userVendorId = req.user?.vendorId;
     const [vendors, depots, products] = await Promise.all([
-      // Get all vendors (they are the farmers/suppliers)
-      prisma.vendor.findMany({
-        select: { id: true, name: true, isDairySupplier: true },
-        orderBy: { name: 'asc' }
-      }),
+      // Get vendors (they are the farmers/suppliers)
+      (async () => {
+        if (role === 'VENDOR' && userVendorId) {
+          const v = await prisma.vendor.findUnique({
+            where: { id: userVendorId },
+            select: { id: true, name: true, isDairySupplier: true }
+          });
+          return v ? [v] : [];
+        }
+        return prisma.vendor.findMany({
+          select: { id: true, name: true, isDairySupplier: true },
+          orderBy: { name: 'asc' }
+        });
+      })(),
       
       // Get depots
       prisma.depot.findMany({
@@ -730,7 +792,7 @@ exports.getReportFilters = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        farmers: vendors, // Return vendors as farmers for the frontend
+        farmers: vendors, // Return vendors as farmers for the frontend; limited for VENDOR role
         depots,
         products: products.map(p => ({ id: p.id, name: p.name })),
         variants

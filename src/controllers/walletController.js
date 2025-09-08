@@ -41,9 +41,31 @@ const getUserWallet = asyncHandler(async (req, res) => {
       referenceNumber: true,
       notes: true,
       createdAt: true,
-      updatedAt: true
+      updatedAt: true,
+      processedByAdmin: {
+        select: {
+          name: true,
+          email: true
+        }
+      }
     }
   });
+
+  // Format transactions to match frontend expectations
+  const formattedTransactions = transactions.map(transaction => ({
+    id: transaction.id,
+    type: transaction.type,
+    amount: transaction.amount,
+    description: transaction.notes, // Map notes to description
+    timestamp: transaction.createdAt.toISOString(), // Map createdAt to timestamp
+    status: transaction.status,
+    paymentMethod: transaction.paymentMethod,
+    referenceNumber: transaction.referenceNumber,
+    processedBy: transaction.processedByAdmin ? {
+      name: transaction.processedByAdmin.name,
+      email: transaction.processedByAdmin.email
+    } : null
+  }));
 
   res.status(200).json({
     success: true,
@@ -53,7 +75,7 @@ const getUserWallet = asyncHandler(async (req, res) => {
         name: member.user?.name,
         email: member.user?.email
       },
-      transactions
+      transactions: formattedTransactions
     }
   });
 });

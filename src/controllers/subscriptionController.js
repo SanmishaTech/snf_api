@@ -405,19 +405,27 @@ const createSubscription = asyncHandler(async (req, res) => {
       });
 
       // 3. Create a WalletTransaction record if wallet funds were used
+      let walletTransaction = null;
       if (walletamt > 0) {
-        await tx.walletTransaction.create({
-          data: {
-            memberId: member.id,
-            amount: walletamt,
-            type: TransactionType.DEBIT,
-            status: TransactionStatus.PAID,
-            notes: `Subscription payment for ID: ${newSubscription.id}`,
-            referenceNumber: `SUB-${newSubscription.id}`,
-            paymentMethod: 'TOPUP',
-            processedByAdminId: null,
-          },
-        });
+        try {
+          console.log(`[Subscription Debug] Creating wallet transaction for member ${member.id}, amount: ${walletamt}`);
+          walletTransaction = await tx.walletTransaction.create({
+            data: {
+              memberId: member.id,
+              amount: walletamt,
+              type: TransactionType.DEBIT,
+              status: TransactionStatus.PAID,
+              notes: `Subscription Payment - ${product.name} (₹${walletamt} from wallet)`,
+              referenceNumber: `SUB-${newSubscription.id}`,
+              paymentMethod: 'WALLET',
+              processedByAdminId: null,
+            },
+          });
+          console.log(`[Subscription Debug] Successfully created wallet transaction with ID: ${walletTransaction.id}`);
+        } catch (walletError) {
+          console.error(`[Subscription Debug] Failed to create wallet transaction:`, walletError);
+          throw new Error(`Failed to create wallet transaction: ${walletError.message}`);
+        }
       }
 
       // 4. Generate and create DeliveryScheduleEntry records
@@ -844,39 +852,121 @@ const cancelSubscription = asyncHandler(async (req, res) => {
   }
 
   // Check if subscription can be cancelled based on payment status
-  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', null];
+  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', 'PAID', null];
   if (!allowedPaymentStatuses.includes(subscription.paymentStatus)) {
     res.status(400);
-    throw new Error('Only subscriptions with unpaid, pending, failed, or cancelled payment status can be cancelled');
+    throw new Error('Subscription cannot be cancelled with current payment status');
   }
 
-  // Mark subscription as cancelled without altering expiryDate
-  const updatedSubscription = await prisma.subscription.update({
-    where: {
-      id: parseInt(req.params.id)
-    },
-    data: {
-      paymentStatus: 'CANCELLED',
-      updatedAt: new Date()
-    }
-  });
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      let walletTransaction = null;
+      let refundAmount = 0;
 
-  // Also cancel any future pending delivery entries for this subscription
-  await prisma.deliveryScheduleEntry.updateMany({
-    where: {
-      subscriptionId: parseInt(req.params.id),
-      status: 'PENDING',
-      deliveryDate: {
-        gte: new Date() // Only future deliveries
+      // Handle refunds for paid subscriptions that used wallet
+      if (subscription.paymentStatus === 'PAID' && subscription.walletamt > 0) {
+        // Get remaining future deliveries
+        const remainingDeliveries = await tx.deliveryScheduleEntry.findMany({
+          where: {
+            subscriptionId: parseInt(req.params.id),
+            status: 'PENDING',
+            deliveryDate: {
+              gte: new Date()
+            }
+          }
+        });
+
+        // Calculate refund amount based on remaining deliveries
+        refundAmount = walletService.calculateSubscriptionRefund(subscription, remainingDeliveries);
+
+        if (refundAmount > 0) {
+          // Get subscription product for refund notes
+          const subscriptionWithProduct = await tx.subscription.findUnique({
+            where: { id: subscription.id },
+            include: { product: true }
+          });
+
+          const referenceNumber = `CANCEL_SUB_${subscription.id}`;
+          const notes = `Refund for cancelled subscription - ${subscriptionWithProduct.product?.name || 'Product'} (${remainingDeliveries.length} remaining deliveries)`;
+
+          // Credit the refund to wallet
+          walletTransaction = await tx.walletTransaction.create({
+            data: {
+              memberId: subscription.memberId,
+              amount: refundAmount,
+              type: TransactionType.CREDIT,
+              status: TransactionStatus.PAID,
+              paymentMethod: 'SYSTEM_CREDIT',
+              referenceNumber: referenceNumber,
+              notes: `Subscription Cancellation - ${notes} (₹${refundAmount} credited to wallet)`,
+              processedByAdminId: req.user.role === 'ADMIN' ? req.user.id : null,
+            }
+          });
+
+          // Update member's wallet balance
+          await tx.member.update({
+            where: { id: subscription.memberId },
+            data: {
+              walletBalance: {
+                increment: refundAmount
+              }
+            }
+          });
+
+          console.log(`[Subscription Cancellation] Refunded ₹${refundAmount} to member ${subscription.memberId} for subscription ${subscription.id}`);
+        }
       }
-    },
-    data: {
-      status: 'CANCELLED',
-      updatedAt: new Date()
-    }
-  });
 
-  res.status(200).json(updatedSubscription);
+      // Mark subscription as cancelled without altering expiryDate
+      const updatedSubscription = await tx.subscription.update({
+        where: {
+          id: parseInt(req.params.id)
+        },
+        data: {
+          paymentStatus: 'CANCELLED',
+          updatedAt: new Date()
+        }
+      });
+
+      // Also cancel any future pending delivery entries for this subscription
+      await tx.deliveryScheduleEntry.updateMany({
+        where: {
+          subscriptionId: parseInt(req.params.id),
+          status: 'PENDING',
+          deliveryDate: {
+            gte: new Date() // Only future deliveries
+          }
+        },
+        data: {
+          status: 'CANCELLED',
+          updatedAt: new Date()
+        }
+      });
+
+      return {
+        subscription: updatedSubscription,
+        refundAmount,
+        walletTransaction
+      };
+    });
+
+    const responseMessage = result.refundAmount > 0 
+      ? `Subscription cancelled successfully. Refund of ₹${result.refundAmount.toFixed(2)} has been credited to your wallet.`
+      : 'Subscription cancelled successfully.';
+
+    res.status(200).json({
+      ...result.subscription,
+      message: responseMessage,
+      refundAmount: result.refundAmount
+    });
+
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    res.status(500).json({ 
+      message: 'Failed to cancel subscription', 
+      error: error.message 
+    });
+  }
 });
 
 // @desc    Renew subscription

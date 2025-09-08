@@ -44,6 +44,32 @@ module.exports = async (req, res, next) => {
       }
     }
 
+    // If user is a vendor (farmer), attach vendorId
+    if (user.role === 'VENDOR') {
+      let vendor = await prisma.vendor.findFirst({
+        where: { userId: user.id },
+        select: { id: true }
+      });
+      if (!vendor) {
+        // Fallback: match by email or mobile if linked via contact instead of userId
+        vendor = await prisma.vendor.findFirst({
+          where: {
+            OR: [
+              user.email ? { email: user.email } : undefined,
+              user.mobile ? { mobile: user.mobile } : undefined,
+            ].filter(Boolean)
+          },
+          select: { id: true }
+        });
+      }
+      if (vendor) {
+        user.vendorId = vendor.id;
+        console.log(`[AuthMiddleware] Vendor user. Vendor ID: ${user.vendorId} attached to req.user.`);
+      } else {
+        console.warn(`[AuthMiddleware] User role is VENDOR but no corresponding vendor record found for userId: ${user.id}`);
+      }
+    }
+
     req.user = user;
     console.log('[AuthMiddleware] Authentication successful. User set on req.user.');
     next();

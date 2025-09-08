@@ -1,7 +1,8 @@
 const asyncHandler = require('express-async-handler');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, TransactionType, TransactionStatus } = require('@prisma/client');
 const { generateInvoicePdf } = require('../utils/invoiceGenerator');
 const { generateInvoiceForOrder } = require('../services/invoiceService');
+const walletService = require('../services/walletService');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -331,7 +332,7 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         allDeliveryScheduleEntries.push(...deliveryEntries);
       }
 
-      // Update member wallet balance
+      // Update member wallet balance and create wallet transaction
       if (walletCalculation.walletAmountUsed > 0) {
         await tx.member.update({
           where: { id: memberId },
@@ -339,6 +340,26 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
             walletBalance: { decrement: walletCalculation.walletAmountUsed }
           },
         });
+
+        // Create wallet transaction for the debit
+        const subscriptionNames = createdSubscriptions.map(sub => 
+          processedSubscriptions.find(p => p.depotVariant.id === sub.depotProductVariantId)?.depotVariant?.product?.name || 'Product'
+        ).join(', ');
+
+        await tx.walletTransaction.create({
+          data: {
+            memberId: memberId,
+            amount: walletCalculation.walletAmountUsed,
+            type: TransactionType.DEBIT,
+            status: TransactionStatus.PAID,
+            paymentMethod: 'WALLET',
+            referenceNumber: `ORDER-${newOrder.orderNo}`,
+            notes: `Subscription Payment - ${subscriptionNames} (₹${walletCalculation.walletAmountUsed} debited from wallet)`,
+            processedByAdminId: null,
+          }
+        });
+
+        console.log(`[Wallet Transaction] Created debit transaction for order ${newOrder.orderNo}, amount: ₹${walletCalculation.walletAmountUsed}`);
       }
 
       // Create delivery schedule entries
