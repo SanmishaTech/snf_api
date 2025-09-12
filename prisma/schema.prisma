@@ -36,6 +36,7 @@ model User {
   processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions")
   wastagesCreated       Wastage[]           @relation("WastageCreatedBy")
   wastagesUpdated       Wastage[]           @relation("WastageUpdatedBy")
+  snfOrderAuditLogs     SNFOrderAuditLog[]
 
   @@index([depotId], map: "users_depotId_fkey")
   @@map("users")
@@ -764,6 +765,7 @@ model SNFOrder {
   payableAmount Float          @default(0)
   walletamt     Float          @default(0)
   items         SNFOrderItem[]
+  auditLogs     SNFOrderAuditLog[]
   depot         Depot?         @relation(fields: [depotId], references: [id])
   member        Member?        @relation("MemberSNFOrders", fields: [memberId], references: [id])
 
@@ -888,4 +890,21 @@ enum LeadStatus {
   CONTACTED
   CONVERTED
   CLOSED
+}
+
+model SNFOrderAuditLog {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  userId      Int
+  action      String   // 'DELIVERY_DATE_UPDATED', 'ITEM_ADDED', 'ITEM_QUANTITY_UPDATED', 'ITEM_CANCELLED', 'ITEM_RESTORED', 'PAYMENT_STATUS_UPDATED', 'INVOICE_GENERATED'
+  description String   // Human-readable description of the change
+  oldValue    String?  // JSON string of old values
+  newValue    String?  // JSON string of new values
+  createdAt   DateTime @default(now())
+  order       SNFOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("snf_order_audit_logs")
 }

@@ -141,9 +141,23 @@ const createSNFOrder = asyncHandler(async (req, res) => {
 
   const orderNo = await generateOrderNo();
 
-  // Attach memberId if available (authenticated request)
+  // Attach memberId if available
   console.log('[SNF Order] User from req:', req.user ? `ID: ${req.user.id}, Role: ${req.user.role}, Member: ${JSON.stringify(req.user.member)}` : 'No user authenticated');
-  const memberId = req.user?.role === 'MEMBER' && req.user?.member?.id ? req.user.member.id : null;
+  let memberId = req.user?.role === 'MEMBER' && req.user?.member?.id ? req.user.member.id : null;
+  // If admin/depot-admin is creating on behalf of a member, allow specifying memberId in body
+  const requesterRole = (req.user?.role || '').toUpperCase();
+  const isAdminRequester = requesterRole === 'ADMIN' || requesterRole === 'DEPOTADMIN' || requesterRole === 'DEPOT_ADMIN' || requesterRole.includes('ADMIN');
+  if (isAdminRequester && req.body?.memberId) {
+    const candidate = parseInt(req.body.memberId, 10);
+    if (!isNaN(candidate)) {
+      const memberExists = await prisma.member.findUnique({ where: { id: candidate }, select: { id: true } });
+      if (!memberExists) {
+        res.status(400);
+        throw new Error('Specified memberId does not exist');
+      }
+      memberId = candidate;
+    }
+  }
   console.log('[SNF Order] Final memberId:', memberId);
   console.log('[SNF Order] Final depotId:', finalDepotId);
 

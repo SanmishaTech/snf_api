@@ -83,6 +83,13 @@ const {
   deleteBanner,
 } = require('../controllers/admin/bannerController');
 const {
+  createProduct,
+  getAllProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+} = require('../controllers/productController');
+const {
   createPurchasePayment,
   getAllPurchasePayments,
   getPurchasePaymentById,
@@ -111,6 +118,10 @@ const {
   updateSNFOrder,
   generateSNFOrderInvoice,
   downloadSNFOrderInvoice,
+  addSNFOrderItem,
+  updateSNFOrderItem,
+  toggleSNFOrderItemCancellation,
+  getSNFOrderAuditLogsController,
 } = require('../controllers/admin/snfOrderAdminController');
 
 // Import admin delivery routes
@@ -272,6 +283,16 @@ router.route('/locations/:id')
   .put(authMiddleware, updateLocation)
   .delete(authMiddleware, deleteLocation);
 
+// Product Routes
+router.route('/products')
+  .post(authMiddleware, createProduct)
+  .get(authMiddleware, getAllProducts);
+
+router.route('/products/:id')
+  .get(authMiddleware, getProductById)
+  .put(authMiddleware, updateProduct)
+  .delete(authMiddleware, deleteProduct);
+
 // SNF Orders (Admin)
 router.route('/snf-orders')
   .get(authMiddleware, getAllSNFOrders);
@@ -286,6 +307,14 @@ router.patch('/snf-orders/:id/mark-paid', authMiddleware, markSNFOrderAsPaid);
 // Invoice generation and download for SNF orders
 router.post('/snf-orders/:id/generate-invoice', authMiddleware, generateSNFOrderInvoice);
 router.get('/snf-orders/:id/download-invoice', authMiddleware, downloadSNFOrderInvoice);
+
+// SNF Order item editing routes
+router.post('/snf-orders/:id/items', authMiddleware, addSNFOrderItem);
+router.patch('/snf-orders/:id/items/:itemId', authMiddleware, updateSNFOrderItem);
+router.patch('/snf-orders/:id/items/:itemId/cancel', authMiddleware, toggleSNFOrderItemCancellation);
+
+// SNF Order audit logs
+router.get('/snf-orders/:id/audit-logs', authMiddleware, getSNFOrderAuditLogsController);
 
 // Admin Delivery Address Routes
 router.route('/delivery-addresses')

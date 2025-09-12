@@ -124,25 +124,12 @@ module.exports = {
       if (search && search.trim()) {
         const searchTerm = search.trim();
         where.OR = [
-          {
-            name: {
-              contains: searchTerm
-            }
-          },
-          {
-            product: {
-              name: {
-                contains: searchTerm
-              }
-            }
-          },
-          {
-            depot: {
-              name: {
-                contains: searchTerm
-              }
-            }
-          }
+          // Match variant name
+          { name: { contains: searchTerm } },
+          // Match related product name (to-one relation requires `is` wrapper)
+          { product: { is: { name: { contains: searchTerm } } } },
+          // Match related depot name (to-one relation requires `is` wrapper)
+          { depot: { is: { name: { contains: searchTerm } } } },
         ];
       }
 
