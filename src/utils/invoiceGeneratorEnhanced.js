@@ -188,21 +188,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
               { text: item.description, style: 'tableCellDescription' },
               // { text: item.hsnSac || '', style: 'tableCell', alignment: 'center' },
               { text: `₹ ${item.amount.toFixed(2)}`, style: 'tableCell', alignment: 'right' }
-            ]),
-            // Empty row for spacing
-            [{ text: '', colSpan: 3, border: [false, false, false, false], margin: [0, 2] }, {}, {}],
-            // Subtotal
-            [
-              { text: '', border: [false, false, false, false] },
-              { text: 'Subtotal:', style: 'totalLabel', alignment: 'right' },
-              { text: `₹ ${totals.amountBeforeTax.toFixed(2)}`, style: 'totalValue', alignment: 'right' }
-            ],
-            // Grand Total
-            [
-              { text: '', border: [false, true, false, false] },
-              { text: 'Grand Total:', style: 'grandTotalLabel', alignment: 'right', border: [false, true, false, false] },
-              { text: `₹ ${totals.totalAmount.toFixed(2)}`, style: 'grandTotalValue', alignment: 'right', border: [false, true, false, false] }
-            ]
+            ])
           ]
         },
         layout: {
@@ -215,6 +201,108 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
           paddingLeft: () => 8,
           paddingRight: () => 8
         }
+      },
+
+      // Totals Section - Separate styled table
+      {
+        margin: [0, 8, 0, 0],
+        table: {
+          widths: ['*', '30%'],
+          body: [
+            // Subtotal
+            [
+              { text: '', border: [false, false, false, false] },
+              {
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'Subtotal:', style: 'totalsLabel', border: [false, false, false, false] },
+                      { text: `₹ ${totals.amountBeforeTax.toFixed(2)}`, style: 'totalsValue', border: [false, false, false, false], alignment: 'right' }
+                    ]
+                  ]
+                },
+                layout: 'noBorders'
+              }
+            ],
+            // Wallet Deduction (if applicable)
+            ...(paymentDetails.walletAmount > 0 ? [[
+              { text: '', border: [false, false, false, false] },
+              {
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'Wallet Deduction:', style: 'totalsLabel', border: [false, false, false, false] },
+                      { text: `- ₹ ${paymentDetails.walletAmount.toFixed(2)}`, style: 'walletDeductionValue', border: [false, false, false, false], alignment: 'right' }
+                    ]
+                  ]
+                },
+                layout: 'noBorders'
+              }
+            ]] : []),
+            // Separator line before grand total
+            [
+              { text: '', border: [false, false, false, false] },
+              {
+                canvas: [{ type: 'line', x1: 0, y1: 0, x2: 150, y2: 0, lineWidth: 1, lineColor: '#CCCCCC' }],
+                margin: [0, 2, 0, 2]
+              }
+            ],
+            // Grand Total
+            [
+              { text: '', border: [false, false, false, false] },
+              {
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'Total Amount:', style: 'grandTotalLabel', border: [false, false, false, false] },
+                      { text: `₹ ${totals.totalAmount.toFixed(2)}`, style: 'grandTotalValue', border: [false, false, false, false], alignment: 'right' }
+                    ]
+                  ]
+                },
+                layout: 'noBorders',
+                margin: [0, 1, 0, 1]
+              }
+            ],
+            // Amount Due (if applicable)
+            ...(paymentDetails.dueAmount > 0 ? [[
+              { text: '', border: [false, false, false, false] },
+              {
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'Amount Due:', style: 'dueAmountLabel', border: [false, false, false, false] },
+                      { text: `₹ ${paymentDetails.dueAmount.toFixed(2)}`, style: 'dueAmountValue', border: [false, false, false, false], alignment: 'right' }
+                    ]
+                  ]
+                },
+                layout: 'noBorders',
+                margin: [0, 5, 0, 0]
+              }
+            ]] : []),
+            // Payment Status (if paid)
+            ...(paymentDetails.paymentStatus === 'PAID' && paymentDetails.dueAmount <= 0 ? [[
+              { text: '', border: [false, false, false, false] },
+              {
+                table: {
+                  widths: ['50%', '50%'],
+                  body: [
+                    [
+                      { text: 'Payment Status:', style: 'totalsLabel', border: [false, false, false, false] },
+                      { text: 'PAID', style: 'paidStatusValue', border: [false, false, false, false], alignment: 'right' }
+                    ]
+                  ]
+                },
+                layout: 'noBorders',
+                margin: [0, 5, 0, 0]
+              }
+            ]] : [])
+          ]
+        },
+        layout: 'noBorders'
       },
 
       // Amount in Words
@@ -319,15 +407,51 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
         fontSize: 9,
         color: '#000000'
       },
+      totalsLabel: {
+        fontSize: 10,
+        color: '#444444',
+        margin: [0, 2, 0, 2]
+      },
+      totalsValue: {
+        fontSize: 10,
+        color: '#000000',
+        margin: [0, 2, 0, 2]
+      },
       grandTotalLabel: {
-        fontSize: 10, 
+        fontSize: 12, 
         bold: true,
-        color: '#000000'
+        color: '#000000',
+        margin: [0, 1, 0, 1]
       },
       grandTotalValue: {
-        fontSize: 10, 
+        fontSize: 12, 
         bold: true,
-        color: '#000000'
+        color: '#000000',
+        margin: [0, 1, 0, 1]
+      },
+      walletDeductionValue: {
+        fontSize: 10,
+        color: '#008000',
+        bold: true,
+        margin: [0, 2, 0, 2]
+      },
+      dueAmountLabel: {
+        fontSize: 11,
+        bold: true,
+        color: '#000000',
+        margin: [0, 3, 0, 3]
+      },
+      dueAmountValue: {
+        fontSize: 11,
+        bold: true,
+        color: '#FF6B35',
+        margin: [0, 3, 0, 3]
+      },
+      paidStatusValue: {
+        fontSize: 10,
+        bold: true,
+        color: '#008000',
+        margin: [0, 3, 0, 3]
       },
       amountWordsLabel: {
         fontSize: 9,
