@@ -85,7 +85,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
 
   const docDefinition = {
     pageSize: 'A4',
-    pageMargins: [30, 30, 30, 30], 
+    pageMargins: [25, 25, 25, 25], 
     content: [
       // Company Header Section
       {
@@ -110,13 +110,13 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
             ]
           }
         ],
-        margin: [0, 0, 0, 10] 
+        margin: [0, 0, 0, 6] 
       },
 
       // Separator line
       {
         canvas: [{ type: 'line', x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 1, lineColor: '#000000' }], 
-        margin: [0, 0, 0, 10] 
+        margin: [0, 0, 0, 6] 
       },
 
       // Bill To Section
@@ -166,7 +166,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
           //   ]
           // }
         ],
-        margin: [0, 0, 0, 15] 
+        margin: [0, 0, 0, 8] 
       },
 
       // Items Table
@@ -316,7 +316,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
             ]
           }
         ],
-        margin: [0, 15, 0, 15] 
+        margin: [0, 10, 0, 10] 
       },
 
       // Payment Information Section
@@ -398,7 +398,7 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
           paddingLeft: () => 10,
           paddingRight: () => 10
         },
-        margin: [0, 0, 0, 20]
+        margin: [0, 0, 0, 12]
       },
 
       // Terms & Conditions
