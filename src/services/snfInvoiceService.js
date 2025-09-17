@@ -35,6 +35,8 @@ const generateInvoiceForSNFOrder = async (snfOrder) => {
     const cgstAmount = 0;
     const sgstAmount = 0;
     const totalAmount = snfOrder.totalAmount;
+    const walletDeduction = snfOrder.walletamt || 0;
+    const amountDue = Math.max(0, totalAmount - walletDeduction);
 
     // Prepare customer data from order details
     const customerInfo = {
@@ -99,15 +101,23 @@ const generateInvoiceForSNFOrder = async (snfOrder) => {
         amountInWords: numberToWords(totalAmount)
       },
       paymentDetails: {
-        walletAmount: 0, // SNF orders don't use wallet
-        paidAmount: snfOrder.paymentStatus === 'PAID' ? totalAmount : 0,
-        dueAmount: snfOrder.paymentStatus === 'PAID' ? 0 : totalAmount,
+        walletAmount: walletDeduction,
+        paidAmount: snfOrder.paymentStatus === 'PAID' ? totalAmount : walletDeduction,
+        dueAmount: snfOrder.paymentStatus === 'PAID' ? 0 : amountDue,
         paymentStatus: snfOrder.paymentStatus,
         paymentMode: snfOrder.paymentMode,
         paymentDate: snfOrder.paymentDate,
-        paymentReferenceNo: snfOrder.paymentRefNo
+        paymentReferenceNo: snfOrder.paymentRefNo,
+        amountDue: amountDue
       }
     };
+
+    console.log('[SNF Invoice] Payment details for invoice:', {
+      walletAmount: walletDeduction,
+      amountDue: amountDue,
+      totalAmount: totalAmount,
+      paymentStatus: snfOrder.paymentStatus
+    });
 
     // Generate PDF
     const pdfFileName = `SNF_${invoiceNo}.pdf`;

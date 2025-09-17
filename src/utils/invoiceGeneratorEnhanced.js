@@ -71,6 +71,9 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
     paymentDetails
   } = invoiceData;
 
+  console.log('[Invoice Generator] Payment details received:', paymentDetails);
+  console.log('[Invoice Generator] Totals received:', totals);
+
   const companyDetails = SNFlobal || {
     name: 'Sarkhot Natural Farms',
     addressLines: ['B/3 Prabhat Society,','Mukherjee Road, Near CKP Hall,',"Dombivli East", "421201", "Thane", "Maharashtra"],
@@ -199,9 +202,21 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
             ],
             // Grand Total
             [
+              { text: '', border: [false, false, false, false] },
+              { text: 'Grand Total:', style: 'grandTotalLabel', alignment: 'right' },
+              { text: `₹ ${totals.totalAmount.toFixed(2)}`, style: 'grandTotalValue', alignment: 'right' }
+            ],
+            // Wallet Deduction (always show for transparency)
+            [
+              { text: '', border: [false, false, false, false] },
+              { text: 'Wallet Deduction:', style: 'totalLabel', alignment: 'right' },
+              { text: `- ₹ ${(paymentDetails?.walletAmount || 0).toFixed(2)}`, style: 'totalValue', alignment: 'right', color: paymentDetails?.walletAmount > 0 ? '#16a34a' : '#000000' }
+            ],
+            // Amount Due
+            [
               { text: '', border: [false, true, false, false] },
-              { text: 'Grand Total:', style: 'grandTotalLabel', alignment: 'right', border: [false, true, false, false] },
-              { text: `₹ ${totals.totalAmount.toFixed(2)}`, style: 'grandTotalValue', alignment: 'right', border: [false, true, false, false] }
+              { text: 'Amount Due:', style: 'grandTotalLabel', alignment: 'right', border: [false, true, false, false] },
+              { text: `₹ ${((paymentDetails?.dueAmount !== undefined ? paymentDetails.dueAmount : (paymentDetails?.amountDue !== undefined ? paymentDetails.amountDue : totals.totalAmount - (paymentDetails?.walletAmount || 0)))).toFixed(2)}`, style: 'grandTotalValue', alignment: 'right', border: [false, true, false, false] }
             ]
           ]
         },
