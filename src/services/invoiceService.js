@@ -65,11 +65,22 @@ const generateInvoiceForOrder = async (productOrder) => {
     const paidAmount = productOrder.receivedamt || 0;
     const dueAmount = totalAmount - walletAmount - paidAmount;
 
+    // Check for QR code image
+    const qrCodePath = path.join(__dirname, '..', '..', 'assets', 'payment-qr-code.jpeg');
+    let qrCodeExists = false;
+    try {
+      await fs.access(qrCodePath);
+      qrCodeExists = true;
+    } catch (error) {
+      console.log('QR code image not found at:', qrCodePath);
+    }
+
     // Prepare data for PDF generation
     const invoiceData = {
       invoiceNumber: invoiceNo,
       invoiceDate: productOrder.createdAt || new Date(),
       orderNo: productOrder.orderNo,
+      qrCodePath: qrCodeExists ? qrCodePath : null,
       member: {
         memberName: memberAddress?.recipientName || member.name,
         mobile: memberAddress?.mobile || member.user?.mobile || '',

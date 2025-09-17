@@ -63,11 +63,22 @@ const generateInvoiceForSNFOrder = async (snfOrder) => {
       };
     }
 
+    // Check for QR code image
+    const qrCodePath = path.join(__dirname, '..', '..', 'assets', 'payment-qr-code.jpeg');
+    let qrCodeExists = false;
+    try {
+      await fs.access(qrCodePath);
+      qrCodeExists = true;
+    } catch (error) {
+      console.log('QR code image not found at:', qrCodePath);
+    }
+
     // Prepare data for PDF generation
     const invoiceData = {
       invoiceNumber: invoiceNo,
       invoiceDate: snfOrder.createdAt || new Date(),
       orderNo: snfOrder.orderNo,
+      qrCodePath: qrCodeExists ? qrCodePath : null,
       member: customerInfo,
       SNFlobal: {
         name: 'Sarkhot Natural Farms',

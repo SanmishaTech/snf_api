@@ -319,6 +319,88 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
         margin: [0, 15, 0, 15] 
       },
 
+      // Payment Information Section
+      {
+        table: {
+          widths: ['50%', '50%'],
+          body: [
+            [
+              // Payment Methods Column
+              {
+                stack: [
+                  { text: 'Payment Options:', style: 'paymentSectionHeader' },
+                  { 
+                    table: {
+                      widths: ['25%', '75%'],
+                      body: [
+                        [
+                          { text: 'UPI/GPay:', style: 'paymentMethodLabel' },
+                          { text: '8850833370', style: 'paymentMethodValue' }
+                        ],
+                        [
+                          { text: '', style: 'paymentMethodLabel' },
+                          { text: '(Sarkhot Natural Farms)', style: 'paymentMethodSubtext' }
+                        ],
+                        [
+                          { text: 'Bank:', style: 'paymentMethodLabel' },
+                          { text: 'Bank of Baroda', style: 'paymentMethodValue' }
+                        ],
+                        [
+                          { text: 'A/C No:', style: 'paymentMethodLabel' },
+                          { text: '76040200002024', style: 'paymentMethodValue' }
+                        ],
+                        [
+                          { text: 'IFSC:', style: 'paymentMethodLabel' },
+                          { text: 'BARB0VJDOME', style: 'paymentMethodValue' }
+                        ],
+                        [
+                          { text: 'Cash:', style: 'paymentMethodLabel' },
+                          { text: 'Cash Before Delivery', style: 'paymentMethodValue' }
+                        ]
+                      ]
+                    },
+                    layout: 'noBorders',
+                    margin: [0, 5, 0, 0]
+                  }
+                ],
+                border: [true, true, true, true]
+              },
+              // QR Code Column
+              {
+                stack: [
+                  { text: 'Scan & Pay:', style: 'paymentSectionHeader', alignment: 'center' },
+                  ...(invoiceData.qrCodePath ? [{
+                    image: invoiceData.qrCodePath,
+                    width: 120,
+                    height: 120,
+                    alignment: 'center',
+                    margin: [0, 10, 0, 10]
+                  }] : [{
+                    text: 'QR Code will be\navailable here',
+                    style: 'qrPlaceholder',
+                    alignment: 'center',
+                    margin: [0, 30, 0, 30]
+                  }]),
+                  { text: 'UPI ID: 8850833370', style: 'qrSubtext', alignment: 'center' }
+                ],
+                border: [true, true, true, true]
+              }
+            ]
+          ]
+        },
+        layout: {
+          hLineWidth: () => 1,
+          vLineWidth: () => 1,
+          hLineColor: () => '#CCCCCC',
+          vLineColor: () => '#CCCCCC',
+          paddingTop: () => 10,
+          paddingBottom: () => 10,
+          paddingLeft: () => 10,
+          paddingRight: () => 10
+        },
+        margin: [0, 0, 0, 20]
+      },
+
       // Terms & Conditions
       // {
       //   stack: [
@@ -494,6 +576,39 @@ const generateInvoicePdf = async (invoiceData, filePath) => {
       },
       normalText: {
         fontSize: 9
+      },
+      paymentSectionHeader: {
+        fontSize: 12,
+        bold: true,
+        color: '#000000',
+        margin: [0, 0, 0, 5]
+      },
+      paymentMethodLabel: {
+        fontSize: 9,
+        bold: true,
+        color: '#333333',
+        margin: [0, 2, 0, 2]
+      },
+      paymentMethodValue: {
+        fontSize: 9,
+        color: '#000000',
+        margin: [0, 2, 0, 2]
+      },
+      paymentMethodSubtext: {
+        fontSize: 8,
+        color: '#666666',
+        italics: true,
+        margin: [0, 0, 0, 5]
+      },
+      qrPlaceholder: {
+        fontSize: 10,
+        color: '#999999',
+        alignment: 'center'
+      },
+      qrSubtext: {
+        fontSize: 8,
+        color: '#333333',
+        italics: true
       }
     },
     defaultStyle: {
