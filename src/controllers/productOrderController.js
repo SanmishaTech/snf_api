@@ -565,20 +565,7 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
   console.log(`[DATE DEBUG - BACKEND] startDate.toISOString(): ${startDateOnly.toISOString()}`);
   console.log(`[DATE DEBUG - BACKEND] startDate.toDateString(): ${startDateOnly.toDateString()}`);
   
-  const expiryDate = new Date(startDateOnly);
-  // For buy-once orders (period = 0), start and expiry date should be the same
-  // For subscription orders, expiry = start + period - 1
-  if (subscriptionPeriod === 0) {
-    // Buy-once: expiry date = start date (same day)
-    console.log(`[DATE DEBUG - BACKEND] Buy-once order: expiryDate = startDate`);
-  } else {
-    // Subscription: expiry date = start date + period - 1
-    expiryDate.setDate(expiryDate.getDate() + subscriptionPeriod - 1);
-    console.log(`[DATE DEBUG - BACKEND] Subscription order: expiryDate = startDate + ${subscriptionPeriod} - 1`);
-  }
-  console.log(`[DATE DEBUG - BACKEND] Calculated expiryDate: ${expiryDate.toString()}`, expiryDate.toDateString());
-
-  // Process delivery schedule
+  // Process delivery schedule first to get the actual delivery dates
   const { internalScheduleLogicType, dbDeliveryScheduleEnum } = mapDeliverySchedule(rawDeliverySchedule);
 
   const deliveryScheduleDetails = generateDeliveryDates(
@@ -589,6 +576,20 @@ async function processSubscription(sub, depotVariantMap, deliveryAddress, delive
     parsedAltQty,
     weekdays
   );
+
+  // Calculate expiry date from the last delivery schedule entry
+  let expiryDate;
+  if (subscriptionPeriod === 0 || deliveryScheduleDetails.length === 0) {
+    // Buy-once: expiry date = start date (same day)
+    expiryDate = new Date(startDateOnly);
+    console.log(`[DATE DEBUG - BACKEND] Buy-once order: expiryDate = startDate`);
+  } else {
+    // Subscription: expiry date = last delivery schedule entry date
+    const lastDeliveryDate = deliveryScheduleDetails[deliveryScheduleDetails.length - 1].date;
+    expiryDate = new Date(lastDeliveryDate);
+    console.log(`[DATE DEBUG - BACKEND] Subscription order: expiryDate set from last delivery schedule entry`);
+  }
+  console.log(`[DATE DEBUG - BACKEND] Final expiryDate: ${expiryDate.toString()}`, expiryDate.toDateString());
 
   // Calculate amounts
   const subscriptionTotalQty = deliveryScheduleDetails.reduce((sum, entry) => sum + entry.quantity, 0);
