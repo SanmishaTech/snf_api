@@ -112,6 +112,10 @@ const {
   generateSNFOrderInvoice,
   downloadSNFOrderInvoice,
 } = require('../controllers/admin/snfOrderAdminController');
+const {
+  getDashboardStats,
+  getRecentActivities,
+} = require('../controllers/admin/dashboardController');
 
 // Import admin delivery routes
 const adminDeliveryRoutes = require('./adminDeliveryRoutes');
@@ -294,5 +298,9 @@ router.patch('/delivery-addresses/:id/set-default', authMiddleware, setAdminDefa
 
 // Admin Delivery Management Routes
 router.use('/deliveries', adminDeliveryRoutes);
+
+// Dashboard Routes
+router.get('/dashboard/stats', authMiddleware, getDashboardStats);
+router.get('/dashboard/activities', authMiddleware, getRecentActivities);
 
 module.exports = router;

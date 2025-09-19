@@ -32,6 +32,7 @@ model User {
   depot                 Depot?              @relation(fields: [depotId], references: [id])
   deliveredOrders       VendorOrder[]       @relation("DeliveredBy")
   receivedOrders        VendorOrder[]       @relation("ReceivedBy")
+  wastageRegisteredOrders VendorOrder[]     @relation("WastageRegisteredBy")
   vendor                Vendor?
   processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions")
   wastagesCreated       Wastage[]           @relation("WastageCreatedBy")
@@ -206,28 +207,36 @@ model Location {
 }
 
 model VendorOrder {
-  id                Int         @id @default(autoincrement())
-  poNumber          String?
-  orderDate         DateTime
-  deliveryDate      DateTime?
-  vendorId          Int
-  contactPersonName String?
-  notes             String?
-  status            OrderStatus @default(PENDING)
-  deliveredById     Int?
-  deliveredAt       DateTime?
-  receivedById      Int?
-  receivedAt        DateTime?
-  totalAmount       Float?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  items             OrderItem[]
-  deliveredBy       User?       @relation("DeliveredBy", fields: [deliveredById], references: [id])
-  receivedBy        User?       @relation("ReceivedBy", fields: [receivedById], references: [id])
-  vendor            Vendor      @relation(fields: [vendorId], references: [id])
+  id                    Int         @id @default(autoincrement())
+  poNumber              String?
+  orderDate             DateTime
+  deliveryDate          DateTime?
+  vendorId              Int
+  contactPersonName     String?
+  notes                 String?
+  status                OrderStatus @default(PENDING)
+  deliveredById         Int?
+  deliveredAt           DateTime?
+  receivedById          Int?
+  receivedAt            DateTime?
+  totalAmount           Float?
+  farmerWastage         Int?        @default(0)
+  farmerNotReceived     Int?        @default(0)
+  agencyWastage         Int?        @default(0)
+  agencyNotReceived     Int?        @default(0)
+  wastageRegisteredById Int?
+  wastageRegisteredAt   DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  items                 OrderItem[]
+  deliveredBy           User?       @relation("DeliveredBy", fields: [deliveredById], references: [id])
+  receivedBy            User?       @relation("ReceivedBy", fields: [receivedById], references: [id])
+  wastageRegisteredBy   User?       @relation("WastageRegisteredBy", fields: [wastageRegisteredById], references: [id])
+  vendor                Vendor      @relation(fields: [vendorId], references: [id])
 
   @@index([deliveredById], map: "vendor_orders_deliveredById_fkey")
   @@index([receivedById], map: "vendor_orders_receivedById_fkey")
+  @@index([wastageRegisteredById], map: "vendor_orders_wastageRegisteredById_fkey")
   @@index([vendorId], map: "vendor_orders_vendorId_fkey")
   @@map("vendor_orders")
 }

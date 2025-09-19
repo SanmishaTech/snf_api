@@ -210,7 +210,7 @@ exports.getDeliveryFilters = async (req, res, next) => {
 // Delivery Agencies Report (group by agency -> area -> status)
 exports.getDeliveryAgenciesReport = async (req, res, next) => {
   try {
-    const { startDate, endDate, agencyId, areaId, status, groupBy = 'agency,area,status' } = req.query;
+    const { startDate, endDate, agencyId, areaId, status, groupBy = 'agency,area,variant,status' } = req.query;
 
     // Build where clause for delivery schedule entries
     const where = {};
@@ -289,8 +289,9 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
     const flat = [];
     deliveries.forEach(d => {
       // Calculate amount based on subscription rate and quantity
-      const rate = d.subscription?.rate || 0;
-      const amount = (d.quantity || 1) * rate;
+      const rate = parseFloat(d.subscription?.rate) || 0;
+      const quantity = parseInt(d.quantity) || 1;
+      const amount = quantity * rate;
       
       // Determine area information - if delivery address exists, check its location
       // If no delivery address or location is present, show Any
@@ -344,11 +345,10 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
     const totals = {
       totalDeliveries: flat.length,
       totalItems: flat.length,
-      totalQuantity: flat.reduce((s, x) => s + (x.quantity || 0), 0),
-      totalAmount: flat.reduce((s, x) => s + (x.amount || 0), 0),
+      totalQuantity: flat.reduce((s, x) => s + (parseInt(x.quantity) || 0), 0),
+      totalAmount: flat.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0),
       deliveredCount: flat.filter(x => (x.status || '').toLowerCase() === 'delivered').length,
-      pendingCount: flat.filter(x => (x.status || '').toLowerCase() === 'pending').length,
-      avgDeliveryValue: flat.length ? flat.reduce((s, x) => s + (x.amount || 0), 0) / flat.length : 0
+      pendingCount: flat.filter(x => (x.status || '').toLowerCase() === 'pending').length
     };
 
     return res.json({
@@ -475,22 +475,49 @@ function groupDeliveries(data, levels) {
   if (!levels || levels.length === 0) return data;
   const level = levels[0];
   const groups = data.reduce((acc, row) => {
-    const key = level === 'agency' ? row.agencyId : level === 'area' ? row.areaId : row.status || 'unknown';
+    let key;
+    if (level === 'agency') {
+      key = row.agencyId;
+    } else if (level === 'area') {
+      key = row.areaId;
+    } else if (level === 'variant') {
+      // Use composite key for variants to ensure proper separation by product
+      key = `${row.productId}_${row.variantId}`;
+    } else {
+      key = row.status || 'unknown';
+    }
+    
     if (!acc[key]) acc[key] = [];
     acc[key].push(row);
     return acc;
   }, {});
   const result = [];
   Object.entries(groups).forEach(([id, rows]) => {
+    let nodeName, productName, variantName;
+    
+    if (level === 'agency') {
+      nodeName = rows[0].agencyName;
+    } else if (level === 'area') {
+      nodeName = rows[0].areaName;
+    } else if (level === 'variant') {
+      productName = rows[0].productName;
+      variantName = rows[0].variantName;
+      nodeName = `${productName} - ${variantName}`;
+    } else {
+      nodeName = rows[0].status;
+    }
+    
     const node = {
       level,
       id,
-      name: level === 'agency' ? rows[0].agencyName : level === 'area' ? rows[0].areaName : rows[0].status,
+      name: nodeName,
+      productName: level === 'variant' ? productName : undefined,
+      variantName: level === 'variant' ? variantName : undefined,
       city: level === 'area' ? rows[0].city : undefined,
       data: [],
       totals: {
-        totalQuantity: rows.reduce((s, r) => s + (r.quantity || 0), 0),
-        totalAmount: rows.reduce((s, r) => s + (r.amount || 0), 0),
+        totalQuantity: rows.reduce((s, r) => s + (parseInt(r.quantity) || 0), 0),
+        totalAmount: rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0),
         itemCount: rows.length,
         deliveredCount: rows.filter(r => (r.status || '').toLowerCase() === 'delivered').length,
         pendingCount: rows.filter(r => (r.status || '').toLowerCase() === 'pending').length,

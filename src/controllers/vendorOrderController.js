@@ -242,6 +242,7 @@ exports.getAllVendorOrders = async (req, res, next) => {
         },
         deliveredBy: { select: { id: true, name: true, email: true } },
         receivedBy: { select: { id: true, name: true, email: true } },
+        wastageRegisteredBy: { select: { id: true, name: true, email: true } },
       },
     });
     const totalOrders = await prisma.vendorOrder.count({ where });
@@ -303,7 +304,17 @@ exports.getMyVendorOrders = async (req, res, next) => {
       orderBy: { [sortBy]: sortOrder },
       include: {
         vendor: true,
-        items: { include: { product: true, agency: true } },
+        items: { 
+          include: { 
+            product: true, 
+            agency: true,
+            depot: { select: { id: true, name: true, city: true } },
+            depotVariant: { select: { id: true, name: true } }
+          } 
+        },
+        deliveredBy: { select: { id: true, name: true, email: true } },
+        receivedBy: { select: { id: true, name: true, email: true } },
+        wastageRegisteredBy: { select: { id: true, name: true, email: true } },
       },
     });
     const totalOrders = await prisma.vendorOrder.count({ where });
@@ -1056,6 +1067,7 @@ exports.getMySupervisorAgencyOrders = async (req, res, next) => {
         },
         deliveredBy: { select: { id: true, name: true, email: true } },
         receivedBy: { select: { id: true, name: true, email: true } },
+        wastageRegisteredBy: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -1198,6 +1210,7 @@ exports.getMyAgencyOrders = async (req, res, next) => {
         },
         deliveredBy: { select: { id: true, name: true, email: true, mobile: true } },
         receivedBy: { select: { id: true, name: true, email: true, mobile: true } },
+        wastageRegisteredBy: { select: { id: true, name: true, email: true } },
       },
       orderBy: { orderDate: 'desc' },
       skip: skip,
@@ -1497,5 +1510,137 @@ exports.getOrderDetailsByDate = async (req, res, next) => {
   } catch (error) {
     console.error('Error fetching order details:', error);
     next(createError(500, 'Failed to fetch order details.'));
+  }
+};
+
+// @desc    Register wastage for vendor order
+// @route   PATCH /api/vendor-orders/:id/register-wastage
+// @access  Private (ADMIN only)
+exports.registerWastage = async (req, res, next) => {
+  const orderId = parseInt(req.params.id);
+  const { farmerWastage, farmerNotReceived, agencyWastage, agencyNotReceived, level } = req.body;
+
+  if (isNaN(orderId)) {
+    return next(createError(400, 'Invalid Order ID.'));
+  }
+
+  // Role-based access control: Only ADMIN users can register wastage
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return next(createError(403, 'Forbidden: Only ADMIN users can register wastage.'));
+  }
+
+  // Determine which level is being registered
+  const isRegisteringFarmerLevel = level === 'farmer' || (farmerWastage != null || farmerNotReceived != null);
+  const isRegisteringAgencyLevel = level === 'agency' || (agencyWastage != null || agencyNotReceived != null);
+
+  // Validation based on level being registered
+  if (isRegisteringFarmerLevel) {
+    if (farmerWastage == null || farmerNotReceived == null || 
+        typeof farmerWastage !== 'number' || typeof farmerNotReceived !== 'number' ||
+        farmerWastage < 0 || farmerNotReceived < 0 || 
+        !Number.isInteger(farmerWastage) || !Number.isInteger(farmerNotReceived)) {
+      return next(createError(400, 'farmerWastage and farmerNotReceived must be non-negative integers.'));
+    }
+  }
+
+  if (isRegisteringAgencyLevel) {
+    if (agencyWastage == null || agencyNotReceived == null || 
+        typeof agencyWastage !== 'number' || typeof agencyNotReceived !== 'number' ||
+        agencyWastage < 0 || agencyNotReceived < 0 || 
+        !Number.isInteger(agencyWastage) || !Number.isInteger(agencyNotReceived)) {
+      return next(createError(400, 'agencyWastage and agencyNotReceived must be non-negative integers.'));
+    }
+  }
+
+  try {
+    const order = await prisma.vendorOrder.findUnique({
+      where: { id: orderId },
+      include: { 
+        items: true,
+        deliveredBy: { select: { id: true, name: true, email: true } },
+        receivedBy: { select: { id: true, name: true, email: true } }
+      },
+    });
+
+    if (!order) {
+      return next(createError(404, 'Order not found.'));
+    }
+
+    // Business rule: Order must have at least been DELIVERED to register wastage
+    if (order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.RECEIVED) {
+      return next(createError(400, `Order status is ${order.status}. Wastage can only be registered for DELIVERED or RECEIVED orders.`));
+    }
+
+    // Calculate quantities for validation
+    const totalDeliveredQuantity = order.items.reduce((sum, item) => sum + (item.deliveredQuantity || 0), 0);
+    const totalReceivedQuantity = order.items.reduce((sum, item) => sum + (item.receivedQuantity || 0), 0);
+
+    // Validate farmer level against delivered quantity
+    if (isRegisteringFarmerLevel) {
+      const farmerTotal = farmerWastage + farmerNotReceived;
+      if (farmerTotal > totalDeliveredQuantity) {
+        return next(createError(400, `Farmer level total (${farmerTotal}) cannot exceed delivered quantity (${totalDeliveredQuantity}).`));
+      }
+    }
+
+    // Validate agency level against received quantity (only if received quantities exist)
+    if (isRegisteringAgencyLevel) {
+      if (totalReceivedQuantity === 0) {
+        return next(createError(400, 'Cannot register agency level wastage as no received quantities have been recorded yet.'));
+      }
+      const agencyTotal = agencyWastage + agencyNotReceived;
+      if (agencyTotal > totalReceivedQuantity) {
+        return next(createError(400, `Agency level total (${agencyTotal}) cannot exceed received quantity (${totalReceivedQuantity}).`));
+      }
+    }
+
+    // Prepare update data based on what's being registered
+    const updateData = {
+      wastageRegisteredById: req.user.id,
+      wastageRegisteredAt: new Date(),
+    };
+
+    // Only update farmer level fields if registering farmer level
+    if (isRegisteringFarmerLevel) {
+      updateData.farmerWastage = farmerWastage;
+      updateData.farmerNotReceived = farmerNotReceived;
+    }
+
+    // Only update agency level fields if registering agency level
+    if (isRegisteringAgencyLevel) {
+      updateData.agencyWastage = agencyWastage;
+      updateData.agencyNotReceived = agencyNotReceived;
+    }
+
+    const updatedOrder = await prisma.vendorOrder.update({
+      where: { id: orderId },
+      data: updateData,
+      include: {
+        vendor: true,
+        items: { 
+          include: { 
+            product: true, 
+            agency: true,
+            depot: { select: { id: true, name: true, city: true } },
+            depotVariant: { select: { id: true, name: true } }
+          } 
+        },
+        deliveredBy: { select: { id: true, name: true, email: true } },
+        receivedBy: { select: { id: true, name: true, email: true } },
+        wastageRegisteredBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (updatedOrder && updatedOrder.items) {
+      updatedOrder.items = transformOrderItems(updatedOrder.items);
+    }
+    res.json(updatedOrder);
+
+  } catch (error) {
+    if (error.statusCode) { // If it's an error created by createError
+      return next(error);
+    }
+    console.error("Error registering wastage:", error);
+    next(createError(500, 'Failed to register wastage. ' + error.message));
   }
 };

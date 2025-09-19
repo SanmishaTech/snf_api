@@ -1033,6 +1033,69 @@ router.put('/:id/record-supervisor-quantity', auth, isSupervisorOrAdmin, vendorO
  */
 router.patch('/:id/reception', auth, vendorOrderController.markOrderReceived);
 
+// PATCH /api/vendor-orders/:id/register-wastage - Register wastage for vendor order
+/**
+ * @swagger
+ * /vendor-orders/{id}/register-wastage:
+ *   patch:
+ *     summary: Register wastage for a vendor order
+ *     tags: [Vendor Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the vendor order.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               level:
+ *                 type: string
+ *                 enum: [farmer, agency]
+ *                 description: Level of wastage being registered (farmer or agency).
+ *               farmerWastage:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Wastage quantity at farmer level (required when level=farmer).
+ *               farmerNotReceived:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Quantity not received at farmer level (required when level=farmer).
+ *               agencyWastage:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Wastage quantity at agency level (required when level=agency).
+ *               agencyNotReceived:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Quantity not received at agency level (required when level=agency).
+ *     responses:
+ *       200:
+ *         description: Wastage registered successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VendorOrderResponse'
+ *       400:
+ *         description: Bad request (e.g., validation error, wastage exceeds delivered quantity).
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Forbidden (e.g., order status does not allow wastage registration).
+ *       404:
+ *         description: Vendor order not found.
+ *       500:
+ *         description: Internal server error.
+ */
+router.patch('/:id/register-wastage', auth, vendorOrderController.registerWastage);
+
 // DELETE /api/vendor-orders/:id - Delete a vendor order (ADMIN only - use with caution)
 /**
  * @swagger
