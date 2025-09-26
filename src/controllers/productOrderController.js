@@ -678,7 +678,8 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
     paymentStatus = '', 
     supervisorAgencyId = '',
     unassignedOnly = '',
-    expiryStatus = 'ALL'  // Default to ALL to show everything
+    expiryStatus = 'ALL',  // Default to ALL to show everything
+    expiringInDays = ''    // New filter for days until expiry
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -710,20 +711,36 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Handle expiry filtering based on the requirement
-  if (expiryStatus === 'EXPIRED') {
-    // Show orders that have at least one expired subscription
+  // Handle days until expiry filtering (takes precedence over expiry status)
+  if (expiringInDays && !isNaN(parseInt(expiringInDays, 10))) {
+    const daysUntilExpiry = parseInt(expiringInDays, 10);
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysUntilExpiry);
+    targetDate.setHours(23, 59, 59, 999); // End of target day
+    
+    // Find subscriptions expiring on exactly the target date
     subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
-    subscriptionWhere.expiryDate = { lt: today };
+    subscriptionWhere.expiryDate = {
+      gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()), // Start of target day
+      lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1) // Start of next day
+    };
     where.paymentStatus = { not: 'CANCELLED' };
-  } else if (expiryStatus === 'NOT_EXPIRED') {
-    // Show orders that have at least one active (non-expired) subscription
-    subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
-    subscriptionWhere.expiryDate = { gte: today };
-    where.paymentStatus = { not: 'CANCELLED' };
+  } else {
+    // Handle general expiry filtering if no specific days filter
+    if (expiryStatus === 'EXPIRED') {
+      // Show orders that have at least one expired subscription
+      subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
+      subscriptionWhere.expiryDate = { lt: today };
+      where.paymentStatus = { not: 'CANCELLED' };
+    } else if (expiryStatus === 'NOT_EXPIRED') {
+      // Show orders that have at least one active (non-expired) subscription
+      subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
+      subscriptionWhere.expiryDate = { gte: today };
+      where.paymentStatus = { not: 'CANCELLED' };
+    }
+    // If expiryStatus is 'ALL', don't add any expiry-related filters
+    // This will show all orders including cancelled and expired ones
   }
-  // If expiryStatus is 'ALL', don't add any expiry-related filters
-  // This will show all orders including cancelled and expired ones
 
   // Apply subscription filters if any exist
   if (Object.keys(subscriptionWhere).length > 0) {
@@ -745,6 +762,7 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
       page: pageNum,
       limit: limitNum,
       expiryStatus,
+      expiringInDays,
       unassignedOnly,
       hasSubscriptionFilters: where.subscriptions ? true : false,
       today: today.toISOString(),
