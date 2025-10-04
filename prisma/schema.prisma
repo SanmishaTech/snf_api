@@ -518,6 +518,7 @@ model Purchase {
   @@index([createdById], map: "Purchase_createdById_fkey")
   @@index([updatedById], map: "Purchase_updatedById_fkey")
 }
+//changes
 
 model PurchaseDetail {
   id               Int                 @id @default(autoincrement())
