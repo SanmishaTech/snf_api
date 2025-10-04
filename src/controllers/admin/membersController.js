@@ -43,6 +43,22 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         });
     }
 
+    // Build orderBy based on sortBy field
+    let orderBy;
+    if (sortBy === 'walletBalance') {
+        // walletBalance is on the member relation, not on User
+        orderBy = {
+            member: {
+                walletBalance: sortOrder
+            }
+        };
+    } else {
+        // For other fields like name, email, active that exist on User model
+        orderBy = {
+            [sortBy]: sortOrder
+        };
+    }
+
     const membersData = await prisma.user.findMany({
         where: whereClause,
         select: {
@@ -60,9 +76,7 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         },
         skip: skip,
         take: limit,
-        orderBy: {
-            [sortBy]: sortOrder,
-        },
+        orderBy: orderBy,
     });
 
     const membersWithWallets = membersData.map(user => ({
