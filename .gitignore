@@ -7,3 +7,6 @@ bun.lockb
 /uploads/categories
 /uploads/products
 src/invoices/
+*uploads/*
+*uploads
+/uploads*
