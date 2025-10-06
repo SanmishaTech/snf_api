@@ -391,7 +391,7 @@ model DeliveryScheduleEntry {
   DepotProductVariant   DepotProductVariant? @relation(fields: [depotProductVariantId], references: [id])
   member                Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
   product               Product              @relation(fields: [productId], references: [id])
-  subscription          Subscription         @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription          Subscription         @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
   walletTransaction     WalletTransaction?   @relation(fields: [walletTransactionId], references: [id])
 
   @@index([subscriptionId])

@@ -1112,22 +1112,43 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'No subscriptions found in this order' });
   }
 
-  // Check if any subscription in the order can be cancelled based on payment status
-  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', null];
-  const cancellableSubscriptions = order.subscriptions.filter(sub =>
-    allowedPaymentStatuses.includes(sub.paymentStatus)
+  const now = new Date();
+
+  // Determine which subscriptions have pending deliveries that can be cancelled
+  const allowedPaymentStatuses = ['PENDING', 'FAILED', 'CANCELLED', 'PAID', null];
+  const subscriptionIds = order.subscriptions.map((sub) => sub.id);
+
+  const pendingDeliveries = await prisma.deliveryScheduleEntry.findMany({
+    where: {
+      subscriptionId: { in: subscriptionIds },
+      status: 'PENDING',
+      deliveryDate: {
+        gte: now
+      }
+    },
+    select: {
+      id: true,
+      subscriptionId: true
+    }
+  });
+
+  const pendingSubscriptionIds = new Set(pendingDeliveries.map((entry) => entry.subscriptionId));
+
+  // Check if any subscription in the order can be cancelled based on payment status and pending deliveries
+  const cancellableSubscriptions = order.subscriptions.filter((sub) =>
+    allowedPaymentStatuses.includes(sub.paymentStatus) && pendingSubscriptionIds.has(sub.id)
   );
 
   if (cancellableSubscriptions.length === 0) {
     return res.status(400).json({
-      message: 'No subscriptions in this order can be cancelled. Only subscriptions with unpaid, pending, failed, or cancelled payment status can be cancelled.'
+      message: 'No pending deliveries are available for cancellation in this order.'
     });
   }
 
   // If some subscriptions can't be cancelled, inform the user
   if (cancellableSubscriptions.length < order.subscriptions.length) {
     const nonCancellableCount = order.subscriptions.length - cancellableSubscriptions.length;
-    console.warn(`${nonCancellableCount} subscription(s) in order ${order.orderNo} cannot be cancelled due to payment status`);
+    console.warn(`${nonCancellableCount} subscription(s) in order ${order.orderNo} cannot be cancelled due to payment status or because they have no pending deliveries`);
   }
 
   try {
@@ -1151,7 +1172,7 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
           subscriptionId: { in: cancellableSubscriptionIds },
           status: 'PENDING',
           deliveryDate: {
-            gte: new Date() // Only future deliveries
+            gte: now // Only future deliveries
           }
         },
         data: {
@@ -1162,7 +1183,7 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
 
       // Process wallet refund if wallet amount was used in this order
       let walletTransaction = null;
-      if (order.walletamt && order.walletamt > 0) {
+      if (order.walletamt && order.walletamt > 0 && req.user.role !== 'ADMIN') {
         console.log(`Processing wallet refund of ₹${order.walletamt} for order ${order.orderNo}`);
         
         // Credit the wallet amount back to member's wallet
