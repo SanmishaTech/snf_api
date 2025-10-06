@@ -165,6 +165,7 @@ model ProductVariant {
   variantStocks   VariantStock[]
 
   @@index([productId])
+  @@map("product_variants")
 }
 
 model Category {
@@ -295,6 +296,8 @@ model Banner {
   listOrder   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+ 
+  @@map("banners")
 }
 
 model Depot {
@@ -490,6 +493,7 @@ model VariantStock {
   @@index([variantId])
   @@index([depotId])
   @@index([productVariantId], map: "VariantStock_productVariantId_fkey")
+  @@map("variant_stocks")
 }
 
 model Purchase {
@@ -517,6 +521,7 @@ model Purchase {
   @@index([depotId])
   @@index([createdById], map: "Purchase_createdById_fkey")
   @@index([updatedById], map: "Purchase_updatedById_fkey")
+  @@map("purchases")
 }
 //changes
 
@@ -539,6 +544,7 @@ model PurchaseDetail {
   @@index([productId])
   @@index([variantId])
   @@index([productVariantId], map: "PurchaseDetail_productVariantId_fkey")
+  @@map("purchase_details")
 }
 
 model PurchasePayment {
@@ -677,6 +683,7 @@ model StockLedger {
   @@index([variantId])
   @@index([depotId])
   @@index([productVariantId], map: "StockLedger_productVariantId_fkey")
+  @@map("stock_ledgers")
 }
 
 model Transfer {
