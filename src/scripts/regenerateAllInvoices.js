@@ -45,7 +45,7 @@ async function regenerateAllInvoices() {
     
     // Step 2: Clear existing invoice directory
     console.log('🗑️  Clearing existing invoice files...');
-    const invoicesDir = path.join(__dirname, '../invoices');
+    const invoicesDir = path.join(__dirname, '../../uploads/invoices');
     
     try {
       const files = await fs.readdir(invoicesDir);
@@ -98,8 +98,8 @@ async function regenerateAllInvoices() {
           const oldPdfPath = invoice.pdfPath;
           const newFileName = `${existingInvoiceNo}.pdf`;
           const newPdfPath = newFileName;
-          const fullOldPath = path.join(__dirname, '../invoices', oldPdfPath);
-          const fullNewPath = path.join(__dirname, '../invoices', newPdfPath);
+          const fullOldPath = path.join(__dirname, '../../uploads/invoices', oldPdfPath);
+          const fullNewPath = path.join(__dirname, '../../uploads/invoices', newPdfPath);
           
           if (oldPdfPath !== newPdfPath) {
             await fs.rename(fullOldPath, fullNewPath);
@@ -191,7 +191,7 @@ async function regenerateAllInvoices() {
     }
     
     if (successCount > 0) {
-      console.log(`\n📁 New invoices saved to: ${path.join(__dirname, '../invoices')}`);
+      console.log(`\n📁 New invoices saved to: ${path.join(__dirname, '../../uploads/invoices')}`);
     }
     
     console.log('\n🎉 Invoice regeneration process completed!');
@@ -206,7 +206,7 @@ async function regenerateAllInvoices() {
 
 // Helper function to create invoices directory if it doesn't exist
 async function ensureInvoicesDirectory() {
-  const invoicesDir = path.join(__dirname, '../invoices');
+  const invoicesDir = path.join(__dirname, '../../uploads/invoices');
   try {
     await fs.access(invoicesDir);
   } catch {

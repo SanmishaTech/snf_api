@@ -129,10 +129,10 @@ const generateInvoiceForOrder = async (productOrder) => {
 
     // Generate PDF
     const pdfFileName = `${invoiceNo}.pdf`;
-    const pdfPath = path.join(__dirname, '..', 'invoices', pdfFileName);
+    const pdfPath = path.join(__dirname, '..', '..', 'uploads', 'invoices', pdfFileName);
     
     // Ensure invoices directory exists
-    const invoicesDir = path.join(__dirname, '..', 'invoices');
+    const invoicesDir = path.join(__dirname, '..', '..', 'uploads', 'invoices');
     await fs.mkdir(invoicesDir, { recursive: true });
 
     await generateInvoicePdf(invoiceData, pdfPath);
@@ -279,7 +279,7 @@ const formatDateShort = (date) => {
 const getInvoicePath = (orderNo) => {
   const invoiceNo = orderNo.replace('ORD', 'INV');
   const pdfFileName = `${invoiceNo}.pdf`;
-  return path.join(__dirname, '..', 'invoices', pdfFileName);
+  return path.join(__dirname, '..', '..', 'uploads', 'invoices', pdfFileName);
 };
 
 /**
@@ -327,7 +327,7 @@ const getInvoiceBySubscription = async (subscriptionId) => {
     
     // Check if invoice exists
     if (order.invoicePath) {
-      const fullPath = path.join(__dirname, '..', 'invoices', order.invoicePath);
+      const fullPath = path.join(__dirname, '..', '..', 'uploads', 'invoices', order.invoicePath);
       const exists = await invoiceExists(order.orderNo);
       
       return {

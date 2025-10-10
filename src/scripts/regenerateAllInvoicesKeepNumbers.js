@@ -42,7 +42,7 @@ async function regenerateAllInvoicesKeepNumbers() {
     
     // Step 2: Clear existing invoice PDF files (but keep the numbers)
     console.log('🗑️  Clearing existing invoice PDF files...');
-    const invoicesDir = path.join(__dirname, '../invoices');
+    const invoicesDir = path.join(__dirname, '../../uploads/invoices');
     
     try {
       const files = await fs.readdir(invoicesDir);
@@ -138,7 +138,7 @@ async function regenerateAllInvoicesKeepNumbers() {
     }
     
     if (successCount > 0) {
-      console.log(`\n📁 Regenerated PDFs saved to: ${path.join(__dirname, '../invoices')}`);
+      console.log(`\n📁 Regenerated PDFs saved to: ${path.join(__dirname, '../../uploads/invoices')}`);
     }
     
     console.log('\n🎉 Invoice regeneration process completed!');
@@ -153,7 +153,7 @@ async function regenerateAllInvoicesKeepNumbers() {
 
 // Helper function to create invoices directory if it doesn't exist
 async function ensureInvoicesDirectory() {
-  const invoicesDir = path.join(__dirname, '../invoices');
+  const invoicesDir = path.join(__dirname, '../../uploads/invoices');
   try {
     await fs.access(invoicesDir);
   } catch {

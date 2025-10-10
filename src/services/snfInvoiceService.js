@@ -122,10 +122,10 @@ const generateInvoiceForSNFOrder = async (snfOrder) => {
 
     // Generate PDF
     const pdfFileName = `SNF_${invoiceNo}.pdf`;
-    const pdfPath = path.join(__dirname, '..', 'invoices', 'snf', pdfFileName);
+    const pdfPath = path.join(__dirname, '..', '..', 'uploads', 'invoices', 'snf', pdfFileName);
     
     // Ensure SNF invoices directory exists
-    const invoicesDir = path.join(__dirname, '..', 'invoices', 'snf');
+    const invoicesDir = path.join(__dirname, '..', '..', 'uploads', 'invoices', 'snf');
     await fs.mkdir(invoicesDir, { recursive: true });
 
     await generateInvoicePdf(invoiceData, pdfPath);

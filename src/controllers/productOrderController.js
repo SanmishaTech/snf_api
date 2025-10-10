@@ -1400,6 +1400,7 @@ const assignAgentToOrder = asyncHandler(async (req, res) => {
     res.status(500).json({ 
       message: 'Failed to assign agent to order subscriptions. Please try again.'
     });
+    
   }
 });
 

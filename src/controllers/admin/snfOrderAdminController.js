@@ -247,7 +247,7 @@ const downloadSNFOrderInvoice = asyncHandler(async (req, res) => {
   }
 
   // Construct full path to invoice
-  const invoicesDir = path.join(__dirname, '..', '..', 'invoices');
+  const invoicesDir = path.join(__dirname, '..', '..', '..', 'uploads', 'invoices');
   const fullPath = path.join(invoicesDir, order.invoicePath);
 
   try {

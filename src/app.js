@@ -97,10 +97,60 @@ const uploadsPath =
 console.log(`Serving uploads from: ${uploadsPath}`);
 app.use("/uploads", express.static(uploadsPath));
 
-// Serve invoices statically
-const invoicesPath = path.resolve(__dirname, "invoices");
-console.log(`Serving invoices from: ${invoicesPath}`);
-app.use("/invoices", express.static(invoicesPath));
+// Middleware to auto-generate missing invoices for static requests
+app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
+  const invoiceNo = req.params.invoiceNo.replace('.pdf', '');
+  const invoicePath = path.resolve(__dirname, "..", "uploads", "invoices", `${invoiceNo}.pdf`);
+  
+  // Check if file exists
+  const fs = require('fs').promises;
+  try {
+    await fs.access(invoicePath);
+    // File exists, continue to static serving
+    next();
+  } catch (error) {
+    // File doesn't exist, try to generate it
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const { generateInvoiceForOrder } = require('./services/invoiceService');
+      const prisma = new PrismaClient();
+      
+      // Find the order by invoice number (financial year format: YYNN-NNNNN)
+      const productOrder = await prisma.productOrder.findFirst({
+        where: { invoiceNo },
+        include: {
+          subscriptions: {
+            include: {
+              product: true,
+              depotProductVariant: true,
+              deliveryScheduleEntries: {
+                orderBy: { deliveryDate: 'asc' }
+              }
+            }
+          },
+          member: { include: { user: true } }
+        }
+      });
+      
+      if (productOrder) {
+        console.log(`Generating invoice ${invoiceNo} for order ${productOrder.orderNo}`);
+        // Generate the invoice
+        await generateInvoiceForOrder(productOrder);
+        
+        await prisma.$disconnect();
+        
+        // Now serve the newly generated file
+        res.sendFile(invoicePath);
+      } else {
+        await prisma.$disconnect();
+        res.status(404).json({ error: 'Invoice not found - order does not exist or invoice was never generated' });
+      }
+    } catch (genError) {
+      console.error('Error generating invoice:', genError);
+      res.status(500).json({ error: 'Failed to generate invoice', details: genError.message });
+    }
+  }
+});
 
 // Public APIs (no auth)
 app.get("/api/products/public", getPublicProducts);
@@ -226,58 +276,5 @@ app.use(
   stockLedgerRoutes
 );
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN", "AGENCY", "VENDOR"), reportRoutes);
-app.use(swaggerRouter);
-
-app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api/") || req.path.includes(".")) {
-    return next();
-  }
-
-  const indexPath = path.join(frontendDistPath, "index.html");
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      if (err.code === "ENOENT") {
-        res
-          .status(404)
-          .send(
-            "Frontend entry point (index.html) not found. Ensure the frontend is built and paths are correctly configured."
-          );
-      } else {
-        res
-          .status(500)
-          .send(
-            "An error occurred while trying to serve the frontend application."
-          );
-      }
-    }
-  });
-});
-
-app.use((req, res, next) => {
-  if (res.headersSent) {
-    return next();
-  }
-  next(createError(404, "The requested resource was not found."));
-});
-
-app.use((err, req, res, next) => {
-  if (res.headersSent) {
-    return next(err);
-  }
-  console.error(
-    "[ERROR HANDLER]:",
-    err.status,
-    err.message,
-    process.env.NODE_ENV === "development" ? err.stack : ""
-  );
-  res.status(err.status || 500);
-  res.json({
-    error: {
-      message: err.message || "An unexpected error occurred.",
-      status: err.status || 500,
-      role: err.role || undefined,
-    },
-  });
-});
 
 module.exports = app;
