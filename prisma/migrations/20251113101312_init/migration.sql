@@ -4,7 +4,7 @@ CREATE TABLE `users` (
     `name` VARCHAR(191) NOT NULL,
     `email` VARCHAR(191) NOT NULL,
     `password` VARCHAR(191) NOT NULL,
-    `role` ENUM('ADMIN', 'AGENCY', 'MEMBER', 'VENDOR', 'DepotAdmin') NOT NULL,
+    `role` ENUM('ADMIN', 'AGENCY', 'MEMBER', 'VENDOR', 'DepotAdmin', 'SUPERVISOR') NOT NULL,
     `mobile` VARCHAR(191) NULL,
     `active` BOOLEAN NOT NULL DEFAULT true,
     `lastLogin` DATETIME(3) NULL,
@@ -56,14 +56,38 @@ CREATE TABLE `agencies` (
     `alternate_mobile` VARCHAR(191) NULL,
     `email` VARCHAR(191) NULL,
     `userId` INTEGER NOT NULL,
+    `depotId` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-    `depotId` INTEGER NULL,
 
     UNIQUE INDEX `agencies_email_key`(`email`),
     UNIQUE INDEX `agencies_userId_key`(`userId`),
-    UNIQUE INDEX `agencies_depotId_key`(`depotId`),
     INDEX `agencies_depotId_idx`(`depotId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `supervisors` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `contact_person_name` VARCHAR(191) NULL,
+    `mobile` VARCHAR(191) NOT NULL,
+    `address1` VARCHAR(191) NOT NULL,
+    `address2` VARCHAR(191) NULL,
+    `city` VARCHAR(191) NOT NULL,
+    `pincode` INTEGER NOT NULL,
+    `alternate_mobile` VARCHAR(191) NULL,
+    `email` VARCHAR(191) NULL,
+    `userId` INTEGER NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `depotId` INTEGER NULL,
+    `agencyId` INTEGER NULL,
+
+    UNIQUE INDEX `supervisors_email_key`(`email`),
+    UNIQUE INDEX `supervisors_userId_key`(`userId`),
+    INDEX `supervisors_depotId_idx`(`depotId`),
+    INDEX `supervisors_agencyId_idx`(`agencyId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -73,23 +97,21 @@ CREATE TABLE `products` (
     `name` VARCHAR(191) NOT NULL,
     `url` VARCHAR(191) NULL,
     `attachmentUrl` VARCHAR(191) NULL,
-    `price` DOUBLE NOT NULL,
-    `rate` DOUBLE NOT NULL,
     `deliveredQuantity` INTEGER NULL,
     `description` TEXT NULL,
-    `unit` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `categoryId` INTEGER NULL,
     `isDairyProduct` BOOLEAN NOT NULL DEFAULT false,
     `maintainStock` BOOLEAN NOT NULL DEFAULT false,
+    `tags` VARCHAR(191) NULL,
 
     INDEX `products_categoryId_fkey`(`categoryId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ProductVariant` (
+CREATE TABLE `product_variants` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `productId` INTEGER NOT NULL,
     `hsnCode` VARCHAR(191) NULL,
@@ -101,7 +123,7 @@ CREATE TABLE `ProductVariant` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `ProductVariant_productId_idx`(`productId`),
+    INDEX `product_variants_productId_idx`(`productId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -158,11 +180,18 @@ CREATE TABLE `vendor_orders` (
     `receivedById` INTEGER NULL,
     `receivedAt` DATETIME(3) NULL,
     `totalAmount` DOUBLE NULL,
+    `farmerWastage` INTEGER NULL DEFAULT 0,
+    `farmerNotReceived` INTEGER NULL DEFAULT 0,
+    `agencyWastage` INTEGER NULL DEFAULT 0,
+    `agencyNotReceived` INTEGER NULL DEFAULT 0,
+    `wastageRegisteredById` INTEGER NULL,
+    `wastageRegisteredAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `vendor_orders_deliveredById_fkey`(`deliveredById`),
     INDEX `vendor_orders_receivedById_fkey`(`receivedById`),
+    INDEX `vendor_orders_wastageRegisteredById_fkey`(`wastageRegisteredById`),
     INDEX `vendor_orders_vendorId_fkey`(`vendorId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -181,9 +210,10 @@ CREATE TABLE `vendor_order_items` (
     `receivedQuantity` INTEGER NULL,
     `depotId` INTEGER NULL,
     `depotVariantId` INTEGER NULL,
+    `supervisorQuantity` INTEGER NULL,
 
     INDEX `vendor_order_items_agencyId_fkey`(`agencyId`),
-    INDEX `vendor_order_items_productId_fkey`(`productId`),
+    INDEX `vendor_order_items_product_idx`(`productId`),
     INDEX `vendor_order_items_vendorOrderId_fkey`(`vendorOrderId`),
     INDEX `vendor_order_items_depotId_fkey`(`depotId`),
     INDEX `vendor_order_items_depotVariantId_fkey`(`depotVariantId`),
@@ -204,7 +234,7 @@ CREATE TABLE `members` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Banner` (
+CREATE TABLE `banners` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `caption` VARCHAR(191) NULL,
     `description` VARCHAR(191) NULL,
@@ -226,6 +256,7 @@ CREATE TABLE `depots` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `isOnline` BOOLEAN NOT NULL DEFAULT false,
+    `city` VARCHAR(191) NOT NULL,
 
     UNIQUE INDEX `depots_name_key`(`name`),
     PRIMARY KEY (`id`)
@@ -263,8 +294,11 @@ CREATE TABLE `area_masters` (
     `depotId` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
+    `isDairyProduct` BOOLEAN NOT NULL DEFAULT false,
+    `cityId` INTEGER NULL,
 
     INDEX `area_masters_depotId_idx`(`depotId`),
+    INDEX `area_masters_cityId_idx`(`cityId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -277,19 +311,23 @@ CREATE TABLE `delivery_schedule_entries` (
     `productId` INTEGER NOT NULL,
     `deliveryDate` DATE NOT NULL,
     `quantity` INTEGER NOT NULL DEFAULT 1,
-    `status` ENUM('PENDING', 'DELIVERED', 'NOT_DELIVERED', 'CANCELLED', 'SKIPPED') NOT NULL DEFAULT 'PENDING',
+    `status` ENUM('PENDING', 'DELIVERED', 'NOT_DELIVERED', 'CANCELLED', 'SKIPPED', 'SKIP_BY_CUSTOMER', 'INDRAAI_DELIVERY', 'TRANSFER_TO_AGENT') NOT NULL DEFAULT 'PENDING',
     `agentId` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `depotId` INTEGER NULL,
     `depotProductVariantId` INTEGER NULL,
+    `adminNotes` TEXT NULL,
+    `walletTransactionId` INTEGER NULL,
 
+    UNIQUE INDEX `delivery_schedule_entries_walletTransactionId_key`(`walletTransactionId`),
     INDEX `delivery_schedule_entries_subscriptionId_idx`(`subscriptionId`),
     INDEX `delivery_schedule_entries_memberId_idx`(`memberId`),
     INDEX `delivery_schedule_entries_deliveryAddressId_idx`(`deliveryAddressId`),
     INDEX `delivery_schedule_entries_productId_idx`(`productId`),
     INDEX `delivery_schedule_entries_deliveryDate_idx`(`deliveryDate`),
     INDEX `delivery_schedule_entries_agentId_idx`(`agentId`),
+    INDEX `delivery_schedule_entries_walletTransactionId_idx`(`walletTransactionId`),
     INDEX `delivery_schedule_entries_depotId_fkey`(`depotId`),
     INDEX `delivery_schedule_entries_depotProductVariantId_fkey`(`depotProductVariantId`),
     PRIMARY KEY (`id`)
@@ -301,9 +339,9 @@ CREATE TABLE `subscriptions` (
     `memberId` INTEGER NOT NULL,
     `deliveryAddressId` INTEGER NULL,
     `productId` INTEGER NOT NULL,
-    `startDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `startDate` DATE NOT NULL,
     `period` INTEGER NOT NULL,
-    `expiryDate` DATETIME(3) NOT NULL,
+    `expiryDate` DATE NOT NULL,
     `deliverySchedule` ENUM('DAILY', 'DAY1_DAY2', 'WEEKDAYS', 'ALTERNATE_DAYS') NOT NULL,
     `weekdays` VARCHAR(191) NULL,
     `qty` INTEGER NOT NULL,
@@ -314,7 +352,7 @@ CREATE TABLE `subscriptions` (
     `paymentMode` ENUM('ONLINE', 'CASH', 'UPI', 'BANK') NULL,
     `paymentReferenceNo` VARCHAR(191) NULL,
     `paymentDate` DATETIME(3) NULL,
-    `paymentStatus` ENUM('PENDING', 'PAID', 'FAILED') NOT NULL DEFAULT 'PENDING',
+    `paymentStatus` ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
     `agencyId` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -323,6 +361,7 @@ CREATE TABLE `subscriptions` (
     `walletamt` DOUBLE NOT NULL DEFAULT 0,
     `depotProductVariantId` INTEGER NULL,
     `productOrderId` INTEGER NULL,
+    `deliveryInstructions` TEXT NULL,
 
     INDEX `subscriptions_memberId_idx`(`memberId`),
     INDEX `subscriptions_deliveryAddressId_idx`(`deliveryAddressId`),
@@ -353,7 +392,7 @@ CREATE TABLE `wallet_transactions` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `VariantStock` (
+CREATE TABLE `variant_stocks` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `productId` INTEGER NOT NULL,
     `variantId` INTEGER NOT NULL,
@@ -363,15 +402,15 @@ CREATE TABLE `VariantStock` (
     `updatedAt` DATETIME(3) NOT NULL,
     `productVariantId` INTEGER NULL,
 
-    INDEX `VariantStock_productId_idx`(`productId`),
-    INDEX `VariantStock_variantId_idx`(`variantId`),
-    INDEX `VariantStock_depotId_idx`(`depotId`),
+    INDEX `variant_stocks_productId_idx`(`productId`),
+    INDEX `variant_stocks_variantId_idx`(`variantId`),
+    INDEX `variant_stocks_depotId_idx`(`depotId`),
     INDEX `VariantStock_productVariantId_fkey`(`productVariantId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Purchase` (
+CREATE TABLE `purchases` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `purchaseNo` VARCHAR(191) NOT NULL,
     `purchaseDate` DATE NOT NULL,
@@ -385,16 +424,16 @@ CREATE TABLE `Purchase` (
     `updatedAt` DATETIME(3) NOT NULL,
     `paidAmt` DOUBLE NOT NULL DEFAULT 0,
 
-    UNIQUE INDEX `Purchase_purchaseNo_key`(`purchaseNo`),
-    INDEX `Purchase_vendorId_idx`(`vendorId`),
-    INDEX `Purchase_depotId_idx`(`depotId`),
+    UNIQUE INDEX `purchases_purchaseNo_key`(`purchaseNo`),
+    INDEX `purchases_vendorId_idx`(`vendorId`),
+    INDEX `purchases_depotId_idx`(`depotId`),
     INDEX `Purchase_createdById_fkey`(`createdById`),
     INDEX `Purchase_updatedById_fkey`(`updatedById`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `PurchaseDetail` (
+CREATE TABLE `purchase_details` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `purchaseId` INTEGER NOT NULL,
     `productId` INTEGER NOT NULL,
@@ -405,9 +444,9 @@ CREATE TABLE `PurchaseDetail` (
     `updatedAt` DATETIME(3) NOT NULL,
     `productVariantId` INTEGER NULL,
 
-    INDEX `PurchaseDetail_purchaseId_idx`(`purchaseId`),
-    INDEX `PurchaseDetail_productId_idx`(`productId`),
-    INDEX `PurchaseDetail_variantId_idx`(`variantId`),
+    INDEX `purchase_details_purchaseId_idx`(`purchaseId`),
+    INDEX `purchase_details_productId_idx`(`productId`),
+    INDEX `purchase_details_variantId_idx`(`variantId`),
     INDEX `PurchaseDetail_productVariantId_fkey`(`productVariantId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -501,6 +540,7 @@ CREATE TABLE `depot_product_variants` (
     `price3Day` DECIMAL(10, 2) NULL,
     `price7Day` DECIMAL(10, 2) NULL,
     `mrp` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `purchasePrice` DECIMAL(10, 2) NULL,
 
     INDEX `depot_product_variants_productId_idx`(`productId`),
     INDEX `depot_product_variants_depotId_idx`(`depotId`),
@@ -508,7 +548,7 @@ CREATE TABLE `depot_product_variants` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `StockLedger` (
+CREATE TABLE `stock_ledgers` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `productId` INTEGER NOT NULL,
     `variantId` INTEGER NOT NULL,
@@ -522,9 +562,9 @@ CREATE TABLE `StockLedger` (
     `updatedAt` DATETIME(3) NOT NULL,
     `productVariantId` INTEGER NULL,
 
-    INDEX `StockLedger_productId_idx`(`productId`),
-    INDEX `StockLedger_variantId_idx`(`variantId`),
-    INDEX `StockLedger_depotId_idx`(`depotId`),
+    INDEX `stock_ledgers_productId_idx`(`productId`),
+    INDEX `stock_ledgers_variantId_idx`(`variantId`),
+    INDEX `stock_ledgers_depotId_idx`(`depotId`),
     INDEX `StockLedger_productVariantId_fkey`(`productVariantId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -576,7 +616,7 @@ CREATE TABLE `product_orders` (
     `paymentMode` ENUM('ONLINE', 'CASH', 'UPI', 'BANK') NULL,
     `paymentReferenceNo` VARCHAR(191) NULL,
     `paymentDate` DATETIME(3) NULL,
-    `paymentStatus` ENUM('PENDING', 'PAID', 'FAILED') NOT NULL DEFAULT 'PENDING',
+    `paymentStatus` ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `agencyId` INTEGER NULL,
@@ -590,6 +630,86 @@ CREATE TABLE `product_orders` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `snf_orders` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `orderNo` VARCHAR(191) NOT NULL,
+    `memberId` INTEGER NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NULL,
+    `mobile` VARCHAR(191) NOT NULL,
+    `addressLine1` VARCHAR(191) NOT NULL,
+    `addressLine2` VARCHAR(191) NULL,
+    `city` VARCHAR(191) NOT NULL,
+    `state` VARCHAR(191) NULL,
+    `pincode` VARCHAR(191) NOT NULL,
+    `subtotal` DOUBLE NOT NULL,
+    `deliveryFee` DOUBLE NOT NULL DEFAULT 0,
+    `totalAmount` DOUBLE NOT NULL,
+    `paymentMode` ENUM('ONLINE', 'CASH', 'UPI', 'BANK') NULL,
+    `paymentStatus` ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+    `paymentRefNo` VARCHAR(191) NULL,
+    `paymentDate` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `depotId` INTEGER NULL,
+    `invoiceNo` VARCHAR(191) NULL,
+    `invoicePath` VARCHAR(191) NULL,
+    `payableAmount` DOUBLE NOT NULL DEFAULT 0,
+    `walletamt` DOUBLE NOT NULL DEFAULT 0,
+
+    UNIQUE INDEX `snf_orders_orderNo_key`(`orderNo`),
+    INDEX `snf_orders_memberId_idx`(`memberId`),
+    INDEX `snf_orders_depotId_idx`(`depotId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `snf_order_items` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `orderId` INTEGER NOT NULL,
+    `depotProductVariantId` INTEGER NULL,
+    `productId` INTEGER NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `variantName` VARCHAR(191) NULL,
+    `imageUrl` VARCHAR(191) NULL,
+    `price` DOUBLE NOT NULL,
+    `quantity` INTEGER NOT NULL,
+    `lineTotal` DOUBLE NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `snf_order_items_orderId_idx`(`orderId`),
+    INDEX `snf_order_items_depotProductVariantId_idx`(`depotProductVariantId`),
+    INDEX `snf_order_items_productId_idx`(`productId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `leads` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `mobile` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NULL,
+    `plotBuilding` VARCHAR(191) NOT NULL,
+    `streetArea` VARCHAR(191) NOT NULL,
+    `landmark` VARCHAR(191) NULL,
+    `pincode` VARCHAR(191) NOT NULL,
+    `city` VARCHAR(191) NOT NULL,
+    `state` VARCHAR(191) NOT NULL,
+    `productId` INTEGER NULL,
+    `isDairyProduct` BOOLEAN NOT NULL DEFAULT false,
+    `notes` TEXT NULL,
+    `status` ENUM('NEW', 'CONTACTED', 'CONVERTED', 'CLOSED') NOT NULL DEFAULT 'NEW',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `leads_status_idx`(`status`),
+    INDEX `leads_isDairyProduct_idx`(`isDairyProduct`),
+    INDEX `leads_pincode_idx`(`pincode`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `users` ADD CONSTRAINT `users_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -597,16 +717,25 @@ ALTER TABLE `users` ADD CONSTRAINT `users_depotId_fkey` FOREIGN KEY (`depotId`) 
 ALTER TABLE `vendors` ADD CONSTRAINT `vendors_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `agencies` ADD CONSTRAINT `agencies_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `agencies` ADD CONSTRAINT `agencies_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `agencies` ADD CONSTRAINT `agencies_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `supervisors` ADD CONSTRAINT `supervisors_agencyId_fkey` FOREIGN KEY (`agencyId`) REFERENCES `agencies`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `supervisors` ADD CONSTRAINT `supervisors_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `supervisors` ADD CONSTRAINT `supervisors_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `products` ADD CONSTRAINT `products_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `categories`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `ProductVariant` ADD CONSTRAINT `ProductVariant_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `product_variants` ADD CONSTRAINT `product_variants_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `locations` ADD CONSTRAINT `locations_agencyId_fkey` FOREIGN KEY (`agencyId`) REFERENCES `agencies`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -619,6 +748,9 @@ ALTER TABLE `vendor_orders` ADD CONSTRAINT `vendor_orders_deliveredById_fkey` FO
 
 -- AddForeignKey
 ALTER TABLE `vendor_orders` ADD CONSTRAINT `vendor_orders_receivedById_fkey` FOREIGN KEY (`receivedById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `vendor_orders` ADD CONSTRAINT `vendor_orders_wastageRegisteredById_fkey` FOREIGN KEY (`wastageRegisteredById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `vendor_orders` ADD CONSTRAINT `vendor_orders_vendorId_fkey` FOREIGN KEY (`vendorId`) REFERENCES `vendors`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -648,6 +780,9 @@ ALTER TABLE `delivery_addresses` ADD CONSTRAINT `delivery_addresses_locationId_f
 ALTER TABLE `delivery_addresses` ADD CONSTRAINT `delivery_addresses_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `area_masters` ADD CONSTRAINT `area_masters_cityId_fkey` FOREIGN KEY (`cityId`) REFERENCES `cities`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `area_masters` ADD CONSTRAINT `area_masters_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -669,7 +804,10 @@ ALTER TABLE `delivery_schedule_entries` ADD CONSTRAINT `delivery_schedule_entrie
 ALTER TABLE `delivery_schedule_entries` ADD CONSTRAINT `delivery_schedule_entries_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `delivery_schedule_entries` ADD CONSTRAINT `delivery_schedule_entries_subscriptionId_fkey` FOREIGN KEY (`subscriptionId`) REFERENCES `subscriptions`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `delivery_schedule_entries` ADD CONSTRAINT `delivery_schedule_entries_subscriptionId_fkey` FOREIGN KEY (`subscriptionId`) REFERENCES `subscriptions`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `delivery_schedule_entries` ADD CONSTRAINT `delivery_schedule_entries_walletTransactionId_fkey` FOREIGN KEY (`walletTransactionId`) REFERENCES `wallet_transactions`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `subscriptions` ADD CONSTRAINT `subscriptions_agencyId_fkey` FOREIGN KEY (`agencyId`) REFERENCES `agencies`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -696,49 +834,49 @@ ALTER TABLE `wallet_transactions` ADD CONSTRAINT `wallet_transactions_memberId_f
 ALTER TABLE `wallet_transactions` ADD CONSTRAINT `wallet_transactions_processedByAdminId_fkey` FOREIGN KEY (`processedByAdminId`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `VariantStock` ADD CONSTRAINT `VariantStock_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `variant_stocks` ADD CONSTRAINT `variant_stocks_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `VariantStock` ADD CONSTRAINT `VariantStock_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `variant_stocks` ADD CONSTRAINT `variant_stocks_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `VariantStock` ADD CONSTRAINT `VariantStock_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `ProductVariant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `variant_stocks` ADD CONSTRAINT `variant_stocks_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `product_variants`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `VariantStock` ADD CONSTRAINT `VariantStock_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `variant_stocks` ADD CONSTRAINT `variant_stocks_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_createdById_fkey` FOREIGN KEY (`createdById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `purchases` ADD CONSTRAINT `purchases_createdById_fkey` FOREIGN KEY (`createdById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `purchases` ADD CONSTRAINT `purchases_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_updatedById_fkey` FOREIGN KEY (`updatedById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `purchases` ADD CONSTRAINT `purchases_updatedById_fkey` FOREIGN KEY (`updatedById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_vendorId_fkey` FOREIGN KEY (`vendorId`) REFERENCES `vendors`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `purchases` ADD CONSTRAINT `purchases_vendorId_fkey` FOREIGN KEY (`vendorId`) REFERENCES `vendors`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `PurchaseDetail` ADD CONSTRAINT `PurchaseDetail_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `purchase_details` ADD CONSTRAINT `purchase_details_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `PurchaseDetail` ADD CONSTRAINT `PurchaseDetail_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `ProductVariant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `purchase_details` ADD CONSTRAINT `purchase_details_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `product_variants`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `PurchaseDetail` ADD CONSTRAINT `PurchaseDetail_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `purchase_details` ADD CONSTRAINT `purchase_details_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `purchases`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `PurchaseDetail` ADD CONSTRAINT `PurchaseDetail_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `purchase_details` ADD CONSTRAINT `purchase_details_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `purchase_payments` ADD CONSTRAINT `purchase_payments_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `purchase_payments` ADD CONSTRAINT `purchase_payments_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `purchases`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `purchase_payments` ADD CONSTRAINT `purchase_payments_vendorId_fkey` FOREIGN KEY (`vendorId`) REFERENCES `vendors`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `purchase_payment_details` ADD CONSTRAINT `purchase_payment_details_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `purchase_payment_details` ADD CONSTRAINT `purchase_payment_details_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `purchases`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `purchase_payment_details` ADD CONSTRAINT `purchase_payment_details_purchasePaymentId_fkey` FOREIGN KEY (`purchasePaymentId`) REFERENCES `purchase_payments`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -771,16 +909,16 @@ ALTER TABLE `depot_product_variants` ADD CONSTRAINT `depot_product_variants_depo
 ALTER TABLE `depot_product_variants` ADD CONSTRAINT `depot_product_variants_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `StockLedger` ADD CONSTRAINT `StockLedger_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `stock_ledgers` ADD CONSTRAINT `stock_ledgers_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `StockLedger` ADD CONSTRAINT `StockLedger_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `stock_ledgers` ADD CONSTRAINT `stock_ledgers_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `StockLedger` ADD CONSTRAINT `StockLedger_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `ProductVariant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `stock_ledgers` ADD CONSTRAINT `stock_ledgers_productVariantId_fkey` FOREIGN KEY (`productVariantId`) REFERENCES `product_variants`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `StockLedger` ADD CONSTRAINT `StockLedger_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `stock_ledgers` ADD CONSTRAINT `stock_ledgers_variantId_fkey` FOREIGN KEY (`variantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `transfers` ADD CONSTRAINT `transfers_createdById_fkey` FOREIGN KEY (`createdById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -805,3 +943,18 @@ ALTER TABLE `product_orders` ADD CONSTRAINT `product_orders_agencyId_fkey` FOREI
 
 -- AddForeignKey
 ALTER TABLE `product_orders` ADD CONSTRAINT `product_orders_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `snf_orders` ADD CONSTRAINT `snf_orders_depotId_fkey` FOREIGN KEY (`depotId`) REFERENCES `depots`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `snf_orders` ADD CONSTRAINT `snf_orders_memberId_fkey` FOREIGN KEY (`memberId`) REFERENCES `members`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `snf_order_items` ADD CONSTRAINT `snf_order_items_depotProductVariantId_fkey` FOREIGN KEY (`depotProductVariantId`) REFERENCES `depot_product_variants`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `snf_order_items` ADD CONSTRAINT `snf_order_items_orderId_fkey` FOREIGN KEY (`orderId`) REFERENCES `snf_orders`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `snf_order_items` ADD CONSTRAINT `snf_order_items_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
