@@ -66,12 +66,25 @@ app.use(
 
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
-  ? allowedOriginsEnv.split(",")
+  ? allowedOriginsEnv
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
   : ["http://localhost:5173", "https://www.indraai.in"];
 
 const corsOptions = {
-  origin: "*", // Specify the origin of your frontend application
-  credentials: true, // This allows cookies and credentials to be included in the requests
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes("*")) {
+      return callback(null, true);
+    }
+
+    return callback(null, allowedOrigins.includes(origin));
+  },
+  credentials: true,
 };
 app.use(cors(corsOptions));
 
