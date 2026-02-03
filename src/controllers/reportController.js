@@ -911,6 +911,13 @@ exports.getSubscriptionReports = async (req, res, next) => {
               categoryId: true
             }
           },
+          productOrder: {
+            select: {
+              id: true,
+              orderNo: true,
+              createdAt: true
+            }
+          },
           agency: {
             select: {
               id: true,
@@ -955,6 +962,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
       
       return {
         id: subscription.id,
+        orderId: subscription.productOrder?.orderNo || null,
+        orderDate: subscription.productOrder?.createdAt || null,
         memberId: subscription.memberId,
         memberName: subscription.member?.user?.name || 'N/A',
         memberEmail: subscription.member?.user?.email || 'N/A',
