@@ -28,6 +28,111 @@ exports.getMemberWallets = async (req, res, next) => {
   }
 };
 
+exports.getMemberTransactions = async (req, res, next) => {
+  const { memberId } = req.params;
+  const memberIdInt = parseInt(memberId);
+
+  if (isNaN(memberIdInt)) {
+    return res.status(400).json({ success: false, message: 'Invalid member ID.' });
+  }
+
+  const {
+    page = 1,
+    limit = 10,
+    search = '',
+    type,
+    status,
+    paymentMethod,
+    fromDate,
+    toDate,
+  } = req.query;
+
+  const parsedPage = parseInt(page);
+  const parsedLimit = parseInt(limit);
+  const pageInt = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+  const limitInt = Number.isFinite(parsedLimit) ? Math.max(1, parsedLimit) : 10;
+  const skip = (pageInt - 1) * limitInt;
+
+  const whereConditions = {
+    memberId: memberIdInt,
+  };
+
+  if (type) whereConditions.type = String(type).toUpperCase();
+  if (status) whereConditions.status = String(status).toUpperCase();
+  if (paymentMethod) whereConditions.paymentMethod = String(paymentMethod);
+
+  if (fromDate || toDate) {
+    whereConditions.createdAt = {};
+    if (fromDate) whereConditions.createdAt.gte = new Date(fromDate);
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      whereConditions.createdAt.lte = end;
+    }
+  }
+
+  const q = String(search || '').trim();
+  if (q) {
+    whereConditions.OR = [
+      { paymentMethod: { contains: q } },
+      { referenceNumber: { contains: q } },
+      { notes: { contains: q } },
+      { processedByAdmin: { is: { name: { contains: q } } } },
+      { processedByAdmin: { is: { email: { contains: q } } } },
+    ];
+  }
+
+  try {
+    const [transactions, total, paymentMethods] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where: whereConditions,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitInt,
+        include: {
+          processedByAdmin: { select: { name: true, email: true } },
+        },
+      }),
+      prisma.walletTransaction.count({ where: whereConditions }),
+      prisma.walletTransaction.findMany({
+        where: { memberId: memberIdInt },
+        distinct: ['paymentMethod'],
+        select: { paymentMethod: true },
+      }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        transactions: transactions.map((t) => ({
+          id: t.id,
+          type: t.type,
+          amount: t.amount,
+          status: t.status,
+          paymentMethod: t.paymentMethod,
+          referenceNumber: t.referenceNumber,
+          notes: t.notes,
+          adminName: t.processedByAdmin?.name || 'N/A',
+          timestamp: t.createdAt,
+        })),
+        paymentMethodOptions: paymentMethods
+          .map((p) => p.paymentMethod)
+          .filter(Boolean)
+          .sort((a, b) => String(a).localeCompare(String(b))),
+        meta: {
+          total,
+          page: pageInt,
+          limit: limitInt,
+          totalPages: Math.max(1, Math.ceil(total / limitInt)),
+        },
+      },
+    });
+  } catch (error) {
+    console.error(`Error fetching transactions for member ${memberIdInt}:`, error);
+    next(error);
+  }
+};
+
 /**
  * @desc Get a specific member's wallet balance and transaction history
  * @route GET /api/admin/wallets/:memberId
@@ -36,6 +141,7 @@ exports.getMemberWallets = async (req, res, next) => {
 exports.getMemberWalletDetails = async (req, res, next) => {
   const { memberId } = req.params;
   const memberIdInt = parseInt(memberId);
+  const includeTransactions = String(req.query?.includeTransactions ?? 'true') !== 'false';
 
   if (isNaN(memberIdInt)) {
     return res.status(400).json({ success: false, message: 'Invalid member ID.' });
@@ -53,30 +159,31 @@ exports.getMemberWalletDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, message: `Member with ID ${memberIdInt} not found.` });
     }
 
-    // Fetch transactions
-    const transactions = await prisma.walletTransaction.findMany({
-      where: { memberId: memberIdInt },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        processedByAdmin: { select: { name: true, email: true } },
-      },
-    });
-
-    // Also get pending credit transactions initiated by this member's user
-    let pendingUserTransactions = [];
-    if (member.userId) {
-      pendingUserTransactions = await prisma.walletTransaction.findMany({
-        where: {
-          memberId: memberIdInt,
-          status: TransactionStatus.PENDING,
-          type: TransactionType.CREDIT,
-        },
+    let transactionsCombined = [];
+    if (includeTransactions) {
+      const transactions = await prisma.walletTransaction.findMany({
+        where: { memberId: memberIdInt },
         orderBy: { createdAt: 'desc' },
-        include: { processedByAdmin: { select: { name: true, email: true } } },
+        include: {
+          processedByAdmin: { select: { name: true, email: true } },
+        },
       });
-    }
 
-    const transactionsCombined = [...transactions, ...pendingUserTransactions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+      let pendingUserTransactions = [];
+      if (member.userId) {
+        pendingUserTransactions = await prisma.walletTransaction.findMany({
+          where: {
+            memberId: memberIdInt,
+            status: TransactionStatus.PENDING,
+            type: TransactionType.CREDIT,
+          },
+          orderBy: { createdAt: 'desc' },
+          include: { processedByAdmin: { select: { name: true, email: true } } },
+        });
+      }
+
+      transactionsCombined = [...transactions, ...pendingUserTransactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
     const walletDetails = {
       balance: member.walletBalance,

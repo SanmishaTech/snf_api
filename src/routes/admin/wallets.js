@@ -3,6 +3,7 @@ const router = express.Router();
 const {
     getMemberWallets,
     getMemberWalletDetails,
+    getMemberTransactions,
     addFundsToWallet,
     removeFundsFromWallet,
     getAllTransactions,
@@ -72,6 +73,9 @@ router.route('/transactions')
 router.route('/transactions/:transactionId')
     // .get(protect, authorize('admin'), getTransactionDetails);
     .get(authMiddleware, getTransactionDetails);
+
+router.route('/:memberId/transactions')
+    .get(authMiddleware, getMemberTransactions);
 
 /**
  * @swagger
