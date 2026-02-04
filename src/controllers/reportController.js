@@ -140,6 +140,90 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
   }
 };
 
+exports.getExceptionReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const where = {};
+    if (startDate || endDate) {
+      where.deliveryDate = {};
+      if (startDate) where.deliveryDate.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.deliveryDate.lte = end;
+      }
+    }
+
+    const deliveries = await prisma.deliveryScheduleEntry.findMany({
+      where,
+      include: {
+        Depot: { select: { id: true, name: true } },
+        DepotProductVariant: { select: { id: true, name: true } },
+        subscription: {
+          include: {
+            depotProductVariant: { select: { id: true, name: true } },
+            deliveryAddress: {
+              select: {
+                plotBuilding: true,
+                streetArea: true,
+                landmark: true,
+                city: true,
+                state: true,
+                pincode: true
+              }
+            },
+            member: {
+              include: {
+                user: { select: { mobile: true } }
+              }
+            }
+          }
+        }
+      },
+      orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }]
+    });
+
+    const report = [];
+    deliveries.forEach(d => {
+      const lastVariantId = d.DepotProductVariant?.id || d.depotProductVariantId || null;
+      const newVariantId = d.subscription?.depotProductVariant?.id || d.subscription?.depotProductVariantId || null;
+      if (!lastVariantId || !newVariantId) return;
+      if (String(lastVariantId) === String(newVariantId)) return;
+
+      const addr = d.subscription?.deliveryAddress;
+      const address = addr
+        ? `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`.replace(/^,\s*/g, '').trim()
+        : '';
+
+      report.push({
+        date: d.deliveryDate,
+        customerId: d.subscription?.memberId || d.memberId || '',
+        address: address,
+        pincode: addr?.pincode || '',
+        depotName: d.Depot?.name || '',
+        subFromDate: d.subscription?.startDate || '',
+        subToDate: d.subscription?.expiryDate || '',
+        mobileNumber: d.subscription?.member?.user?.mobile || '',
+        lastVariant: d.DepotProductVariant?.name || '',
+        newVariant: d.subscription?.depotProductVariant?.name || ''
+      });
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        report,
+        filters: { startDate, endDate },
+        recordCount: report.length
+      }
+    });
+  } catch (error) {
+    console.error('[getExceptionReport]', error);
+    return next(createError(500, error.message || 'Failed to generate exception report'));
+  }
+};
+
 // Delivery Agencies Report: filters (agencies, areas)
 exports.getDeliveryFilters = async (req, res, next) => {
   try {
@@ -152,13 +236,18 @@ exports.getDeliveryFilters = async (req, res, next) => {
       if (role === 'AGENCY' && userAgencyId) {
         const agency = await prisma.agency.findUnique({
           where: { id: userAgencyId },
-          select: { id: true, name: true, city: true }
+          select: { id: true, name: true, city: true, user: { select: { active: true } } }
         });
-        agencies = agency ? [agency] : [];
+        agencies = agency && agency.user?.active !== false ? [agency] : [];
       } else {
-        agencies = await prisma.agency.findMany({ 
-          select: { id: true, name: true, city: true }, 
-          orderBy: { name: 'asc' } 
+        agencies = await prisma.agency.findMany({
+          where: {
+            user: {
+              active: true
+            }
+          },
+          select: { id: true, name: true, city: true },
+          orderBy: { name: 'asc' }
         });
       }
     } catch (e) {
@@ -255,8 +344,17 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       include: {
         subscription: {
           include: {
-            agency: { select: { id: true, name: true, city: true } },
+            agency: { select: { id: true, name: true, city: true, user: { select: { active: true } } } },
             product: { select: { id: true, name: true } },
+            deliveryAddress: {
+              include: {
+                location: {
+                  include: {
+                    city: { select: { id: true, name: true } }
+                  }
+                }
+              }
+            },
             member: {
               include: {
                 user: { select: { id: true, name: true, mobile: true } }
@@ -278,9 +376,10 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
             user: { select: { id: true, name: true, mobile: true } }
           }
         },
+        Depot: { select: { id: true, name: true } },
         DepotProductVariant: { select: { id: true, name: true, mrp: true, purchasePrice: true } },
         product: { select: { id: true, name: true } },
-        agent: { select: { id: true, name: true, city: true } }
+        agent: { select: { id: true, name: true, city: true, user: { select: { active: true } } } }
       },
       orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }]
     });
@@ -288,6 +387,17 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
     // Transform to flat structure expected by frontend exporter
     const flat = [];
     deliveries.forEach(d => {
+      const resolvedAgency = d.agent || d.subscription?.agency;
+      // Do not show inactive agencies in report
+      if (resolvedAgency && resolvedAgency?.user?.active === false) {
+        return;
+      }
+
+      // If no agency is assigned, keep it as an "Unassigned" bucket
+      const effectiveAgencyId = resolvedAgency?.id ?? 'unassigned';
+      const effectiveAgencyName = resolvedAgency?.name ?? 'Unassigned';
+      const effectiveAgencyCity = resolvedAgency?.city ?? '';
+
       // Calculate amount based on subscription rate and quantity
       const rate = parseFloat(d.subscription?.rate) || 0;
       const quantity = parseInt(d.quantity) || 1;
@@ -296,17 +406,19 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       // Determine area information - if delivery address exists, check its location
       // If no delivery address or location is present, show Any
       let areaName, areaIdValue, city;
-      
-      if (d.deliveryAddress && d.deliveryAddress.locationId) {
+
+      const effectiveAddress = d.deliveryAddress || d.subscription?.deliveryAddress;
+
+      if (effectiveAddress && effectiveAddress.locationId) {
         // Delivery address exists with a location, use it
-        areaName = d.deliveryAddress.location?.name || 'Any';
-        areaIdValue = d.deliveryAddress.locationId;
-        city = d.deliveryAddress.location?.city?.name || d.deliveryAddress.city || 'Any';
+        areaName = effectiveAddress.location?.name || 'Any';
+        areaIdValue = effectiveAddress.locationId;
+        city = effectiveAddress.location?.city?.name || effectiveAddress.city || 'Any';
       } else {
         // No delivery address or no location assigned to delivery address, use Any
         areaName = 'Any';
         areaIdValue = 'any';
-        city = d.deliveryAddress?.city || d.agent?.city || 'Any';
+        city = effectiveAddress?.city || d.agent?.city || 'Any';
       }
       
       flat.push({
@@ -322,16 +434,19 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         customerId: d.member?.id || d.subscription?.member?.id,
         customerName: d.member?.name || d.subscription?.member?.name || 'Unknown Customer',
         customerMobile: d.member?.user?.mobile || d.subscription?.member?.user?.mobile || '',
-        deliveryAddress: d.deliveryAddress ? 
-          `${d.deliveryAddress.plotBuilding}, ${d.deliveryAddress.streetArea}, ${d.deliveryAddress.city}` : 
+        pincode: effectiveAddress?.pincode || '',
+        deliveryAddress: effectiveAddress ? 
+          `${effectiveAddress.plotBuilding}, ${effectiveAddress.streetArea}, ${effectiveAddress.city}` : 
           'No address specified',
         areaId: areaIdValue,
         areaName: areaName,
-        city: city,
-        agencyId: d.agent?.id || d.subscription?.agency?.id,
-        agencyName: d.agent?.name || d.subscription?.agency?.name || 'Unknown Agency',
-        deliveredBy: d.agent?.name || 'Not assigned',
+        city: city || effectiveAgencyCity,
+        agencyId: effectiveAgencyId,
+        agencyName: effectiveAgencyName,
+        deliveredBy: effectiveAgencyName,
         deliveryTime: '', // Not available in current schema
+        depotId: d.Depot?.id || d.depotId || null,
+        depotName: d.Depot?.name || '',
         subscriptionId: d.subscriptionId,
         rate: rate,
         notes: d.adminNotes || ''
@@ -403,10 +518,10 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       include: {
         subscription: {
           include: {
-            agency: { select: { id: true, name: true, city: true } }
+            agency: { select: { id: true, name: true, city: true, user: { select: { active: true } } } }
           }
         },
-        agent: { select: { id: true, name: true, city: true } }
+        agent: { select: { id: true, name: true, city: true, user: { select: { active: true } } } }
       },
       orderBy: [{ deliveryDate: 'desc' }]
     });
@@ -416,9 +531,20 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
     const statusSet = new Set();
 
     deliveries.forEach(d => {
-      const agencyId = d.agent?.id || d.subscription?.agency?.id;
-      const agencyName = d.agent?.name || d.subscription?.agency?.name || 'Unknown Agency';
-      const agencyCity = d.agent?.city || d.subscription?.agency?.city || '';
+      const resolvedAgency = d.agent || d.subscription?.agency;
+      // Skip inactive agencies
+      if (resolvedAgency && resolvedAgency?.user?.active === false) {
+        return;
+      }
+
+      // If no agency is assigned, group it under an "Unassigned" bucket
+      const effectiveAgencyId = resolvedAgency?.id ?? 'unassigned';
+      const effectiveAgencyName = resolvedAgency?.name ?? 'Unassigned';
+      const effectiveAgencyCity = resolvedAgency?.city ?? '';
+
+      const agencyId = effectiveAgencyId;
+      const agencyName = effectiveAgencyName;
+      const agencyCity = effectiveAgencyCity;
       const status = d.status || 'UNKNOWN';
       
       statusSet.add(status);

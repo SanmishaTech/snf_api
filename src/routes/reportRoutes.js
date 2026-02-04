@@ -51,4 +51,11 @@ router.get(
   reportController.getSubscriptionReports
 );
 
+router.get(
+  '/exceptions',
+  allowRoles('ADMIN'),
+  roleGuard(),
+  reportController.getExceptionReport
+);
+
 module.exports = router;
