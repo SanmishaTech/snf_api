@@ -1229,7 +1229,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
                 select: {
                   name: true,
                   email: true,
-                  mobile: true
+                  mobile: true,
+                  active: true
                 }
               }
             }
@@ -1298,6 +1299,7 @@ exports.getSubscriptionReports = async (req, res, next) => {
         memberName: subscription.member?.user?.name || 'N/A',
         memberEmail: subscription.member?.user?.email || 'N/A',
         memberMobile: subscription.member?.user?.mobile || 'N/A',
+        memberActive: subscription.member?.user?.active ?? true,
         productName: subscription.product?.name || 'N/A',
         variantName: subscription.depotProductVariant?.name || 'N/A',
         deliverySchedule: subscription.deliverySchedule,
