@@ -698,13 +698,15 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       ];
     }
 
-    // Fetch delivery schedule entries with agency and status information
+    // Fetch delivery schedule entries with agency, status, and variant information
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
       where,
       include: {
+        DepotProductVariant: { select: { id: true, name: true } },
         subscription: {
           include: {
-            agency: { select: { id: true, name: true, city: true, user: { select: { active: true } } } }
+            agency: { select: { id: true, name: true, city: true, user: { select: { active: true } } } },
+            depotProductVariant: { select: { id: true, name: true } }
           }
         },
         agent: { select: { id: true, name: true, city: true, user: { select: { active: true } } } }
@@ -712,7 +714,7 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       orderBy: [{ deliveryDate: 'desc' }]
     });
 
-    // Group by agency and count status-wise
+    // Group by agency + variant and count status-wise
     const agencySummary = new Map();
     const statusSet = new Set();
 
@@ -731,33 +733,49 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       const agencyId = effectiveAgencyId;
       const agencyName = effectiveAgencyName;
       const agencyCity = effectiveAgencyCity;
+
+      const resolvedVariant = d.DepotProductVariant || d.subscription?.depotProductVariant;
+      const variantId = resolvedVariant?.id ?? 'unknown_variant';
+      const variantName = resolvedVariant?.name ?? 'Unknown Variant';
+
       const status = d.status || 'UNKNOWN';
       
       statusSet.add(status);
-      
-      if (!agencySummary.has(agencyId)) {
-        agencySummary.set(agencyId, {
-          id: agencyId,
+
+      const groupKey = `${agencyId}__${variantId}`;
+
+      if (!agencySummary.has(groupKey)) {
+        agencySummary.set(groupKey, {
+          id: groupKey,
+          agencyId,
           name: agencyName,
           city: agencyCity,
+          variantId,
+          variantName,
           statusCounts: {},
           totalCount: 0
         });
       }
-      
-      const agency = agencySummary.get(agencyId);
+
+      const agency = agencySummary.get(groupKey);
       agency.statusCounts[status] = (agency.statusCounts[status] || 0) + 1;
       agency.totalCount += 1;
     });
 
     // Convert to array format
     const summaryData = Array.from(agencySummary.values());
+    summaryData.sort((a, b) => {
+      const nameCmp = String(a.name || '').localeCompare(String(b.name || ''));
+      if (nameCmp !== 0) return nameCmp;
+      return String(a.variantName || '').localeCompare(String(b.variantName || ''));
+    });
     const statusList = Array.from(statusSet).sort();
 
     // Calculate totals
+    const uniqueAgencyCount = new Set(summaryData.map(x => String(x.agencyId ?? x.id))).size;
     const totals = {
       totalDeliveries: deliveries.length,
-      totalAgencies: summaryData.length,
+      totalAgencies: uniqueAgencyCount,
       statusTotals: {}
     };
     
