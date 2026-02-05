@@ -10,13 +10,13 @@ router.use(authMiddleware);
 // Purchase Order Report endpoints
 router.get(
   '/purchase-orders',
-  allowRoles('ADMIN', 'VENDOR'),
+  allowRoles('ADMIN', 'SUPER_ADMIN', 'VENDOR'),
   roleGuard(),
   reportController.getPurchaseOrderReport
 );
 router.get(
   '/filters',
-  allowRoles('ADMIN', 'VENDOR'),
+  allowRoles('ADMIN', 'SUPER_ADMIN', 'VENDOR'),
   roleGuard(),
   reportController.getReportFilters
 );
@@ -24,13 +24,13 @@ router.get(
 // Delivery agencies report
 router.get(
   '/delivery-agencies',
-  allowRoles('ADMIN', 'AGENCY'),
+  allowRoles('ADMIN', 'SUPER_ADMIN', 'AGENCY'),
   roleGuard(),
   reportController.getDeliveryAgenciesReport
 );
 router.get(
   '/delivery-filters',
-  allowRoles('ADMIN', 'AGENCY'),
+  allowRoles('ADMIN', 'SUPER_ADMIN', 'AGENCY'),
   roleGuard(),
   reportController.getDeliveryFilters
 );
@@ -38,7 +38,7 @@ router.get(
 // Delivery summaries report
 router.get(
   '/delivery-summaries',
-  allowRoles('ADMIN', 'AGENCY'),
+  allowRoles('ADMIN', 'SUPER_ADMIN', 'AGENCY'),
   roleGuard(),
   reportController.getDeliverySummariesReport
 );
@@ -46,7 +46,7 @@ router.get(
 // Subscription reports
 router.get(
   '/subscriptions',
-  allowRoles('ADMIN'),
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
   roleGuard(),
   reportController.getSubscriptionReports
 );
@@ -54,14 +54,22 @@ router.get(
 // Sale Register report
 router.get(
   '/sale-register',
-  allowRoles('ADMIN'),
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
   roleGuard(),
   reportController.getSaleRegisterReport
 );
 
+// Revenue report
+router.get(
+  '/revenue',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getRevenueReport
+);
+
 router.get(
   '/exceptions',
-  allowRoles('ADMIN'),
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
   roleGuard(),
   reportController.getExceptionReport
 );

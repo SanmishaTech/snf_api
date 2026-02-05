@@ -1405,3 +1405,156 @@ exports.getSaleRegisterReport = async (req, res, next) => {
     return next(createError(500, error.message || 'Failed to generate sale register report'));
   }
 };
+
+exports.getRevenueReport = async (req, res, next) => {
+  try {
+    const paidTotals = await prisma.subscription.groupBy({
+      by: ['memberId'],
+      where: {
+        paymentStatus: 'PAID',
+        product: {
+          isDairyProduct: true
+        }
+      },
+      _sum: {
+        receivedamt: true
+      }
+    });
+
+    const memberIds = paidTotals.map(x => x.memberId);
+    if (memberIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          report: [],
+          recordCount: 0
+        }
+      });
+    }
+
+    const members = await prisma.member.findMany({
+      where: { id: { in: memberIds } },
+      include: {
+        user: { select: { name: true, mobile: true } },
+        addresses: {
+          take: 1,
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      }
+    });
+
+    const memberMap = new Map(members.map(m => [m.id, m]));
+
+    const firstMilkSubs = await prisma.subscription.groupBy({
+      by: ['memberId'],
+      where: {
+        memberId: { in: memberIds },
+        product: {
+          isDairyProduct: true
+        }
+      },
+      _min: {
+        startDate: true
+      }
+    });
+
+    const firstStartMap = new Map(firstMilkSubs.map(x => [x.memberId, x._min?.startDate || null]));
+
+    const now = new Date();
+
+    const milkSubsOrdered = await prisma.subscription.findMany({
+      where: {
+        memberId: { in: memberIds },
+        product: {
+          isDairyProduct: true
+        }
+      },
+      orderBy: [{ memberId: 'asc' }, { startDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        memberId: true,
+        startDate: true,
+        expiryDate: true,
+        paymentStatus: true,
+        depotProductVariant: {
+          select: {
+            name: true,
+            depot: { select: { name: true } }
+          }
+        },
+        deliveryAddress: {
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      }
+    });
+
+    const currentSubMap = new Map();
+    const fallbackSubMap = new Map();
+    for (const s of milkSubsOrdered) {
+      if (!fallbackSubMap.has(s.memberId)) {
+        fallbackSubMap.set(s.memberId, s);
+      }
+
+      const isCancelled = String(s.paymentStatus || '').toUpperCase() === 'CANCELLED';
+      const isActive = !isCancelled && s.expiryDate && new Date(s.expiryDate) >= now;
+      if (isActive && !currentSubMap.has(s.memberId)) {
+        currentSubMap.set(s.memberId, s);
+      }
+    }
+
+    const formatAddress = (addr) => {
+      if (!addr) return '';
+      return `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`
+        .replace(/^,\s*/g, '')
+        .trim();
+    };
+
+    const report = paidTotals
+      .map(t => {
+        const member = memberMap.get(t.memberId);
+        const latest = currentSubMap.get(t.memberId) || fallbackSubMap.get(t.memberId);
+        const memberAddr = Array.isArray(member?.addresses) && member.addresses.length > 0 ? member.addresses[0] : null;
+        const addr = latest?.deliveryAddress || memberAddr;
+        const name = member?.name || member?.user?.name || '';
+
+        return {
+          name,
+          memberId: t.memberId,
+          saleAmount: Number(t._sum?.receivedamt || 0),
+          mobile: member?.user?.mobile || '',
+          currentVariant: latest?.depotProductVariant?.name || '',
+          milkSubscriptionStartDate: firstStartMap.get(t.memberId) || null,
+          address: formatAddress(addr),
+          pincode: addr?.pincode || '',
+          depot: latest?.depotProductVariant?.depot?.name || ''
+        };
+      })
+      .sort((a, b) => (b.saleAmount || 0) - (a.saleAmount || 0));
+
+    return res.json({
+      success: true,
+      data: {
+        report,
+        recordCount: report.length
+      }
+    });
+  } catch (error) {
+    console.error('[getRevenueReport]', error);
+    return next(createError(500, error.message || 'Failed to generate revenue report'));
+  }
+};
