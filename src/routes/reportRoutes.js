@@ -51,6 +51,14 @@ router.get(
   reportController.getSubscriptionReports
 );
 
+// Sale Register report
+router.get(
+  '/sale-register',
+  allowRoles('ADMIN'),
+  roleGuard(),
+  reportController.getSaleRegisterReport
+);
+
 router.get(
   '/exceptions',
   allowRoles('ADMIN'),

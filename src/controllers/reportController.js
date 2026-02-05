@@ -1186,3 +1186,16 @@ exports.getSubscriptionReports = async (req, res, next) => {
     return next(createError(500, error.message || 'Failed to generate subscription reports'));
   }
 };
+
+// Sale Register Report (Revenue Report rename)
+exports.getSaleRegisterReport = async (req, res, next) => {
+  try {
+    if (!req.query.paymentStatus) {
+      req.query.paymentStatus = 'PAID';
+    }
+    return exports.getSubscriptionReports(req, res, next);
+  } catch (error) {
+    console.error('[getSaleRegisterReport]', error);
+    return next(createError(500, error.message || 'Failed to generate sale register report'));
+  }
+};
