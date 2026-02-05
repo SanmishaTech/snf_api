@@ -67,6 +67,14 @@ router.get(
   reportController.getRevenueReport
 );
 
+// Wallet report
+router.get(
+  '/wallet',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getWalletReport
+);
+
 router.get(
   '/exceptions',
   allowRoles('ADMIN', 'SUPER_ADMIN'),

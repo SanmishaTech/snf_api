@@ -140,6 +140,104 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
   }
 };
 
+exports.getWalletReport = async (req, res, next) => {
+  try {
+    const { endDate } = req.query;
+
+    const asOf = endDate ? new Date(endDate) : new Date();
+    if (Number.isNaN(asOf.getTime())) {
+      return next(createError(400, 'Invalid endDate'));
+    }
+    asOf.setHours(23, 59, 59, 999);
+
+    const txGroups = await prisma.walletTransaction.groupBy({
+      by: ['memberId', 'type'],
+      where: {
+        status: 'PAID',
+        createdAt: {
+          lte: asOf
+        }
+      },
+      _sum: {
+        amount: true
+      }
+    });
+
+    const sums = new Map();
+    txGroups.forEach(g => {
+      const memberId = g.memberId;
+      const prev = sums.get(memberId) || { credit: 0, debit: 0 };
+      const amt = Number(g._sum?.amount || 0);
+      if (String(g.type || '').toUpperCase() === 'DEBIT') {
+        prev.debit += amt;
+      } else {
+        prev.credit += amt;
+      }
+      sums.set(memberId, prev);
+    });
+
+    const members = await prisma.member.findMany({
+      include: {
+        user: { select: { name: true, mobile: true } },
+        addresses: {
+          take: 1,
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      },
+      orderBy: [{ id: 'desc' }]
+    });
+
+    const formatAddress = (addr) => {
+      if (!addr) return '';
+      return `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`
+        .replace(/^,\s*/g, '')
+        .trim();
+    };
+
+    const report = members.map(m => {
+      const s = sums.get(m.id) || { credit: 0, debit: 0 };
+      const closingBalance = Number(s.credit || 0) - Number(s.debit || 0);
+      const addr = Array.isArray(m.addresses) && m.addresses.length > 0 ? m.addresses[0] : null;
+      return {
+        name: m.name || m.user?.name || '',
+        memberId: m.id,
+        mobile: m.user?.mobile || '',
+        address: formatAddress(addr),
+        pincode: addr?.pincode || '',
+        closingBalance
+      };
+    });
+
+    report.sort((a, b) => (b.closingBalance || 0) - (a.closingBalance || 0));
+    const totalClosingBalance = report.reduce((sum, r) => sum + (Number(r.closingBalance) || 0), 0);
+
+    return res.json({
+      success: true,
+      data: {
+        report,
+        totals: {
+          totalClosingBalance
+        },
+        filters: {
+          endDate: endDate || null
+        },
+        recordCount: report.length
+      }
+    });
+  } catch (error) {
+    console.error('[getWalletReport]', error);
+    return next(createError(500, error.message || 'Failed to generate wallet report'));
+  }
+};
+
 exports.getExceptionReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
