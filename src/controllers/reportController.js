@@ -144,19 +144,30 @@ exports.getExceptionReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
 
-    const where = {};
+    const dateRange = {};
+    if (startDate) {
+      dateRange.gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange.lte = end;
+    }
+
+    const formatAddress = (addr) => {
+      if (!addr) return '';
+      return `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`
+        .replace(/^,\s*/g, '')
+        .trim();
+    };
+
+    const deliveryWhere = {};
     if (startDate || endDate) {
-      where.deliveryDate = {};
-      if (startDate) where.deliveryDate.gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        where.deliveryDate.lte = end;
-      }
+      deliveryWhere.deliveryDate = dateRange;
     }
 
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
-      where,
+      where: deliveryWhere,
       include: {
         Depot: { select: { id: true, name: true } },
         DepotProductVariant: { select: { id: true, name: true } },
@@ -175,7 +186,7 @@ exports.getExceptionReport = async (req, res, next) => {
             },
             member: {
               include: {
-                user: { select: { mobile: true } }
+                user: { select: { name: true, mobile: true } }
               }
             }
           }
@@ -184,7 +195,7 @@ exports.getExceptionReport = async (req, res, next) => {
       orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }]
     });
 
-    const report = [];
+    const variantChanges = [];
     deliveries.forEach(d => {
       const lastVariantId = d.DepotProductVariant?.id || d.depotProductVariantId || null;
       const newVariantId = d.subscription?.depotProductVariant?.id || d.subscription?.depotProductVariantId || null;
@@ -192,14 +203,13 @@ exports.getExceptionReport = async (req, res, next) => {
       if (String(lastVariantId) === String(newVariantId)) return;
 
       const addr = d.subscription?.deliveryAddress;
-      const address = addr
-        ? `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`.replace(/^,\s*/g, '').trim()
-        : '';
 
-      report.push({
+      variantChanges.push({
+        exceptionType: 'VARIANT_CHANGED',
         date: d.deliveryDate,
         customerId: d.subscription?.memberId || d.memberId || '',
-        address: address,
+        customerName: d.subscription?.member?.name || d.subscription?.member?.user?.name || '',
+        address: formatAddress(addr),
         pincode: addr?.pincode || '',
         depotName: d.Depot?.name || '',
         subFromDate: d.subscription?.startDate || '',
@@ -210,10 +220,186 @@ exports.getExceptionReport = async (req, res, next) => {
       });
     });
 
+    const cancelledWhere = {
+      paymentStatus: 'CANCELLED'
+    };
+    if (startDate || endDate) {
+      cancelledWhere.updatedAt = dateRange;
+    }
+
+    const cancelledSubscriptions = await prisma.subscription.findMany({
+      where: cancelledWhere,
+      include: {
+        depotProductVariant: { select: { id: true, name: true, depot: { select: { name: true } } } },
+        deliveryAddress: {
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        },
+        member: {
+          include: {
+            user: { select: { name: true, mobile: true } }
+          }
+        }
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }]
+    });
+
+    const expiredWhere = {
+      paymentStatus: { not: 'CANCELLED' }
+    };
+    if (startDate || endDate) {
+      expiredWhere.expiryDate = dateRange;
+    }
+
+    const expiredSubscriptions = await prisma.subscription.findMany({
+      where: expiredWhere,
+      include: {
+        depotProductVariant: { select: { id: true, name: true, depot: { select: { name: true } } } },
+        deliveryAddress: {
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        },
+        member: {
+          include: {
+            user: { select: { name: true, mobile: true } }
+          }
+        }
+      },
+      orderBy: [{ expiryDate: 'desc' }, { id: 'desc' }]
+    });
+
+    const stoppedSubscriptions = [...cancelledSubscriptions.map(s => {
+      const addr = s.deliveryAddress;
+      const variantName = s.depotProductVariant?.name || '';
+      return {
+        exceptionType: 'STOPPED_SUBSCRIPTION',
+        date: s.updatedAt,
+        customerId: s.memberId,
+        customerName: s.member?.name || s.member?.user?.name || '',
+        address: formatAddress(addr),
+        pincode: addr?.pincode || '',
+        depotName: s.depotProductVariant?.depot?.name || '',
+        subFromDate: s.startDate || '',
+        subToDate: s.expiryDate || '',
+        mobileNumber: s.member?.user?.mobile || '',
+        lastVariant: variantName,
+        newVariant: variantName
+      };
+    }),
+    ...expiredSubscriptions.map(s => {
+      const addr = s.deliveryAddress;
+      const variantName = s.depotProductVariant?.name || '';
+      return {
+        exceptionType: 'STOPPED_SUBSCRIPTION',
+        date: s.expiryDate,
+        customerId: s.memberId,
+        customerName: s.member?.name || s.member?.user?.name || '',
+        address: formatAddress(addr),
+        pincode: addr?.pincode || '',
+        depotName: s.depotProductVariant?.depot?.name || '',
+        subFromDate: s.startDate || '',
+        subToDate: s.expiryDate || '',
+        mobileNumber: s.member?.user?.mobile || '',
+        lastVariant: variantName,
+        newVariant: variantName
+      };
+    })];
+
+    const startDateWhere = {};
+    if (startDate || endDate) {
+      startDateWhere.startDate = dateRange;
+    }
+
+    const startedSubscriptions = await prisma.subscription.findMany({
+      where: startDateWhere,
+      include: {
+        depotProductVariant: { select: { id: true, name: true, depot: { select: { name: true } } } },
+        deliveryAddress: {
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        },
+        member: {
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            user: { select: { name: true, mobile: true } }
+          }
+        }
+      },
+      orderBy: [{ startDate: 'desc' }, { id: 'desc' }]
+    });
+
+    const isSameCalendarDate = (a, b) => {
+      if (!a || !b) return false;
+      const da = new Date(a);
+      const db = new Date(b);
+      if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
+      return da.toISOString().slice(0, 10) === db.toISOString().slice(0, 10);
+    };
+
+    const newCustomers = startedSubscriptions
+      .filter(s => {
+        if (!s.member?.createdAt) return false;
+        if (!(startDate || endDate)) return isSameCalendarDate(s.member.createdAt, s.startDate);
+        const created = new Date(s.member.createdAt);
+        const inRange = (!dateRange.gte || created >= dateRange.gte) && (!dateRange.lte || created <= dateRange.lte);
+        return inRange && isSameCalendarDate(s.member.createdAt, s.startDate);
+      })
+      .map(s => {
+        const addr = s.deliveryAddress;
+        const variantName = s.depotProductVariant?.name || '';
+        return {
+          exceptionType: 'NEW_CUSTOMER',
+          date: s.startDate,
+          customerId: s.memberId,
+          customerName: s.member?.name || s.member?.user?.name || '',
+          address: formatAddress(addr),
+          pincode: addr?.pincode || '',
+          depotName: s.depotProductVariant?.depot?.name || '',
+          subFromDate: s.startDate || '',
+          subToDate: s.expiryDate || '',
+          mobileNumber: s.member?.user?.mobile || '',
+          lastVariant: variantName,
+          newVariant: variantName
+        };
+      });
+
+    const report = [...stoppedSubscriptions, ...newCustomers, ...variantChanges].sort((a, b) => {
+      const da = new Date(a.date);
+      const db = new Date(b.date);
+      return (Number.isNaN(db.getTime()) ? 0 : db.getTime()) - (Number.isNaN(da.getTime()) ? 0 : da.getTime());
+    });
+
+    const counts = {
+      stoppedSubscriptions: stoppedSubscriptions.length,
+      newCustomers: newCustomers.length,
+      variantChanges: variantChanges.length
+    };
+
     return res.json({
       success: true,
       data: {
         report,
+        counts,
         filters: { startDate, endDate },
         recordCount: report.length
       }
