@@ -201,7 +201,8 @@ const login = async (req, res, next) => {
 
     // Access the actual validated data from the .data property
     // const validatedData = validationResult.data; 
-    const { identifier, password } = req.body; // Now email and password should be correctly destructured
+    const identifier = typeof req.body.identifier === 'string' ? req.body.identifier.trim() : req.body.identifier;
+    const password = typeof req.body.password === 'string' ? req.body.password.trim() : req.body.password;
 
     console.log(`[LOGIN_TRACE] Attempting to fetch user: ${identifier}`);
     let user;
