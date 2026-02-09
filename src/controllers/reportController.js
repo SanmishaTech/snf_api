@@ -142,7 +142,7 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
 
 exports.getWalletReport = async (req, res, next) => {
   try {
-    const { endDate } = req.query;
+    const { endDate, name } = req.query;
 
     const asOf = endDate ? new Date(endDate) : new Date();
     if (Number.isNaN(asOf.getTime())) {
@@ -150,13 +150,54 @@ exports.getWalletReport = async (req, res, next) => {
     }
     asOf.setHours(23, 59, 59, 999);
 
+    const nameTerm = String(name || '').trim();
+
+    const members = await prisma.member.findMany({
+      ...(nameTerm
+        ? {
+            where: {
+              OR: [
+                { name: { contains: nameTerm } },
+                { user: { name: { contains: nameTerm } } }
+              ]
+            }
+          }
+        : {}),
+      include: {
+        user: {
+          select: {
+            name: true,
+            mobile: true,
+            active: true,
+            depot: { select: { name: true } }
+          }
+        },
+        addresses: {
+          take: 1,
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      },
+      orderBy: [{ id: 'desc' }]
+    });
+
+    const memberIds = members.map(m => m.id);
+
     const txGroups = await prisma.walletTransaction.groupBy({
       by: ['memberId', 'type'],
       where: {
         status: 'PAID',
         createdAt: {
           lte: asOf
-        }
+        },
+        ...(nameTerm ? { memberId: { in: memberIds } } : {})
       },
       _sum: {
         amount: true
@@ -176,24 +217,74 @@ exports.getWalletReport = async (req, res, next) => {
       sums.set(memberId, prev);
     });
 
-    const members = await prisma.member.findMany({
-      include: {
-        user: { select: { name: true, mobile: true } },
-        addresses: {
-          take: 1,
-          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
-          select: {
-            plotBuilding: true,
-            streetArea: true,
-            landmark: true,
-            city: true,
-            state: true,
-            pincode: true
+    const firstPaidSubGroups = memberIds.length
+      ? await prisma.subscription.groupBy({
+          by: ['memberId'],
+          where: {
+            memberId: { in: memberIds },
+            paymentStatus: 'PAID'
+          },
+          _min: {
+            createdAt: true
           }
-        }
-      },
-      orderBy: [{ id: 'desc' }]
-    });
+        })
+      : [];
+
+    const firstSubscriptionDateByMemberId = new Map(
+      firstPaidSubGroups.map(g => [g.memberId, g._min?.createdAt || null])
+    );
+
+    // Depot mapping: prefer the member's active subscription depot; fallback to latest subscription depot.
+    // Note: Many MEMBER users may not have user.depotId set, so user.depot can be empty.
+    const subscriptions = memberIds.length
+      ? await prisma.subscription.findMany({
+          where: {
+            memberId: { in: memberIds },
+            paymentStatus: { not: 'CANCELLED' }
+          },
+          select: {
+            memberId: true,
+            expiryDate: true,
+            createdAt: true,
+            depotProductVariant: {
+              select: {
+                name: true,
+                depot: { select: { name: true } }
+              }
+            }
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+        })
+      : [];
+
+    const now = new Date();
+    const activeDepotByMemberId = new Map();
+    const latestDepotByMemberId = new Map();
+    const activeVariantByMemberId = new Map();
+    const latestVariantByMemberId = new Map();
+
+    for (const s of subscriptions) {
+      const depotName = s.depotProductVariant?.depot?.name || '';
+      const variantName = s.depotProductVariant?.name || '';
+      if (!depotName) continue;
+
+      if (!latestDepotByMemberId.has(s.memberId)) {
+        latestDepotByMemberId.set(s.memberId, depotName);
+      }
+
+      if (variantName && !latestVariantByMemberId.has(s.memberId)) {
+        latestVariantByMemberId.set(s.memberId, variantName);
+      }
+
+      const isActive = !s.expiryDate || new Date(s.expiryDate) >= now;
+      if (isActive && !activeDepotByMemberId.has(s.memberId)) {
+        activeDepotByMemberId.set(s.memberId, depotName);
+      }
+
+      if (isActive && variantName && !activeVariantByMemberId.has(s.memberId)) {
+        activeVariantByMemberId.set(s.memberId, variantName);
+      }
+    }
 
     const formatAddress = (addr) => {
       if (!addr) return '';
@@ -206,12 +297,30 @@ exports.getWalletReport = async (req, res, next) => {
       const s = sums.get(m.id) || { credit: 0, debit: 0 };
       const closingBalance = Number(s.credit || 0) - Number(s.debit || 0);
       const addr = Array.isArray(m.addresses) && m.addresses.length > 0 ? m.addresses[0] : null;
+
+      const depotName =
+        activeDepotByMemberId.get(m.id) ||
+        latestDepotByMemberId.get(m.id) ||
+        m.user?.depot?.name ||
+        '';
+
+      const currentVariant =
+        activeVariantByMemberId.get(m.id) ||
+        latestVariantByMemberId.get(m.id) ||
+        '';
+
+      const firstSubscriptionDate = firstSubscriptionDateByMemberId.get(m.id) || null;
+
       return {
         name: m.name || m.user?.name || '',
         memberId: m.id,
+        memberStatus: m.user?.active === false ? 'Inactive' : 'Active',
         mobile: m.user?.mobile || '',
+        currentVariant,
+        firstSubscriptionDate,
         address: formatAddress(addr),
         pincode: addr?.pincode || '',
+        depotName,
         closingBalance
       };
     });
@@ -227,7 +336,8 @@ exports.getWalletReport = async (req, res, next) => {
           totalClosingBalance
         },
         filters: {
-          endDate: endDate || null
+          endDate: endDate || null,
+          name: nameTerm || null
         },
         recordCount: report.length
       }
@@ -240,7 +350,7 @@ exports.getWalletReport = async (req, res, next) => {
 
 exports.getExceptionReport = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, name } = req.query;
 
     const dateRange = {};
     if (startDate) {
@@ -262,6 +372,18 @@ exports.getExceptionReport = async (req, res, next) => {
     const deliveryWhere = {};
     if (startDate || endDate) {
       deliveryWhere.deliveryDate = dateRange;
+    }
+
+    const nameTerm = String(name || '').trim();
+    if (nameTerm) {
+      deliveryWhere.subscription = {
+        member: {
+          OR: [
+            { name: { contains: nameTerm } },
+            { user: { name: { contains: nameTerm } } }
+          ]
+        }
+      };
     }
 
     const deliveries = await prisma.deliveryScheduleEntry.findMany({
@@ -293,6 +415,13 @@ exports.getExceptionReport = async (req, res, next) => {
       orderBy: [{ deliveryDate: 'desc' }, { id: 'desc' }]
     });
 
+    const normalizeNewVariant = (lastVariant, newVariant) => {
+      const lv = String(lastVariant ?? '').trim();
+      const nv = String(newVariant ?? '').trim();
+      if (!lv || !nv) return nv;
+      return lv.toLowerCase() === nv.toLowerCase() ? '0' : nv;
+    };
+
     const variantChanges = [];
     deliveries.forEach(d => {
       const lastVariantId = d.DepotProductVariant?.id || d.depotProductVariantId || null;
@@ -314,7 +443,7 @@ exports.getExceptionReport = async (req, res, next) => {
         subToDate: d.subscription?.expiryDate || '',
         mobileNumber: d.subscription?.member?.user?.mobile || '',
         lastVariant: d.DepotProductVariant?.name || '',
-        newVariant: d.subscription?.depotProductVariant?.name || ''
+        newVariant: normalizeNewVariant(d.DepotProductVariant?.name || '', d.subscription?.depotProductVariant?.name || '')
       });
     });
 
@@ -323,6 +452,14 @@ exports.getExceptionReport = async (req, res, next) => {
     };
     if (startDate || endDate) {
       cancelledWhere.updatedAt = dateRange;
+    }
+    if (nameTerm) {
+      cancelledWhere.member = {
+        OR: [
+          { name: { contains: nameTerm } },
+          { user: { name: { contains: nameTerm } } }
+        ]
+      };
     }
 
     const cancelledSubscriptions = await prisma.subscription.findMany({
@@ -353,6 +490,14 @@ exports.getExceptionReport = async (req, res, next) => {
     };
     if (startDate || endDate) {
       expiredWhere.expiryDate = dateRange;
+    }
+    if (nameTerm) {
+      expiredWhere.member = {
+        OR: [
+          { name: { contains: nameTerm } },
+          { user: { name: { contains: nameTerm } } }
+        ]
+      };
     }
 
     const expiredSubscriptions = await prisma.subscription.findMany({
@@ -393,7 +538,7 @@ exports.getExceptionReport = async (req, res, next) => {
         subToDate: s.expiryDate || '',
         mobileNumber: s.member?.user?.mobile || '',
         lastVariant: variantName,
-        newVariant: variantName
+        newVariant: normalizeNewVariant(variantName, variantName)
       };
     }),
     ...expiredSubscriptions.map(s => {
@@ -411,13 +556,21 @@ exports.getExceptionReport = async (req, res, next) => {
         subToDate: s.expiryDate || '',
         mobileNumber: s.member?.user?.mobile || '',
         lastVariant: variantName,
-        newVariant: variantName
+        newVariant: normalizeNewVariant(variantName, variantName)
       };
     })];
 
     const startDateWhere = {};
     if (startDate || endDate) {
       startDateWhere.startDate = dateRange;
+    }
+    if (nameTerm) {
+      startDateWhere.member = {
+        OR: [
+          { name: { contains: nameTerm } },
+          { user: { name: { contains: nameTerm } } }
+        ]
+      };
     }
 
     const startedSubscriptions = await prisma.subscription.findMany({
@@ -477,7 +630,7 @@ exports.getExceptionReport = async (req, res, next) => {
           subToDate: s.expiryDate || '',
           mobileNumber: s.member?.user?.mobile || '',
           lastVariant: variantName,
-          newVariant: variantName
+          newVariant: normalizeNewVariant(variantName, variantName)
         };
       });
 
@@ -498,7 +651,7 @@ exports.getExceptionReport = async (req, res, next) => {
       data: {
         report,
         counts,
-        filters: { startDate, endDate },
+        filters: { startDate, endDate, name: nameTerm || null },
         recordCount: report.length
       }
     });
@@ -1271,6 +1424,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
       agencyId,
       productId,
       memberId,
+      name,
+      paginate = 'true',
       page = 1,
       limit = 50
     } = req.query;
@@ -1310,10 +1465,21 @@ exports.getSubscriptionReports = async (req, res, next) => {
     if (productId) where.productId = parseInt(productId, 10);
     if (memberId) where.memberId = parseInt(memberId, 10);
 
+    const nameTerm = String(name || '').trim();
+    if (nameTerm) {
+      where.member = {
+        OR: [
+          { name: { contains: nameTerm } },
+          { user: { name: { contains: nameTerm } } }
+        ]
+      };
+    }
+
     // Calculate pagination
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 50;
-    const skip = (pageNum - 1) * limitNum;
+    const shouldPaginate = String(paginate).toLowerCase() !== 'false';
+    const pageNum = shouldPaginate ? (parseInt(page, 10) || 1) : 1;
+    const limitNum = shouldPaginate ? (parseInt(limit, 10) || 50) : undefined;
+    const skip = shouldPaginate && limitNum ? (pageNum - 1) * limitNum : undefined;
 
     // Fetch subscriptions with all related data
     const [subscriptions, totalCount] = await Promise.all([
@@ -1379,8 +1545,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
           { createdAt: 'desc' },
           { id: 'desc' }
         ],
-        skip,
-        take: limitNum
+        ...(shouldPaginate && typeof skip === 'number' ? { skip } : {}),
+        ...(shouldPaginate && typeof limitNum === 'number' ? { take: limitNum } : {})
       }),
       prisma.subscription.count({ where })
     ]);
@@ -1434,7 +1600,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
     });
 
     // Calculate summary statistics
-    const totalPages = Math.ceil(totalCount / limitNum);
+    const effectiveLimit = shouldPaginate ? (limitNum || 50) : (totalCount || subscriptions.length || 0);
+    const totalPages = shouldPaginate ? Math.ceil(totalCount / effectiveLimit) : 1;
     
     // Get overall statistics (not paginated)
     const stats = await prisma.subscription.groupBy({
@@ -1454,7 +1621,7 @@ exports.getSubscriptionReports = async (req, res, next) => {
       totalSubscriptions: totalCount,
       currentPage: pageNum,
       totalPages,
-      pageSize: limitNum,
+      pageSize: effectiveLimit,
       statistics: {
         byPaymentStatus: stats.reduce((acc, stat) => {
           acc[stat.paymentStatus] = {
@@ -1481,7 +1648,8 @@ exports.getSubscriptionReports = async (req, res, next) => {
         paymentStatus,
         agencyId,
         productId,
-        memberId
+        memberId,
+        name: nameTerm || null
       }
     });
 
@@ -1494,25 +1662,26 @@ exports.getSubscriptionReports = async (req, res, next) => {
 // Sale Register Report (Revenue Report rename)
 exports.getSaleRegisterReport = async (req, res, next) => {
   try {
-    if (!req.query.paymentStatus) {
-      req.query.paymentStatus = 'PAID';
-    }
-    return exports.getSubscriptionReports(req, res, next);
-  } catch (error) {
-    console.error('[getSaleRegisterReport]', error);
-    return next(createError(500, error.message || 'Failed to generate sale register report'));
-  }
-};
+    const { startDate, endDate, paymentStatus, name } = req.query;
 
-exports.getRevenueReport = async (req, res, next) => {
-  try {
+    const dateRange = {};
+    if (startDate) {
+      dateRange.gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange.lte = end;
+    }
+
     const paidTotals = await prisma.subscription.groupBy({
       by: ['memberId'],
       where: {
-        paymentStatus: 'PAID',
+        paymentStatus: paymentStatus || 'PAID',
         product: {
           isDairyProduct: true
-        }
+        },
+        ...(startDate || endDate ? { createdAt: dateRange } : {})
       },
       _sum: {
         receivedamt: true
@@ -1523,15 +1692,83 @@ exports.getRevenueReport = async (req, res, next) => {
     if (memberIds.length === 0) {
       return res.json({
         success: true,
-        data: {
-          report: [],
-          recordCount: 0
+        data: [],
+        recordCount: 0,
+        totals: {
+          totalSaleAmount: 0,
+          totalRefundAmount: 0,
+          totalNetAmount: 0
+        },
+        filters: {
+          startDate: startDate || null,
+          endDate: endDate || null,
+          paymentStatus: paymentStatus || 'PAID'
         }
       });
     }
 
+    const nameTerm = String(name || '').trim();
+    let filteredMemberIds = memberIds;
+    if (nameTerm) {
+      const matchedMembers = await prisma.member.findMany({
+        where: {
+          id: { in: memberIds },
+          OR: [
+            { name: { contains: nameTerm } },
+            { user: { name: { contains: nameTerm } } }
+          ]
+        },
+        select: { id: true }
+      });
+
+      filteredMemberIds = matchedMembers.map(m => m.id);
+      if (filteredMemberIds.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          recordCount: 0,
+          totals: {
+            totalSaleAmount: 0,
+            totalRefundAmount: 0,
+            totalNetAmount: 0
+          },
+          filters: {
+            startDate: startDate || null,
+            endDate: endDate || null,
+            paymentStatus: paymentStatus || 'PAID',
+            name: nameTerm
+          }
+        });
+      }
+    }
+
+    const paidTotalsFiltered = nameTerm
+      ? paidTotals.filter(x => filteredMemberIds.includes(x.memberId))
+      : paidTotals;
+
+    const refundGroups = await prisma.walletTransaction.groupBy({
+      by: ['memberId'],
+      where: {
+        memberId: { in: filteredMemberIds },
+        status: 'PAID',
+        type: 'CREDIT',
+        OR: [
+          { referenceNumber: { startsWith: 'CANCEL_SUB_' } },
+          { notes: { contains: 'Subscription Cancellation' } },
+          { notes: { contains: 'Refund for cancelled subscription' } },
+          { paymentMethod: { in: ['SYSTEM_CREDIT', 'SYSTEM_REFUND'] } }
+        ],
+        ...(startDate || endDate ? { createdAt: dateRange } : {})
+      },
+      _sum: {
+        amount: true
+      }
+    });
+
+    const refundMap = new Map(refundGroups.map(g => [g.memberId, Number(g._sum?.amount || 0)]));
+
     const members = await prisma.member.findMany({
-      where: { id: { in: memberIds } },
+      where: { id: { in: filteredMemberIds } },
       include: {
         user: { select: { name: true, mobile: true } },
         addresses: {
@@ -1554,7 +1791,7 @@ exports.getRevenueReport = async (req, res, next) => {
     const firstMilkSubs = await prisma.subscription.groupBy({
       by: ['memberId'],
       where: {
-        memberId: { in: memberIds },
+        memberId: { in: filteredMemberIds },
         product: {
           isDairyProduct: true
         }
@@ -1570,7 +1807,7 @@ exports.getRevenueReport = async (req, res, next) => {
 
     const milkSubsOrdered = await prisma.subscription.findMany({
       where: {
-        memberId: { in: memberIds },
+        memberId: { in: filteredMemberIds },
         product: {
           isDairyProduct: true
         }
@@ -1622,7 +1859,254 @@ exports.getRevenueReport = async (req, res, next) => {
         .trim();
     };
 
-    const report = paidTotals
+    const report = paidTotalsFiltered
+      .map(t => {
+        const member = memberMap.get(t.memberId);
+        const latest = currentSubMap.get(t.memberId) || fallbackSubMap.get(t.memberId);
+        const memberAddr = Array.isArray(member?.addresses) && member.addresses.length > 0 ? member.addresses[0] : null;
+        const addr = latest?.deliveryAddress || memberAddr;
+        const name = member?.name || member?.user?.name || '';
+
+        const saleAmount = Number(t._sum?.receivedamt || 0);
+        const refundAmount = refundMap.get(t.memberId) || 0;
+        const netAmount = saleAmount - refundAmount;
+
+        return {
+          name,
+          customerId: t.memberId,
+          saleAmount,
+          refundAmount,
+          netAmount,
+          mobile: member?.user?.mobile || '',
+          variant: latest?.depotProductVariant?.name || '',
+          subscriptionStartDate: firstStartMap.get(t.memberId) || null,
+          address: formatAddress(addr),
+          pincode: addr?.pincode || '',
+          depot: latest?.depotProductVariant?.depot?.name || ''
+        };
+      })
+      .sort((a, b) => (b.saleAmount || 0) - (a.saleAmount || 0));
+
+    const responseFilters = {
+      startDate: startDate || null,
+      endDate: endDate || null,
+      name: nameTerm || null
+    };
+
+    const totalSaleAmount = report.reduce((sum, r) => sum + (Number(r.saleAmount) || 0), 0);
+    const totalRefundAmount = report.reduce((sum, r) => sum + (Number(r.refundAmount) || 0), 0);
+    const totalNetAmount = report.reduce((sum, r) => sum + (Number(r.netAmount) || 0), 0);
+
+    return res.json({
+      success: true,
+      data: report,
+      recordCount: report.length,
+      totals: {
+        totalSaleAmount,
+        totalRefundAmount,
+        totalNetAmount
+      },
+      filters: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+        paymentStatus: paymentStatus || 'PAID',
+        name: nameTerm || null
+      }
+    });
+  } catch (error) {
+    console.error('[getSaleRegisterReport]', error);
+    return next(createError(500, error.message || 'Failed to generate sale register report'));
+  }
+};
+
+exports.getRevenueReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate, name } = req.query;
+
+    const dateRange = {};
+    if (startDate) {
+      dateRange.gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange.lte = end;
+    }
+
+    const paidTotals = await prisma.subscription.groupBy({
+      by: ['memberId'],
+      where: {
+        paymentStatus: 'PAID',
+        product: {
+          isDairyProduct: true
+        },
+        ...(startDate || endDate ? { createdAt: dateRange } : {})
+      },
+      _sum: {
+        receivedamt: true
+      }
+    });
+
+    const memberIds = paidTotals.map(x => x.memberId);
+    if (memberIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          report: [],
+          recordCount: 0
+        }
+      });
+    }
+
+    const nameTerm = String(name || '').trim();
+    let filteredMemberIds = memberIds;
+    if (nameTerm) {
+      const matchedMembers = await prisma.member.findMany({
+        where: {
+          id: { in: memberIds },
+          OR: [
+            { name: { contains: nameTerm } },
+            { user: { name: { contains: nameTerm } } }
+          ]
+        },
+        select: { id: true }
+      });
+
+      filteredMemberIds = matchedMembers.map(m => m.id);
+      if (filteredMemberIds.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            report: [],
+            recordCount: 0
+          },
+          filters: {
+            startDate: startDate || null,
+            endDate: endDate || null,
+            name: nameTerm
+          }
+        });
+      }
+    }
+
+    const paidTotalsFiltered = nameTerm
+      ? paidTotals.filter(x => filteredMemberIds.includes(x.memberId))
+      : paidTotals;
+
+    const refundGroups = await prisma.walletTransaction.groupBy({
+      by: ['memberId'],
+      where: {
+        memberId: { in: filteredMemberIds },
+        status: 'PAID',
+        type: 'CREDIT',
+        OR: [
+          { referenceNumber: { startsWith: 'CANCEL_SUB_' } },
+          { notes: { contains: 'Subscription Cancellation' } },
+          { notes: { contains: 'Refund for cancelled subscription' } },
+          { paymentMethod: { in: ['SYSTEM_CREDIT', 'SYSTEM_REFUND'] } }
+        ],
+        ...(startDate || endDate ? { createdAt: dateRange } : {})
+      },
+      _sum: {
+        amount: true
+      }
+    });
+
+    const refundMap = new Map(refundGroups.map(g => [g.memberId, Number(g._sum?.amount || 0)]));
+
+    const members = await prisma.member.findMany({
+      where: { id: { in: filteredMemberIds } },
+      include: {
+        user: { select: { name: true, mobile: true } },
+        addresses: {
+          take: 1,
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      }
+    });
+
+    const memberMap = new Map(members.map(m => [m.id, m]));
+
+    const firstMilkSubs = await prisma.subscription.groupBy({
+      by: ['memberId'],
+      where: {
+        memberId: { in: filteredMemberIds },
+        product: {
+          isDairyProduct: true
+        }
+      },
+      _min: {
+        startDate: true
+      }
+    });
+
+    const firstStartMap = new Map(firstMilkSubs.map(x => [x.memberId, x._min?.startDate || null]));
+
+    const now = new Date();
+
+    const milkSubsOrdered = await prisma.subscription.findMany({
+      where: {
+        memberId: { in: filteredMemberIds },
+        product: {
+          isDairyProduct: true
+        }
+      },
+      orderBy: [{ memberId: 'asc' }, { startDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        memberId: true,
+        startDate: true,
+        expiryDate: true,
+        paymentStatus: true,
+        depotProductVariant: {
+          select: {
+            name: true,
+            depot: { select: { name: true } }
+          }
+        },
+        deliveryAddress: {
+          select: {
+            plotBuilding: true,
+            streetArea: true,
+            landmark: true,
+            city: true,
+            state: true,
+            pincode: true
+          }
+        }
+      }
+    });
+
+    const currentSubMap = new Map();
+    const fallbackSubMap = new Map();
+    for (const s of milkSubsOrdered) {
+      if (!fallbackSubMap.has(s.memberId)) {
+        fallbackSubMap.set(s.memberId, s);
+      }
+
+      const isCancelled = String(s.paymentStatus || '').toUpperCase() === 'CANCELLED';
+      const isActive = !isCancelled && s.expiryDate && new Date(s.expiryDate) >= now;
+      if (isActive && !currentSubMap.has(s.memberId)) {
+        currentSubMap.set(s.memberId, s);
+      }
+    }
+
+    const formatAddress = (addr) => {
+      if (!addr) return '';
+      return `${addr.plotBuilding || ''}${addr.streetArea ? ', ' + addr.streetArea : ''}${addr.landmark ? ', ' + addr.landmark : ''}${addr.city ? ', ' + addr.city : ''}${addr.state ? ', ' + addr.state : ''}`
+        .replace(/^,\s*/g, '')
+        .trim();
+    };
+
+    const report = paidTotalsFiltered
       .map(t => {
         const member = memberMap.get(t.memberId);
         const latest = currentSubMap.get(t.memberId) || fallbackSubMap.get(t.memberId);
@@ -1634,6 +2118,8 @@ exports.getRevenueReport = async (req, res, next) => {
           name,
           memberId: t.memberId,
           saleAmount: Number(t._sum?.receivedamt || 0),
+          refundAmount: Number(refundMap.get(t.memberId) || 0),
+          netAmount: Number(t._sum?.receivedamt || 0) - Number(refundMap.get(t.memberId) || 0),
           mobile: member?.user?.mobile || '',
           currentVariant: latest?.depotProductVariant?.name || '',
           milkSubscriptionStartDate: firstStartMap.get(t.memberId) || null,
@@ -1644,12 +2130,19 @@ exports.getRevenueReport = async (req, res, next) => {
       })
       .sort((a, b) => (b.saleAmount || 0) - (a.saleAmount || 0));
 
+    const responseFilters = {
+      startDate: startDate || null,
+      endDate: endDate || null,
+      name: nameTerm || null
+    };
+
     return res.json({
       success: true,
       data: {
         report,
         recordCount: report.length
-      }
+      },
+      filters: responseFilters
     });
   } catch (error) {
     console.error('[getRevenueReport]', error);

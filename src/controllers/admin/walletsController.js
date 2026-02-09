@@ -151,7 +151,7 @@ exports.getMemberWalletDetails = async (req, res, next) => {
     const member = await prisma.member.findUnique({
       where: { id: memberIdInt },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, active: true } },
       },
     });
 
@@ -206,6 +206,7 @@ exports.getMemberWalletDetails = async (req, res, next) => {
         memberId: member.id,
         memberName: member.user?.name || member.name,
         memberEmail: member.user?.email,
+        memberActive: member.user?.active ?? true,
         wallet: walletDetails,
       },
     });

@@ -142,7 +142,39 @@ const register = async (req, res, next) => {
 
     const user = await prisma.user.create({
       data: userData,
+      select: {
+        id: true,
+        userUniqueId: true,
+        createdAt: true,
+      },
     });
+
+    if (!user.userUniqueId) {
+      const year = new Date(user.createdAt).getFullYear();
+      const prefix = `${year}-`;
+
+      const lastUserThisYear = await prisma.user.findFirst({
+        where: {
+          userUniqueId: {
+            startsWith: prefix,
+          },
+        },
+        select: { userUniqueId: true },
+        orderBy: { userUniqueId: 'desc' },
+      });
+
+      const lastSeq = lastUserThisYear?.userUniqueId
+        ? parseInt(String(lastUserThisYear.userUniqueId).split('-')[1] || '0', 10)
+        : 0;
+
+      const nextSeq = lastSeq + 1;
+      const userUniqueId = `${year}-${String(nextSeq).padStart(4, '0')}`;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { userUniqueId },
+      });
+    }
 
     res.status(201).json(user);
   } catch (error) {

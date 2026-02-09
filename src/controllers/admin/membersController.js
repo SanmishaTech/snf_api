@@ -63,6 +63,8 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         where: whereClause,
         select: {
             id: true,
+            userUniqueId: true,
+            createdAt: true,
             name: true,
             email: true,
             role: true,
@@ -83,6 +85,7 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         _id: user.member?.id, // Use the ID from the Member table for _id
         id: user.member?.id,  // Use the ID from the Member table for id
         userId: user.id,      // Keep user.id as userId if needed elsewhere
+        userUniqueId: user.userUniqueId || `${new Date(user.createdAt).getFullYear()}-${String(user.id).padStart(4, '0')}`,
         name: user.name,
         email: user.email,
         role: user.role,
