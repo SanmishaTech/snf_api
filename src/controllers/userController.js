@@ -261,8 +261,65 @@ const createUser = async (req, res, next) => {
         ...req.body,
         password: hashedPassword,
       },
+      select: {
+        id: true,
+        userUniqueId: true,
+        createdAt: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+      },
     });
-    res.status(201).json(user);
+
+    let finalUser = user;
+    if (user.role === 'MEMBER' && !user.userUniqueId) {
+      const year = new Date(user.createdAt).getFullYear();
+      const prefix = `${year}-`;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const lastUserThisYear = await prisma.user.findFirst({
+          where: {
+            userUniqueId: {
+              startsWith: prefix,
+            },
+          },
+          select: { userUniqueId: true },
+          orderBy: { userUniqueId: 'desc' },
+        });
+
+        const lastSeq = lastUserThisYear?.userUniqueId
+          ? parseInt(String(lastUserThisYear.userUniqueId).split('-')[1] || '0', 10)
+          : 0;
+
+        const nextSeq = lastSeq + 1;
+        const generatedUserUniqueId = `${year}-${String(nextSeq).padStart(4, '0')}`;
+
+        try {
+          finalUser = await prisma.user.update({
+            where: { id: user.id },
+            data: { userUniqueId: generatedUserUniqueId },
+            select: {
+              id: true,
+              userUniqueId: true,
+              createdAt: true,
+              name: true,
+              email: true,
+              role: true,
+              active: true,
+            },
+          });
+          break;
+        } catch (e) {
+          if (e && e.code === 'P2002') {
+            continue;
+          }
+          throw e;
+        }
+      }
+    }
+
+    res.status(201).json(finalUser);
   } catch (error) {
     next(error);
   }

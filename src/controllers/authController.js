@@ -149,34 +149,51 @@ const register = async (req, res, next) => {
       },
     });
 
-    if (!user.userUniqueId) {
+    let finalUser = user;
+    if (resolvedUserRole === 'MEMBER' && !user.userUniqueId) {
       const year = new Date(user.createdAt).getFullYear();
       const prefix = `${year}-`;
 
-      const lastUserThisYear = await prisma.user.findFirst({
-        where: {
-          userUniqueId: {
-            startsWith: prefix,
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const lastUserThisYear = await prisma.user.findFirst({
+          where: {
+            userUniqueId: {
+              startsWith: prefix,
+            },
           },
-        },
-        select: { userUniqueId: true },
-        orderBy: { userUniqueId: 'desc' },
-      });
+          select: { userUniqueId: true },
+          orderBy: { userUniqueId: 'desc' },
+        });
 
-      const lastSeq = lastUserThisYear?.userUniqueId
-        ? parseInt(String(lastUserThisYear.userUniqueId).split('-')[1] || '0', 10)
-        : 0;
+        const lastSeq = lastUserThisYear?.userUniqueId
+          ? parseInt(String(lastUserThisYear.userUniqueId).split('-')[1] || '0', 10)
+          : 0;
 
-      const nextSeq = lastSeq + 1;
-      const userUniqueId = `${year}-${String(nextSeq).padStart(4, '0')}`;
+        const nextSeq = lastSeq + 1;
+        const generatedUserUniqueId = `${year}-${String(nextSeq).padStart(4, '0')}`;
 
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { userUniqueId },
-      });
+        try {
+          finalUser = await prisma.user.update({
+            where: { id: user.id },
+            data: { userUniqueId: generatedUserUniqueId },
+            select: {
+              id: true,
+              userUniqueId: true,
+              createdAt: true,
+            },
+          });
+          break;
+        } catch (e) {
+          // Prisma unique constraint violation
+          if (e && e.code === 'P2002') {
+            continue;
+          }
+          throw e;
+        }
+      }
     }
 
-    res.status(201).json(user);
+    res.status(201).json(finalUser);
   } catch (error) {
     next(error);
   }
