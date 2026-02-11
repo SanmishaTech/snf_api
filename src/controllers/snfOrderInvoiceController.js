@@ -105,6 +105,7 @@ const downloadSNFOrderInvoiceByOrderNo = asyncHandler(async (req, res) => {
     await fs.access(fullPath);
 
     // Set response headers for PDF download
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Invoice_${order.invoiceNo}.pdf"`);
     

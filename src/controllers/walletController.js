@@ -27,7 +27,7 @@ const getUserWallet = asyncHandler(async (req, res) => {
     throw new Error('Member profile not found');
   }
 
-  // Get wallet transactions
+  // Get wallet transactions with delivery entry data for skipped deliveries
   const transactions = await prisma.walletTransaction.findMany({
     where: { memberId: member.id },
     orderBy: { createdAt: 'desc' },
@@ -47,6 +47,12 @@ const getUserWallet = asyncHandler(async (req, res) => {
           name: true,
           email: true
         }
+      },
+      deliveryScheduleEntry: {
+        select: {
+          deliveryDate: true,
+          status: true
+        }
       }
     }
   });
@@ -61,6 +67,7 @@ const getUserWallet = asyncHandler(async (req, res) => {
     status: transaction.status,
     paymentMethod: transaction.paymentMethod,
     referenceNumber: transaction.referenceNumber,
+    deliveryDate: transaction.deliveryScheduleEntry?.deliveryDate, // Include delivery date for skipped deliveries
     processedBy: transaction.processedByAdmin ? {
       name: transaction.processedByAdmin.name,
       email: transaction.processedByAdmin.email

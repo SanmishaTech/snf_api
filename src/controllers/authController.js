@@ -12,7 +12,7 @@ const createError = require("http-errors");
 const POLICY_TEXT_KEY = "policy"; // Changed to 'policy' for consistency
 
 // Helper function to get user's chapter roles
- 
+
 /**
  * Get chapters accessible by user based on their roles
  * Groups chapters by role categories:
@@ -23,7 +23,7 @@ const POLICY_TEXT_KEY = "policy"; // Changed to 'policy' for consistency
  * @param {string} userId - User ID to check roles for
  * @returns {Promise<Array>} Array containing role categories and accessible chapter IDs
  */
- 
+
 
 // Register a new user
 const register = async (req, res, next) => {
@@ -49,7 +49,7 @@ const register = async (req, res, next) => {
       agreedToPolicy: z.boolean().optional(), // Add agreedToPolicy to schema
       mobile: z
         .string()
-        .regex(/^\d{10}$/ , "Mobile must be a 10 digit number.")
+        .regex(/^\d{10}$/, "Mobile must be a 10 digit number.")
         .optional(),
     })
     .refine((data) => data.email || data.mobile, {
@@ -103,7 +103,7 @@ const register = async (req, res, next) => {
       } else {
         // Fallback if the default role from config is not in validPrismaRoles and not 'USER'
         console.warn(`Unrecognized default role '${config.defaultUserRole}' from config, defaulting to MEMBER.`);
-        resolvedUserRole = "MEMBER"; 
+        resolvedUserRole = "MEMBER";
       }
     }
 
@@ -202,7 +202,7 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   console.log("[LOGIN_TRACE] Attempting login...");
   const schema = z.object({
-    identifier: z.string().nonempty("Email or phone is required"),
+    identifier: z.string().trim().nonempty("Email or phone is required"),
     password: z.string().nonempty("Password is required"),
   });
 
@@ -213,7 +213,7 @@ const login = async (req, res, next) => {
     // if(validateRequest){
     //   res.status(401).json(validationResult);
     // }
-    
+
     // console.log("[LOGIN_TRACE] Validation successful.");
 
     // Access the actual validated data from the .data property
@@ -226,11 +226,11 @@ const login = async (req, res, next) => {
     if (identifier.includes("@")) {
       // Email login - check User table email field first
       user = await prisma.user.findUnique({ where: { email: identifier } });
-      
+
       // If not found in User table, check role-specific tables for email
       if (!user) {
         console.log(`[LOGIN_TRACE] User not found in User table, checking role-specific tables for email: ${identifier}`);
-        
+
         // Check Vendor table
         const vendor = await prisma.vendor.findFirst({
           where: { email: identifier },
@@ -240,7 +240,7 @@ const login = async (req, res, next) => {
           user = vendor.user;
           console.log(`[LOGIN_TRACE] User found via Vendor email: ${user.id}`);
         }
-        
+
         // Check Agency table if not found in Vendor
         if (!user) {
           const agency = await prisma.agency.findFirst({
@@ -252,7 +252,7 @@ const login = async (req, res, next) => {
             console.log(`[LOGIN_TRACE] User found via Agency email: ${user.id}`);
           }
         }
-        
+
         // Check Supervisor table if not found in Agency
         if (!user) {
           const supervisor = await prisma.supervisor.findFirst({
@@ -264,17 +264,17 @@ const login = async (req, res, next) => {
             console.log(`[LOGIN_TRACE] User found via Supervisor email: ${user.id}`);
           }
         }
-        
+
         // Note: Depot table doesn't have email field, only contactNumber
       }
     } else {
       // Mobile login - check User table mobile field first
       user = await prisma.user.findFirst({ where: { mobile: identifier } });
-      
+
       // If not found in User table, check role-specific tables
       if (!user) {
         console.log(`[LOGIN_TRACE] User not found in User table, checking role-specific tables for mobile: ${identifier}`);
-        
+
         // Check Vendor table
         const vendor = await prisma.vendor.findFirst({
           where: { mobile: identifier },
@@ -284,7 +284,7 @@ const login = async (req, res, next) => {
           user = vendor.user;
           console.log(`[LOGIN_TRACE] User found via Vendor table: ${user.id}`);
         }
-        
+
         // Check Agency table if not found in Vendor
         if (!user) {
           const agency = await prisma.agency.findFirst({
@@ -296,7 +296,7 @@ const login = async (req, res, next) => {
             console.log(`[LOGIN_TRACE] User found via Agency table: ${user.id}`);
           }
         }
-        
+
         // Check Supervisor table if not found in Agency
         if (!user) {
           const supervisor = await prisma.supervisor.findFirst({
@@ -308,12 +308,12 @@ const login = async (req, res, next) => {
             console.log(`[LOGIN_TRACE] User found via Supervisor table: ${user.id}`);
           }
         }
-        
+
         // Check Depot table for contactNumber (for DepotAdmin users)
         if (!user) {
           const depot = await prisma.depot.findFirst({
             where: { contactNumber: identifier },
-            include: { 
+            include: {
               members: {
                 where: { role: 'DepotAdmin' }
               }
@@ -580,8 +580,8 @@ const changePassword = async (req, res, next) => {
         .string()
         .min(6, "New password must be at least 6 characters long."),
     })
-    // We don't need to check if newPassword and confirmPassword match here,
-    // as the frontend dialog already does that. The backend only needs newPassword.
+  // We don't need to check if newPassword and confirmPassword match here,
+  // as the frontend dialog already does that. The backend only needs newPassword.
 
   try {
     // Validate request body
@@ -590,9 +590,9 @@ const changePassword = async (req, res, next) => {
       // If validateRequest sends a response, it returns an object with errors
       // If it doesn't send a response (e.g. on success), it might return undefined or the data
       // This check ensures we don't proceed if validation failed and response was sent.
-      return; 
+      return;
     }
-    
+
     const { currentPassword, newPassword } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -622,7 +622,7 @@ const changePassword = async (req, res, next) => {
     console.error("Error changing password:", error);
     // Pass to global error handler, which might send a 500 error
     // Or, if it's a validation error from http-errors, it will use that status
-    next(error); 
+    next(error);
   }
 };
 
@@ -631,7 +631,7 @@ module.exports = {
   login,
   forgotPassword,
   resetPassword,
-    getPolicyText,
+  getPolicyText,
   acceptPolicy,
   changePassword,
 };

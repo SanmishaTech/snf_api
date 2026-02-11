@@ -830,9 +830,11 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         return;
       }
 
-      // If no agency is assigned, keep it as an "Unassigned" bucket
+      // If no agency is assigned, keep it as an "Unassigned (Cancelled)" bucket
       const effectiveAgencyId = resolvedAgency?.id ?? 'unassigned';
-      const effectiveAgencyName = resolvedAgency?.name ?? 'Unassigned';
+      const effectiveAgencyName = resolvedAgency?.name
+        ? `${resolvedAgency.name}-${resolvedAgency.id}`
+        : 'Unassigned (Cancelled)';
       const effectiveAgencyCity = resolvedAgency?.city ?? '';
 
       // Calculate amount based on subscription rate and quantity
@@ -976,9 +978,11 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
         return;
       }
 
-      // If no agency is assigned, group it under an "Unassigned" bucket
+      // If no agency is assigned, group it under an "Unassigned (Cancelled)" bucket
       const effectiveAgencyId = resolvedAgency?.id ?? 'unassigned';
-      const effectiveAgencyName = resolvedAgency?.name ?? 'Unassigned';
+      const effectiveAgencyName = resolvedAgency?.name
+        ? `${resolvedAgency.name}-${resolvedAgency.id}`
+        : 'Unassigned (Cancelled)';
       const effectiveAgencyCity = resolvedAgency?.city ?? '';
 
       const agencyId = effectiveAgencyId;

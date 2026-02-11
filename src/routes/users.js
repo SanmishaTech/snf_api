@@ -113,7 +113,7 @@ const { roleGuard } = require("../middleware/authorize");
 router.get("/", auth, roleGuard("ADMIN"), userController.getUsers);
 
 // GET /api/users/me - Get current logged-in user's profile
-router.get("/me",auth, userController.getCurrentUserProfile);
+router.get("/me", auth, userController.getCurrentUserProfile);
 
 /**
  * @swagger
@@ -149,6 +149,22 @@ router.get("/me",auth, userController.getCurrentUserProfile);
  *         description: Forbidden
  */
 router.post("/", auth, roleGuard("ADMIN"), userController.createUser);
+
+/**
+ * @swagger
+ * /users/roles:
+ *   get:
+ *     summary: Get all available user roles
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of roles
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/roles", auth, userController.getRoles);
 
 /**
  * @swagger

@@ -17,8 +17,8 @@ const getUsers = async (req, res, next) => {
     req.query.active === "true"
       ? true
       : req.query.active === "false"
-      ? false
-      : undefined;
+        ? false
+        : undefined;
   const sortBy = req.query.sortBy || "id";
   const sortOrder = req.query.sortOrder === "desc" ? "desc" : "asc";
   const exportToExcel = req.query.export === "true"; // Check if export is requested
@@ -184,7 +184,7 @@ const getCurrentUserProfile = async (req, res, next) => {
 
     if (userWithoutPassword.role === 'AGENCY') {
       if (userWithoutPassword.agency) { // If agency relation is loaded
-        userProfile.agencyId = userWithoutPassword.agency.id; 
+        userProfile.agencyId = userWithoutPassword.agency.id;
         // You can add more agency details from userWithoutPassword.agency if needed
         // userProfile.agencyName = userWithoutPassword.agency.name;
       } else if (userWithoutPassword.agencyId) { // Fallback if agencyId is a direct field and relation not used/loaded
@@ -440,6 +440,33 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+const getRoles = async (req, res, next) => {
+  try {
+    // Get distinct roles that are actually used by users
+    const usedRoles = await prisma.user.groupBy({
+      by: ['role'],
+      where: {
+        active: true, // Only consider active users
+      },
+    });
+
+    // Transform to the same format as before
+    const rolesObject = {};
+    // Add "All" option first
+    rolesObject['ALL'] = 'all';
+    
+    usedRoles.forEach(({ role }) => {
+      // Create a key from the role (e.g., "super_admin" -> "SUPER_ADMIN")
+      const key = role.toUpperCase().replace(/ /g, '_');
+      rolesObject[key] = role;
+    });
+
+    res.json({ roles: rolesObject });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
@@ -449,4 +476,5 @@ module.exports = {
   deleteUser,
   setActiveStatus,
   changePassword,
+  getRoles,
 };
