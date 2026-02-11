@@ -732,10 +732,22 @@ const getAllProductOrders = asyncHandler(async (req, res) => {
       subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
       subscriptionWhere.expiryDate = { lt: today };
       where.paymentStatus = { not: 'CANCELLED' };
-    } else if (expiryStatus === 'NOT_EXPIRED') {
+    } else if (expiryStatus === 'NOT_EXPIRED' || expiryStatus === 'ACTIVE') {
       // Show orders that have at least one active (non-expired) subscription
       subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
       subscriptionWhere.expiryDate = { gte: today };
+      where.paymentStatus = { not: 'CANCELLED' };
+    } else if (expiryStatus === 'EXPIRING_SOON') {
+      // Show orders expiring within next 7 days
+      const sevenDaysFromNow = new Date(today);
+      sevenDaysFromNow.setDate(today.getDate() + 7);
+      sevenDaysFromNow.setHours(23, 59, 59, 999);
+      
+      subscriptionWhere.paymentStatus = { not: 'CANCELLED' };
+      subscriptionWhere.expiryDate = {
+        gte: today,
+        lte: sevenDaysFromNow
+      };
       where.paymentStatus = { not: 'CANCELLED' };
     }
     // If expiryStatus is 'ALL', don't add any expiry-related filters

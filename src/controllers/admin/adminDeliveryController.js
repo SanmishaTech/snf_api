@@ -30,7 +30,7 @@ const updateDeliveryStatus = async (req, res) => {
       where: { id: id },
       include: {
         subscription: {
-          select: { 
+          select: {
             id: true,
             agencyId: true,
             rate: true,
@@ -74,11 +74,11 @@ const updateDeliveryStatus = async (req, res) => {
 
     // Handle business logic for different status values
     let walletTransaction = null;
-    let statusUpdateData = { 
+    let statusUpdateData = {
       status: status,
       adminNotes: notes || null
     };
-    
+
     // For admin updates, we can optionally set the agentId if specified in the request
     // This allows admins to assign deliveries to specific agencies
     if (req.body.agentId) {
@@ -89,13 +89,13 @@ const updateDeliveryStatus = async (req, res) => {
       case 'SKIP_BY_CUSTOMER':
         // Calculate refund amount and credit to wallet
         const refundAmount = walletService.calculateRefundAmount(deliveryEntry);
-        
+
         if (refundAmount > 0) {
           const referenceNumber = `ADMIN_DELIVERY_${deliveryEntry.id}`;
-          const transactionNotes = notes ? 
-            `Admin: ${notes} - Credit for skipped delivery` : 
+          const transactionNotes = notes ?
+            `Admin: ${notes} - Credit for skipped delivery` :
             `Credit for skipped delivery - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
-          
+
           walletTransaction = await walletService.creditWallet(
             deliveryEntry.subscription.memberId,
             refundAmount,
@@ -103,7 +103,33 @@ const updateDeliveryStatus = async (req, res) => {
             transactionNotes,
             req.user.id // Admin user who processed this
           );
-          
+
+          // Link the wallet transaction to the delivery entry
+          if (walletTransaction) {
+            statusUpdateData.walletTransactionId = walletTransaction.id;
+          }
+        }
+        break;
+
+      case 'NOT_DELIVERED':
+        // Calculate refund amount and credit to wallet
+        const notDeliveredRefundAmount = walletService.calculateRefundAmount(deliveryEntry);
+
+        if (notDeliveredRefundAmount > 0) {
+          // Use a different reference prefix to distinguish from skips
+          const referenceNumber = `ADMIN_ND_REFUND_${deliveryEntry.id}`;
+          const transactionNotes = notes ?
+            `Admin: ${notes} - Refund for undelivered item` :
+            `Refund for undelivered item - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
+
+          walletTransaction = await walletService.creditWallet(
+            deliveryEntry.subscription.memberId,
+            notDeliveredRefundAmount,
+            referenceNumber,
+            transactionNotes,
+            req.user.id // Admin user who processed this
+          );
+
           // Link the wallet transaction to the delivery entry
           if (walletTransaction) {
             statusUpdateData.walletTransactionId = walletTransaction.id;
@@ -203,17 +229,17 @@ const updateDeliveryStatus = async (req, res) => {
     res.status(200).json(response);
   } catch (error) {
     console.error('Error updating delivery status (Admin):', error);
-    
+
     // Handle specific Prisma errors
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Delivery entry not found for update.' });
     }
-    
+
     // Handle wallet service errors
     if (error.message.includes('Failed to credit wallet')) {
       return res.status(500).json({ error: 'Failed to process wallet credit', details: error.message });
     }
-    
+
     res.status(500).json({ error: 'Failed to update delivery status', details: error.message });
   }
 };
@@ -222,13 +248,13 @@ const updateDeliveryStatus = async (req, res) => {
  * Get delivery entries with admin-specific filters and information
  */
 const getDeliveries = async (req, res) => {
-  const { 
-    date, 
-    agencyId, 
-    status, 
-    memberId, 
-    limit = 50, 
-    offset = 0 
+  const {
+    date,
+    agencyId,
+    status,
+    memberId,
+    limit = 50,
+    offset = 0
   } = req.query;
 
   // Ensure only ADMIN can use this endpoint
@@ -398,12 +424,12 @@ const updateDeliveryDate = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating delivery date (Admin):', error);
-    
+
     // Handle specific Prisma errors
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Delivery entry not found for update.' });
     }
-    
+
     res.status(500).json({ error: 'Failed to update delivery date', details: error.message });
   }
 };

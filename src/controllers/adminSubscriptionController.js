@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 // Get all subscriptions with pagination, sorting, and filtering
 const getAllSubscriptions = async (req, res) => {
-  const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', paymentStatus, productId, memberName, memberEmail, memberMobile, searchTerm, subscriptionDate } = req.query;
+  const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', paymentStatus, productId, memberName, memberEmail, memberMobile, searchTerm, subscriptionDate, unassigned, daysUntilExpiry, expiryStatus } = req.query;
 
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
@@ -45,6 +45,51 @@ const getAllSubscriptions = async (req, res) => {
       gte: date,
       lt: nextDay,
     };
+  }
+
+  // Filter for unassigned subscriptions (no agency assigned)
+  if (unassigned === 'true') {
+    whereClause.agencyId = null;
+  }
+
+  // Filter by days until expiry
+  if (daysUntilExpiry) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + parseInt(daysUntilExpiry, 10));
+    futureDate.setHours(23, 59, 59, 999);
+    whereClause.expiryDate = {
+      gte: today,
+      lte: futureDate,
+    };
+  }
+
+  // Filter by expiry status
+  if (expiryStatus && expiryStatus !== 'ALL') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (expiryStatus === 'ACTIVE') {
+      // Not expired yet
+      whereClause.expiryDate = {
+        gte: today,
+      };
+    } else if (expiryStatus === 'EXPIRED') {
+      // Already expired
+      whereClause.expiryDate = {
+        lt: today,
+      };
+    } else if (expiryStatus === 'EXPIRING_SOON') {
+      // Expiring within next 7 days
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(today.getDate() + 7);
+      sevenDaysFromNow.setHours(23, 59, 59, 999);
+      whereClause.expiryDate = {
+        gte: today,
+        lte: sevenDaysFromNow,
+      };
+    }
   }
 
   // If there are any user-specific filters, apply them to the member relation
