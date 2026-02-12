@@ -167,6 +167,7 @@ exports.getWalletReport = async (req, res, next) => {
         user: {
           select: {
             name: true,
+            userUniqueId: true,
             mobile: true,
             active: true,
             depot: { select: { name: true } }
@@ -314,6 +315,7 @@ exports.getWalletReport = async (req, res, next) => {
       return {
         name: m.name || m.user?.name || '',
         memberId: m.id,
+        memberUniqueId: m.user?.userUniqueId || '',
         memberStatus: m.user?.active === false ? 'Inactive' : 'Active',
         mobile: m.user?.mobile || '',
         currentVariant,
@@ -406,7 +408,7 @@ exports.getExceptionReport = async (req, res, next) => {
             },
             member: {
               include: {
-                user: { select: { name: true, mobile: true } }
+                user: { select: { name: true, mobile: true, userUniqueId: true } }
               }
             }
           }
@@ -435,6 +437,7 @@ exports.getExceptionReport = async (req, res, next) => {
         exceptionType: 'VARIANT_CHANGED',
         date: d.deliveryDate,
         customerId: d.subscription?.memberId || d.memberId || '',
+        customerUniqueId: d.subscription?.member?.user?.userUniqueId || '',
         customerName: d.subscription?.member?.name || d.subscription?.member?.user?.name || '',
         address: formatAddress(addr),
         pincode: addr?.pincode || '',
@@ -478,7 +481,7 @@ exports.getExceptionReport = async (req, res, next) => {
         },
         member: {
           include: {
-            user: { select: { name: true, mobile: true } }
+            user: { select: { name: true, mobile: true, userUniqueId: true } }
           }
         }
       },
@@ -516,7 +519,7 @@ exports.getExceptionReport = async (req, res, next) => {
         },
         member: {
           include: {
-            user: { select: { name: true, mobile: true } }
+            user: { select: { name: true, mobile: true, userUniqueId: true } }
           }
         }
       },
@@ -530,6 +533,7 @@ exports.getExceptionReport = async (req, res, next) => {
         exceptionType: 'STOPPED_SUBSCRIPTION',
         date: s.updatedAt,
         customerId: s.memberId,
+        customerUniqueId: s.member?.user?.userUniqueId || '',
         customerName: s.member?.name || s.member?.user?.name || '',
         address: formatAddress(addr),
         pincode: addr?.pincode || '',
@@ -548,6 +552,7 @@ exports.getExceptionReport = async (req, res, next) => {
         exceptionType: 'STOPPED_SUBSCRIPTION',
         date: s.expiryDate,
         customerId: s.memberId,
+        customerUniqueId: s.member?.user?.userUniqueId || '',
         customerName: s.member?.name || s.member?.user?.name || '',
         address: formatAddress(addr),
         pincode: addr?.pincode || '',
@@ -592,7 +597,7 @@ exports.getExceptionReport = async (req, res, next) => {
             id: true,
             name: true,
             createdAt: true,
-            user: { select: { name: true, mobile: true } }
+            user: { select: { name: true, mobile: true, userUniqueId: true } }
           }
         }
       },
@@ -622,6 +627,7 @@ exports.getExceptionReport = async (req, res, next) => {
           exceptionType: 'NEW_CUSTOMER',
           date: s.startDate,
           customerId: s.memberId,
+          customerUniqueId: s.member?.user?.userUniqueId || '',
           customerName: s.member?.name || s.member?.user?.name || '',
           address: formatAddress(addr),
           pincode: addr?.pincode || '',
@@ -794,7 +800,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
             },
             member: {
               include: {
-                user: { select: { id: true, name: true, mobile: true } }
+                user: { select: { id: true, name: true, mobile: true, userUniqueId: true } }
               }
             }
           }
@@ -810,7 +816,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         },
         member: {
           include: {
-            user: { select: { id: true, name: true, mobile: true } }
+            user: { select: { id: true, name: true, mobile: true, userUniqueId: true } }
           }
         },
         Depot: { select: { id: true, name: true } },
@@ -872,6 +878,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         amount: amount,
         customerId: d.member?.id || d.subscription?.member?.id,
         customerName: d.member?.name || d.subscription?.member?.name || 'Unknown Customer',
+        customerUniqueId: d.member?.user?.userUniqueId || d.subscription?.member?.user?.userUniqueId || '',
         customerMobile: d.member?.user?.mobile || d.subscription?.member?.user?.mobile || '',
         pincode: effectiveAddress?.pincode || '',
         deliveryAddress: effectiveAddress ? 
@@ -1774,7 +1781,7 @@ exports.getSaleRegisterReport = async (req, res, next) => {
     const members = await prisma.member.findMany({
       where: { id: { in: filteredMemberIds } },
       include: {
-        user: { select: { name: true, mobile: true } },
+        user: { select: { name: true, mobile: true, userUniqueId: true } },
         addresses: {
           take: 1,
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
@@ -1877,6 +1884,7 @@ exports.getSaleRegisterReport = async (req, res, next) => {
 
         return {
           name,
+          memberUniqueId: member?.user?.userUniqueId || '',
           customerId: t.memberId,
           saleAmount,
           refundAmount,
@@ -2021,7 +2029,7 @@ exports.getRevenueReport = async (req, res, next) => {
     const members = await prisma.member.findMany({
       where: { id: { in: filteredMemberIds } },
       include: {
-        user: { select: { name: true, mobile: true } },
+        user: { select: { name: true, mobile: true, userUniqueId: true } },
         addresses: {
           take: 1,
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
@@ -2120,6 +2128,7 @@ exports.getRevenueReport = async (req, res, next) => {
 
         return {
           name,
+          memberUniqueId: member?.user?.userUniqueId || '',
           memberId: t.memberId,
           saleAmount: Number(t._sum?.receivedamt || 0),
           refundAmount: Number(refundMap.get(t.memberId) || 0),
