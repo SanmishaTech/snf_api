@@ -203,6 +203,17 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     ];
   }
 
+  // Handle tag filtering
+  if (req.query.tags) {
+    const tagsArray = req.query.tags.split(',').map(t => t.trim()).filter(Boolean);
+    if (tagsArray.length > 0) {
+      // Create an AND condition for each tag to ensure the product contains all selected tags
+      whereConditions.AND = tagsArray.map(tag => ({
+        tags: { contains: tag }
+      }));
+    }
+  }
+
   const validSortByFields = ["name", "url", "createdAt", "updatedAt"];
   const orderByField = validSortByFields.includes(sortBy)
     ? sortBy
@@ -248,7 +259,7 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
 const getPublicProducts = asyncHandler(async (req, res, next) => {
   try {
     const { depotId } = req.query;
-    
+
     if (depotId) {
       // If depotId is provided, get products with variants for the specified depot
       const dId = parseInt(depotId, 10);
@@ -259,7 +270,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           timestamp: new Date(),
         });
       }
-      
+
       // Get depot information
       const depot = await prisma.depot.findUnique({
         where: { id: dId },
@@ -270,7 +281,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           isOnline: true,
         },
       });
-      
+
       if (!depot) {
         return res.status(404).json({
           success: false,
@@ -278,7 +289,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           timestamp: new Date(),
         });
       }
-      
+
       // Get products with variants for the depot
       const productsWithVariants = await prisma.product.findMany({
         where: {
@@ -343,7 +354,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
         },
         take: 50, // Increase limit for depot-specific queries
       });
-      
+
       // Transform the data to match the expected Product interface
       const transformedProducts = productsWithVariants.map((product) => ({
         id: product.id,
@@ -376,7 +387,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           isAvailable: !variant.notInStock && !variant.isHidden,
         })),
       }));
-      
+
       // Return in the format expected by the frontend
       res.status(200).json({
         success: true,
@@ -414,7 +425,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           },
         },
       });
-      
+
       res.status(200).json({
         success: true,
         data: products,
@@ -773,14 +784,14 @@ const getDepotVariantPricing = asyncHandler(async (req, res, next) => {
 const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
   try {
     const { depotId } = req.query;
-    
+
     if (!depotId) {
       return res.status(400).json({
         success: false,
         message: "depotId parameter is required",
       });
     }
-    
+
     const dId = parseInt(depotId, 10);
     if (isNaN(dId)) {
       return res.status(400).json({
@@ -788,7 +799,7 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
         message: "Invalid depotId parameter",
       });
     }
-    
+
     // First, get the depot information
     const depot = await prisma.depot.findUnique({
       where: { id: dId },
@@ -799,14 +810,14 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
         isOnline: true,
       },
     });
-    
+
     if (!depot) {
       return res.status(404).json({
         success: false,
         message: "Depot not found",
       });
     }
-    
+
     // Get products for the depot. Do NOT require variants to exist so that
     // non-dairy or not-yet-varianted products are included in the listing.
     const productsWithVariants = await prisma.product.findMany({
@@ -861,7 +872,7 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
         createdAt: "desc",
       },
     });
-    
+
     // Transform the data to match the desired response structure
     const transformedProducts = productsWithVariants.map((product) => ({
       id: product.id,
@@ -892,10 +903,10 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
         isAvailable: !variant.notInStock && !variant.isHidden,
       })),
     }));
-    
+
     // Calculate total number of variants across all products
     const totalVariants = transformedProducts.reduce((sum, product) => sum + product.variants.length, 0);
-    
+
     res.status(200).json({
       success: true,
       data: {
