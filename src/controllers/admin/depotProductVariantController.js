@@ -16,6 +16,7 @@ const optionalNumber = (val) => safeParseNumber(val, null);
 
 // Validation schema for DepotProductVariant
 const depotProductVariantSchema = z.object({
+  depotId: z.coerce.number().int().positive({ message: "depotId must be a positive integer" }).optional(),
   productId: z.coerce
     .number()
     .int()
@@ -27,6 +28,10 @@ const depotProductVariantSchema = z.object({
     z.number().nonnegative({ message: "MRP must be a non-negative number" })
   ),
   purchasePrice: z.preprocess(
+    optionalNumber,
+    z.number().nonnegative().nullable()
+  ).optional(),
+  salesPrice: z.preprocess(
     optionalNumber,
     z.number().nonnegative().nullable()
   ).optional(),
@@ -62,14 +67,33 @@ module.exports = {
   createDepotProductVariant: asyncHandler(async (req, res, next) => {
     try {
       const { user } = req;
-      if (!user?.depotId) {
-        return next(
-          createError(400, "Logged-in user is not associated with any depot")
-        );
-      }
       const data = depotProductVariantSchema.parse(req.body);
+
+      let finalDepotId = user?.depotId || data.depotId;
+
+      // If the user is an ADMIN, they might not have a depotId attached to their account.
+      // Therefore they must provide it in the payload (which comes from the frontend logic later).
+      // If this is missing AND the user is not associated with one, throw an error.
+      if (!finalDepotId) {
+        // Fallback for right now since the frontend form doesn't actually have a depot selector for admins yet
+        // In a real app we'd require it in the form. But let's check if the default depot "1" exists.
+        const firstDepot = await prisma.depot.findFirst();
+        if (firstDepot) {
+          finalDepotId = firstDepot.id;
+        } else {
+          return next(
+            createError(400, "Logged-in user is not associated with any depot, and no fallback depot could be found.")
+          );
+        }
+      }
+
+      // If salesPrice is set, use it as the buyOncePrice (the displayed "Buy Once" price)
+      if (data.salesPrice != null) {
+        data.buyOncePrice = data.salesPrice;
+      }
+
       const created = await prisma.depotProductVariant.create({
-        data: { ...data, depotId: user.depotId },
+        data: { ...data, depotId: finalDepotId },
       });
       res.status(201).json(created);
     } catch (error) {
@@ -191,6 +215,7 @@ module.exports = {
           price1Month: true,
           buyOncePrice: true,
           purchasePrice: true,
+          salesPrice: true,
           depot: { select: { id: true, name: true } },
         },
         orderBy: { name: "asc" },
@@ -208,6 +233,7 @@ module.exports = {
         price7Day: variant.price7Day,
         price15Day: variant.price15Day,
         price1Month: variant.price1Month,
+        salesPrice: variant.salesPrice,
         minimumQty: variant.minimumQty,
         depot: variant.depot,
         isAvailable: true, // Assuming variants returned are available
@@ -226,6 +252,12 @@ module.exports = {
 
     try {
       const data = depotProductVariantUpdateSchema.parse(req.body);
+
+      // If salesPrice is set, use it as the buyOncePrice (the displayed "Buy Once" price)
+      if (data.salesPrice != null) {
+        data.buyOncePrice = data.salesPrice;
+      }
+
       const updated = await prisma.depotProductVariant.update({
         where: { id },
         data,

@@ -21,6 +21,10 @@ const productSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === "true"), // Added isDairyProduct
+  isSubscription: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"), // Added isSubscription
   categoryId: z.preprocess(
     (val) => (val ? parseInt(String(val), 10) : null),
     z.number().int().positive().nullable().optional()
@@ -115,6 +119,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       description,
       tags,
       isDairyProduct,
+      isSubscription,
       categoryId,
       maintainStock,
     } = validationResult.data;
@@ -126,6 +131,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
       description,
       tags,
       isDairyProduct,
+      isSubscription,
       categoryId,
       maintainStock,
     };
@@ -136,11 +142,18 @@ const createProduct = asyncHandler(async (req, res, next) => {
     );
     const newProduct = await prisma.product.create({
       data: productData,
+      include: { images: true },
     });
-    console.log(
-      "[ProductController:createProduct] Product created successfully:",
-      newProduct
-    );
+
+    // Save any additional product images
+    if (req.files && req.files.productImages && req.files.productImages.length > 0) {
+      const imageRecords = req.files.productImages.map((file, idx) => {
+        const uuid = req.fileUUID && req.fileUUID[`productImages_${idx}`] || req.fileUUID?.productImages;
+        const url = `/uploads/products/productImages/${uuid || 'default'}/${file.filename}`;
+        return { productId: newProduct.id, url, order: idx };
+      });
+      await prisma.productImage.createMany({ data: imageRecords });
+    }
 
     res.status(201).json(newProduct);
   } catch (error) {
@@ -335,6 +348,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
               hsnCode: true,
               mrp: true,
               buyOncePrice: true,
+              salesPrice: true,
               price3Day: true,
               price7Day: true,
               price15Day: true,
@@ -374,7 +388,8 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
           name: variant.name,
           hsnCode: variant.hsnCode,
           mrp: parseFloat(variant.mrp),
-          buyOncePrice: variant.buyOncePrice ? parseFloat(variant.buyOncePrice) : parseFloat(variant.mrp),
+          buyOncePrice: variant.buyOncePrice ? parseFloat(variant.buyOncePrice) : undefined,
+          salesPrice: variant.salesPrice ? parseFloat(variant.salesPrice) : undefined,
           price3Day: variant.price3Day ? parseFloat(variant.price3Day) : null,
           price7Day: variant.price7Day ? parseFloat(variant.price7Day) : null,
           price15Day: variant.price15Day ? parseFloat(variant.price15Day) : null,
@@ -511,6 +526,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       description,
       tags,
       isDairyProduct,
+      isSubscription,
       categoryId,
       maintainStock,
     } = validationResult.data;
@@ -521,6 +537,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
       description,
       tags,
       isDairyProduct,
+      isSubscription,
       categoryId,
       maintainStock,
     };
@@ -556,7 +573,19 @@ const updateProduct = asyncHandler(async (req, res, next) => {
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
       data: updateData,
+      include: { images: { orderBy: { order: "asc" } } },
     });
+
+    // Save any additional product images uploaded in this update
+    if (req.files && req.files.productImages && req.files.productImages.length > 0) {
+      const existingCount = updatedProduct.images.length;
+      const imageRecords = req.files.productImages.map((file, idx) => {
+        const uuid = req.fileUUID?.productImages || 'default';
+        const url = `/uploads/products/productImages/${uuid}/${file.filename}`;
+        return { productId, url, order: existingCount + idx };
+      });
+      await prisma.productImage.createMany({ data: imageRecords });
+    }
 
     res.status(200).json(updatedProduct);
   } catch (error) {
@@ -921,7 +950,52 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
   }
 });
 
+
+/**
+ * @desc    Add images to a product
+ * @route   POST /api/products/:id/images
+ * @access  Private/Admin
+ */
+const addProductImages = asyncHandler(async (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return next(createError(400, "Invalid product ID"));
+
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) return next(createError(404, "Product not found"));
+
+  if (!req.files || !req.files.productImages || req.files.productImages.length === 0) {
+    return res.status(400).json({ message: "No images uploaded" });
+  }
+
+  const imageRecords = req.files.productImages.map((file, idx) => {
+    const uuid = req.fileUUID?.productImages || 'default';
+    const url = `/uploads/products/productImages/${uuid}/${file.filename}`;
+    return { productId: id, url, order: idx };
+  });
+
+  await prisma.productImage.createMany({ data: imageRecords });
+  const images = await prisma.productImage.findMany({ where: { productId: id }, orderBy: { order: "asc" } });
+  res.status(201).json({ success: true, images });
+});
+
+/**
+ * @desc    Delete a single product image
+ * @route   DELETE /api/products/:id/images/:imageId
+ * @access  Private/Admin
+ */
+const deleteProductImage = asyncHandler(async (req, res, next) => {
+  const imageId = parseInt(req.params.imageId, 10);
+  if (isNaN(imageId)) return next(createError(400, "Invalid image ID"));
+
+  const image = await prisma.productImage.findUnique({ where: { id: imageId } });
+  if (!image) return next(createError(404, "Image not found"));
+
+  await prisma.productImage.delete({ where: { id: imageId } });
+  res.json({ success: true, message: "Image deleted successfully" });
+});
+
 module.exports = {
+
   createProduct,
   getAllProducts,
   getPublicProducts,
@@ -931,4 +1005,6 @@ module.exports = {
   deleteProduct,
   bulkUpdateVariants,
   getDepotVariantPricing,
+  addProductImages,
+  deleteProductImage,
 };

@@ -1,6 +1,7 @@
 -- CreateTable
 CREATE TABLE `users` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `userUniqueId` VARCHAR(191) NULL,
     `name` VARCHAR(191) NOT NULL,
     `email` VARCHAR(191) NOT NULL,
     `password` VARCHAR(191) NOT NULL,
@@ -15,6 +16,7 @@ CREATE TABLE `users` (
     `depotId` INTEGER NULL,
     `joiningDate` DATETIME(3) NULL,
 
+    UNIQUE INDEX `users_userUniqueId_key`(`userUniqueId`),
     UNIQUE INDEX `users_email_key`(`email`),
     UNIQUE INDEX `users_mobile_key`(`mobile`),
     INDEX `users_depotId_fkey`(`depotId`),
@@ -103,10 +105,23 @@ CREATE TABLE `products` (
     `updatedAt` DATETIME(3) NOT NULL,
     `categoryId` INTEGER NULL,
     `isDairyProduct` BOOLEAN NOT NULL DEFAULT false,
+    `isSubscription` BOOLEAN NOT NULL DEFAULT false,
     `maintainStock` BOOLEAN NOT NULL DEFAULT false,
     `tags` VARCHAR(191) NULL,
 
     INDEX `products_categoryId_fkey`(`categoryId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `product_images` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `productId` INTEGER NOT NULL,
+    `url` VARCHAR(191) NOT NULL,
+    `order` INTEGER NOT NULL DEFAULT 0,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `product_images_productId_idx`(`productId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -540,6 +555,7 @@ CREATE TABLE `depot_product_variants` (
     `price3Day` DECIMAL(10, 2) NULL,
     `price7Day` DECIMAL(10, 2) NULL,
     `mrp` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `salesPrice` DECIMAL(10, 2) NULL,
     `purchasePrice` DECIMAL(10, 2) NULL,
 
     INDEX `depot_product_variants_productId_idx`(`productId`),
@@ -733,6 +749,9 @@ ALTER TABLE `supervisors` ADD CONSTRAINT `supervisors_userId_fkey` FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE `products` ADD CONSTRAINT `products_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `categories`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `product_images` ADD CONSTRAINT `product_images_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `product_variants` ADD CONSTRAINT `product_variants_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

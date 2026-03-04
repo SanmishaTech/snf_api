@@ -89,6 +89,8 @@ const {
   getPublicProductsWithVariants,
   bulkUpdateVariants,
   getDepotVariantPricing,
+  addProductImages,
+  deleteProductImage,
 } = require("../controllers/productController");
 const authMiddleware = require("../middleware/auth"); // Assuming auth middleware is in the same location
 const createUploadMiddleware = require("../middleware/uploadMiddleware");
@@ -96,9 +98,14 @@ const { allowPublic, allowRoles } = require("../middleware/authorize");
 // Configure upload middleware for product attachments
 const productUploadMiddleware = createUploadMiddleware("products", [
   {
-    name: "productAttachment", // This is the field name expected in FormData
+    name: "productAttachment",
     allowedTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
-    maxSize: 5 * 1024 * 1024, // 5 MB
+    maxSize: 5 * 1024 * 1024,
+  },
+  {
+    name: "productImages",
+    allowedTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    maxSize: 5 * 1024 * 1024,
   },
 ]);
 
@@ -529,6 +536,23 @@ router.get(
   "/:id/depot-variant-pricing",
   authMiddleware,
   getDepotVariantPricing
+);
+
+// POST /api/products/:id/images - Add images to a product
+router.post(
+  "/:id/images",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  productUploadMiddleware,
+  addProductImages
+);
+
+// DELETE /api/products/:id/images/:imageId - Delete a product image
+router.delete(
+  "/:id/images/:imageId",
+  authMiddleware,
+  allowRoles("ADMIN", "DepotAdmin", "AGENCY", "VENDOR"),
+  deleteProductImage
 );
 
 module.exports = router;

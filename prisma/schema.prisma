@@ -131,6 +131,7 @@ model Product {
   updatedAt               DateTime                @updatedAt
   categoryId              Int?
   isDairyProduct          Boolean                 @default(false)
+  isSubscription          Boolean                 @default(false)
   maintainStock           Boolean                 @default(false)
   tags                    String?
   variants                ProductVariant[]
@@ -144,9 +145,22 @@ model Product {
   subscriptions           Subscription[]
   orderItems              OrderItem[]
   wastageDetails          WastageDetail[]
+  images                  ProductImage[]
 
   @@index([categoryId], map: "products_categoryId_fkey")
   @@map("products")
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
 }
 
 model ProductVariant {
@@ -643,6 +657,7 @@ model DepotProductVariant {
   price3Day               Decimal?                @db.Decimal(10, 2)
   price7Day               Decimal?                @db.Decimal(10, 2)
   mrp                     Decimal                 @default(0.00) @db.Decimal(10, 2)
+  salesPrice              Decimal?                @db.Decimal(10, 2)
   purchasePrice           Decimal?                @db.Decimal(10, 2)
   PurchaseDetail          PurchaseDetail[]
   StockLedger             StockLedger[]
