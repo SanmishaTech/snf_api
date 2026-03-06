@@ -271,7 +271,25 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
  */
 const getPublicProducts = asyncHandler(async (req, res, next) => {
   try {
-    const { depotId } = req.query;
+    const { depotId, page = 1, limit = 10, categoryId } = req.query;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const catIdNum = categoryId ? parseInt(categoryId, 10) : undefined;
+
+    if (isNaN(pageNum) || pageNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid page number",
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid limit number",
+      });
+    }
 
     if (depotId) {
       // If depotId is provided, get products with variants for the specified depot
@@ -303,17 +321,23 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
         });
       }
 
-      // Get products with variants for the depot
-      const productsWithVariants = await prisma.product.findMany({
-        where: {
-          depotProductVariants: {
-            some: {
-              depotId: dId,
-              notInStock: false,
-              isHidden: false,
-            },
+      const whereConditions = {
+        depotProductVariants: {
+          some: {
+            depotId: dId,
+            notInStock: false,
+            isHidden: false,
           },
         },
+      };
+
+      if (catIdNum) {
+        whereConditions.categoryId = catIdNum;
+      }
+
+      // Get products for the depot.
+      const productsWithVariants = await prisma.product.findMany({
+        where: whereConditions,
         select: {
           id: true,
           name: true,
@@ -366,8 +390,16 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
         orderBy: {
           createdAt: "desc",
         },
-        take: 50, // Increase limit for depot-specific queries
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
       });
+
+      // Get total count for pagination
+      const totalProducts = await prisma.product.count({
+        where: whereConditions,
+      });
+
+      const totalPages = Math.ceil(totalProducts / limitNum);
 
       // Transform the data to match the expected Product interface
       const transformedProducts = productsWithVariants.map((product) => ({
@@ -407,12 +439,25 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
       res.status(200).json({
         success: true,
         data: transformedProducts,
+        pagination: {
+          currentPage: pageNum,
+          limit: limitNum,
+          totalPages,
+          totalProducts,
+        },
         timestamp: new Date(),
       });
     } else {
+      const whereConditions = {};
+      if (catIdNum) {
+        whereConditions.categoryId = catIdNum;
+      }
+
       // If no depotId, return general products (original behavior)
       const products = await prisma.product.findMany({
-        take: 10, // Limit to 10 products for the landing page
+        where: whereConditions,
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum, // Limit to requested limit products for the landing page
         orderBy: {
           createdAt: "desc", // Get the latest products
         },
@@ -441,9 +486,20 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
         },
       });
 
+      const totalProducts = await prisma.product.count({
+        where: whereConditions,
+      });
+      const totalPages = Math.ceil(totalProducts / limitNum);
+
       res.status(200).json({
         success: true,
         data: products,
+        pagination: {
+          currentPage: pageNum,
+          limit: limitNum,
+          totalPages,
+          totalProducts,
+        },
         timestamp: new Date(),
       });
     }
@@ -812,7 +868,7 @@ const getDepotVariantPricing = asyncHandler(async (req, res, next) => {
  */
 const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
   try {
-    const { depotId } = req.query;
+    const { depotId, page = 1, limit = 10, categoryId } = req.query;
 
     if (!depotId) {
       return res.status(400).json({
@@ -822,10 +878,28 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
     }
 
     const dId = parseInt(depotId, 10);
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const catIdNum = categoryId ? parseInt(categoryId, 10) : undefined;
+
     if (isNaN(dId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid depotId parameter",
+      });
+    }
+
+    if (isNaN(pageNum) || pageNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid page number",
+      });
+    }
+
+    if (isNaN(limitNum) || limitNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid limit number",
       });
     }
 
@@ -847,9 +921,21 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
       });
     }
 
-    // Get products for the depot. Do NOT require variants to exist so that
-    // non-dairy or not-yet-varianted products are included in the listing.
+    const whereConditions = {};
+    if (catIdNum) {
+      whereConditions.categoryId = catIdNum;
+    }
+
+    // Get total count for pagination
+    const totalProducts = await prisma.product.count({
+      where: whereConditions,
+    });
+
+    // Get products for the depot.
     const productsWithVariants = await prisma.product.findMany({
+      where: whereConditions,
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
       select: {
         id: true,
         name: true,
@@ -933,22 +1019,28 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
       })),
     }));
 
-    // Calculate total number of variants across all products
-    const totalVariants = transformedProducts.reduce((sum, product) => sum + product.variants.length, 0);
+    const totalPages = Math.ceil(totalProducts / limitNum);
 
     res.status(200).json({
       success: true,
       data: {
         depot,
         products: transformedProducts,
+        pagination: {
+          currentPage: pageNum,
+          limit: limitNum,
+          totalPages,
+          totalProducts,
+        },
       },
-      total: totalVariants,
+      total: totalProducts, // Keep this for backward compatibility if needed
     });
   } catch (error) {
     console.error("Error fetching public products with variants:", error);
     next(createError(500, "Failed to fetch products with variants for public display"));
   }
 });
+
 
 
 /**
