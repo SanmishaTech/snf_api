@@ -148,8 +148,8 @@ const createProduct = asyncHandler(async (req, res, next) => {
     // Save any additional product images
     if (req.files && req.files.productImages && req.files.productImages.length > 0) {
       const imageRecords = req.files.productImages.map((file, idx) => {
-        const uuid = req.fileUUID && req.fileUUID[`productImages_${idx}`] || req.fileUUID?.productImages;
-        const url = `/uploads/products/productImages/${uuid || 'default'}/${file.filename}`;
+        const uuid = file.fileUUID || (req.fileUUID && req.fileUUID[`productImages_${idx}`]) || req.fileUUID?.productImages || 'default';
+        const url = `/uploads/products/productImages/${uuid}/${file.filename}`;
         return { productId: newProduct.id, url, order: idx };
       });
       await prisma.productImage.createMany({ data: imageRecords });
@@ -529,6 +529,7 @@ const getProductById = asyncHandler(async (req, res, next) => {
     include: {
       variants: true, // Include related variants
       category: true, // Also include the category information
+      images: { orderBy: { order: "asc" } }, // Include product images
     },
   });
 
@@ -636,7 +637,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
     if (req.files && req.files.productImages && req.files.productImages.length > 0) {
       const existingCount = updatedProduct.images.length;
       const imageRecords = req.files.productImages.map((file, idx) => {
-        const uuid = req.fileUUID?.productImages || 'default';
+        const uuid = file.fileUUID || req.fileUUID?.productImages || 'default';
         const url = `/uploads/products/productImages/${uuid}/${file.filename}`;
         return { productId, url, order: existingCount + idx };
       });
@@ -1059,10 +1060,18 @@ const addProductImages = asyncHandler(async (req, res, next) => {
     return res.status(400).json({ message: "No images uploaded" });
   }
 
+  // Find the highest existing order index for this product
+  const existingImages = await prisma.productImage.findMany({
+    where: { productId: id },
+    orderBy: { order: "desc" },
+    take: 1
+  });
+  const maxOrder = existingImages.length > 0 ? existingImages[0].order + 1 : 0;
+
   const imageRecords = req.files.productImages.map((file, idx) => {
-    const uuid = req.fileUUID?.productImages || 'default';
+    const uuid = file.fileUUID || req.fileUUID?.productImages || 'default';
     const url = `/uploads/products/productImages/${uuid}/${file.filename}`;
-    return { productId: id, url, order: idx };
+    return { productId: id, url, order: maxOrder + idx };
   });
 
   await prisma.productImage.createMany({ data: imageRecords });

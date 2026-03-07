@@ -34,6 +34,7 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
       // Store the UUID on the request for later use
       req.fileUUID = req.fileUUID || {};
       req.fileUUID[fieldName] = uuid;
+      file.fileUUID = uuid; // Map precisely to this specific file
       // Construct the full path: uploads/members/profilePicture/UUID/
       const fullPath = path.join(uploadDir, moduleName, fieldName, uuid);
       console.log(`[UploadMiddleware] Destination for module '${moduleName}', field '${fieldName}': ${fullPath}`); // DEBUG LINE
@@ -407,8 +408,8 @@ const createUploadMiddleware = (moduleName, fields, uploadDir = "uploads") => {
           `[Multer Success:${requestUUID}] Multer finished processing. Files on req:`,
           req.files
             ? Object.keys(req.files)
-                .map((k) => `${k}: ${req.files[k].length}`)
-                .join(", ")
+              .map((k) => `${k}: ${req.files[k].length}`)
+              .join(", ")
             : "None",
         );
         // Log the actual file paths for verification
