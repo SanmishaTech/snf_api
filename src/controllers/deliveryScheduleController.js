@@ -127,6 +127,8 @@ const getAgencyDeliveriesByDate = async (req, res) => {
             deliverySchedule: true,
             deliveryInstructions: true,
             agencyId: true,
+            startDate: true,
+            expiryDate: true,
             agency: {
               select: {
                 id: true,
