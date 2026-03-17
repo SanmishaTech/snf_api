@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 const { z } = require("zod");
 const prisma = require("../config/db");
 const emailService = require("../services/emailService");
+const { logLoginAttempt } = require("../services/auditLogService");
 const validateRequest = require("../utils/validateRequest");
 const config = require("../config/config");
 const jwtConfig = require("../config/jwt"); // Corrected: Get secret and expiresIn from here
@@ -331,6 +332,12 @@ const login = async (req, res, next) => {
 
     if (!user) {
       console.log("[LOGIN_TRACE] User not found.");
+      await logLoginAttempt({
+        identifier,
+        success: false,
+        req,
+        reason: "USER_NOT_FOUND",
+      });
       return next(createError(401, "Invalid credentials"));
     }
 
@@ -339,12 +346,26 @@ const login = async (req, res, next) => {
     console.log(`[LOGIN_TRACE] Password valid: ${isPasswordValid}`);
     if (!isPasswordValid) {
       console.log("[LOGIN_TRACE] Invalid password.");
+      await logLoginAttempt({
+        user,
+        identifier,
+        success: false,
+        req,
+        reason: "INVALID_PASSWORD",
+      });
       return next(createError(401, "Invalid credentials"));
     }
 
     console.log(`[LOGIN_TRACE] Checking if user active: ${user.active}`);
     if (!user.active) {
       console.log("[LOGIN_TRACE] User inactive.");
+      await logLoginAttempt({
+        user,
+        identifier,
+        success: false,
+        req,
+        reason: "ACCOUNT_INACTIVE",
+      });
       return next(createError(403, "Account is inactive. Please contact support."));
     }
 
@@ -378,6 +399,13 @@ const login = async (req, res, next) => {
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
+    });
+    await logLoginAttempt({
+      user,
+      identifier,
+      success: true,
+      req,
+      reason: "LOGIN_SUCCESS",
     });
     console.log("[LOGIN_TRACE] lastLogin updated.");
 

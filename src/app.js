@@ -46,9 +46,11 @@ const publicAreaMasterRoutes = require("./routes/public/areaMasterRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const auditLogRoutes = require("./routes/auditLogRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
+const auditLogger = require("./middleware/auditLogger");
 const { roleGuard, allowRoles } = require("./middleware/authorize"); // default role guard
 
 const app = express();
@@ -90,6 +92,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+app.use(auditLogger);
 
 const frontendDistPath =
   process.env.NODE_ENV === "production"
@@ -177,6 +180,7 @@ app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/audit-logs", auditLogRoutes);
 app.use(
   "/api/vendors",
   authMiddleware,
@@ -289,5 +293,14 @@ app.use(
   stockLedgerRoutes
 );
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN", "AGENCY", "VENDOR"), reportRoutes);
+
+// Catch-all route to serve the frontend index.html for Single Page Application routing
+app.get("*", (req, res, next) => {
+  if (req.originalUrl.startsWith("/api/")) {
+    // If it's an API route that wasn't matched, let it flow to standard 404 handler
+    return next(); 
+  }
+  res.sendFile(path.join(frontendDistPath, "index.html"));
+});
 
 module.exports = app;
