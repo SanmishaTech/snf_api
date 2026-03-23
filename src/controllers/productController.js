@@ -227,6 +227,11 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     }
   }
 
+  // Handle isSubscription filtering
+  if (req.query.isSubscription !== undefined) {
+    whereConditions.isSubscription = req.query.isSubscription === 'true';
+  }
+
   const validSortByFields = ["name", "url", "createdAt", "updatedAt"];
   const orderByField = validSortByFields.includes(sortBy)
     ? sortBy
