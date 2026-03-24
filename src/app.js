@@ -168,10 +168,13 @@ app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
   }
 });
 
+const publicDepotRoutes = require("./routes/public/depotRoutes");
+
 // Public APIs (no auth)
 app.get("/api/products/public", getPublicProducts);
 app.get("/api/products/:id", getProductById);
 app.get("/api/public/locations", getPublicLocations);
+app.use("/api/public/depots", publicDepotRoutes);
 app.use("/api/public/depot-variants", publicDepotVariantRoutes);
 app.use("/api/public/area-masters", publicAreaMasterRoutes);
 app.use("/api/leads", leadRoutes);

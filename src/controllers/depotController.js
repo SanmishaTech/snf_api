@@ -36,3 +36,40 @@ exports.getDepotById = asyncHandler(async (req, res, next) => {
   if (!depot) return next(createError(404, 'Depot not found'));
   res.json(depot);
 });
+
+// GET /api/public/depots - List all active depots (public)
+exports.getPublicDepots = asyncHandler(async (req, res, next) => {
+  const depots = await prisma.depot.findMany({
+    orderBy: { name: 'asc' },
+  });
+
+  res.json({
+    success: true,
+    data: depots,
+  });
+});
+
+// GET /api/public/depots/online - List online depots (public)
+exports.getOnlineDepots = asyncHandler(async (req, res, next) => {
+  const depots = await prisma.depot.findMany({
+    where: { isOnline: true },
+    orderBy: { name: 'asc' },
+  });
+
+  res.json({
+    success: true,
+    data: depots,
+  });
+});
+
+// GET /api/public/depots/:id - Get specific depot by ID (public)
+exports.getPublicDepotById = asyncHandler(async (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return next(createError(400, 'Invalid id parameter'));
+
+  const depot = await prisma.depot.findUnique({ where: { id } });
+  res.json({
+    success: true,
+    data: depot,
+  });
+});
