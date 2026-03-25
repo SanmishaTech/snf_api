@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { createSNFOrder, getSNFOrderByOrderNo } = require('../controllers/snfOrderController');
+const { validateCoupon } = require('../controllers/couponController');
+
+router.post('/validate-coupon', validateCoupon);
+
 const { getSNFOrderInvoiceStatus, downloadSNFOrderInvoiceByOrderNo } = require('../controllers/snfOrderInvoiceController');
 const authMiddleware = require('../middleware/auth');
 const optionalAuthMiddleware = require('../middleware/optionalAuth');

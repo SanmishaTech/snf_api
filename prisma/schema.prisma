@@ -824,6 +824,9 @@ model SNFOrder {
   invoicePath   String?
   payableAmount Float          @default(0)
   walletamt     Float          @default(0)
+  couponCode    String?
+  couponDiscount Float?         @default(0)
+
   items         SNFOrderItem[]
   depot         Depot?         @relation(fields: [depotId], references: [id])
   member        Member?        @relation("MemberSNFOrders", fields: [memberId], references: [id])
@@ -948,4 +951,22 @@ enum LeadStatus {
   CONTACTED
   CONVERTED
   CLOSED
+}
+
+model Coupon {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique
+  discountType      String   // Using String: "PERCENTAGE" or "CASH"
+  discountValue     Float
+  minOrderAmount    Float?
+  fromDate          DateTime?
+
+  toDate            DateTime?
+  usageLimit        Int?
+  usageCount        Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("coupons")
 }

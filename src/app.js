@@ -169,6 +169,8 @@ app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
 });
 
 const publicDepotRoutes = require("./routes/public/depotRoutes");
+const publicCouponRoutes = require("./routes/public/couponRoutes");
+
 
 // Public APIs (no auth)
 app.get("/api/products/public", getPublicProducts);
@@ -177,7 +179,9 @@ app.get("/api/public/locations", getPublicLocations);
 app.use("/api/public/depots", publicDepotRoutes);
 app.use("/api/public/depot-variants", publicDepotVariantRoutes);
 app.use("/api/public/area-masters", publicAreaMasterRoutes);
+app.use("/api/public/coupons", publicCouponRoutes);
 app.use("/api/leads", leadRoutes);
+
 app.use("/api/snf-orders", snfOrderRoutes);
 app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);

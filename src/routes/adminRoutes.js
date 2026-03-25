@@ -112,6 +112,15 @@ const {
   generateSNFOrderInvoice,
   downloadSNFOrderInvoice,
 } = require('../controllers/admin/snfOrderAdminController');
+
+const {
+  getAllCoupons,
+  getCouponById,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
+} = require('../controllers/couponController');
+
 const {
   getDashboardStats,
   getRecentActivities,
@@ -283,6 +292,17 @@ router.patch('/snf-orders/:id/mark-paid', authMiddleware, markSNFOrderAsPaid);
 // Invoice generation and download for SNF orders
 router.post('/snf-orders/:id/generate-invoice', authMiddleware, generateSNFOrderInvoice);
 router.get('/snf-orders/:id/download-invoice', authMiddleware, downloadSNFOrderInvoice);
+
+// Coupon Routes (Admin)
+router.route('/coupons')
+  .get(authMiddleware, getAllCoupons)
+  .post(authMiddleware, createCoupon);
+
+router.route('/coupons/:id')
+  .get(authMiddleware, getCouponById)
+  .put(authMiddleware, updateCoupon)
+  .delete(authMiddleware, deleteCoupon);
+
 
 // Admin Delivery Address Routes
 router.route('/delivery-addresses')

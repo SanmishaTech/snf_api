@@ -51,7 +51,10 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     paymentStatus = 'PENDING',
     paymentDate = null,
     depotId = null, // Optional depot association
+    couponCode = null,
+    couponDiscount = 0,
   } = req.body || {};
+
 
   // Basic validations
   if (!customer || typeof customer !== 'object') {
@@ -167,12 +170,55 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  // Handle Coupon Logic
+  let validCoupon = null;
+  let backendCouponDiscount = 0;
+  if (couponCode) {
+    validCoupon = await prisma.coupon.findUnique({
+      where: { code: couponCode.toUpperCase(), isActive: true }
+    });
+    
+    if (!validCoupon) {
+      res.status(400);
+      throw new Error('Invalid or inactive coupon');
+    }
+
+    // Date and Limit checks
+    const now = new Date();
+    if (validCoupon.fromDate && now < new Date(validCoupon.fromDate)) {
+      res.status(400);
+      throw new Error('Coupon is not yet valid');
+    }
+    if (validCoupon.toDate && now > new Date(validCoupon.toDate)) {
+      res.status(400);
+      throw new Error('Coupon has expired');
+    }
+    if (validCoupon.usageLimit && validCoupon.usageCount >= validCoupon.usageLimit) {
+      res.status(400);
+      throw new Error('Coupon limit reached');
+    }
+    if (validCoupon.minOrderAmount && computedSubtotal < validCoupon.minOrderAmount) {
+      res.status(400);
+      throw new Error(`Minimum order of ₹${validCoupon.minOrderAmount} required for this coupon`);
+    }
+
+    // Re-calculate discount
+    if (validCoupon.discountType === 'PERCENTAGE') {
+      backendCouponDiscount = (computedSubtotal * validCoupon.discountValue) / 100;
+    } else {
+      backendCouponDiscount = validCoupon.discountValue;
+    }
+    backendCouponDiscount = Math.min(backendCouponDiscount, computedSubtotal);
+  }
+
+
   try {
     // Calculate the actual payable amount (backend should be source of truth)
     const actualWalletDeduction = walletamt || 0;
-    const actualPayableAmount = Math.max(0, computedTotal - actualWalletDeduction);
+    const actualPayableAmount = Math.max(0, computedTotal - backendCouponDiscount - actualWalletDeduction);
     
-    console.log(`[SNF Order] Computed amounts - Total: ${computedTotal}, Wallet: ${actualWalletDeduction}, Payable: ${actualPayableAmount}`);
+    console.log(`[SNF Order] Computed amounts - Total: ${computedTotal}, Coupon: ${backendCouponDiscount}, Wallet: ${actualWalletDeduction}, Payable: ${actualPayableAmount}`);
+
     
     // Use transaction to ensure atomicity of order creation and wallet deduction
     const created = await prisma.$transaction(async (tx) => {
@@ -199,7 +245,10 @@ const createSNFOrder = asyncHandler(async (req, res) => {
         paymentStatus,
         paymentRefNo,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
+        couponCode: couponCode ? couponCode.toUpperCase() : null,
+        couponDiscount: backendCouponDiscount,
         items: {
+
           create: preparedItems,
         },
       },
@@ -208,8 +257,17 @@ const createSNFOrder = asyncHandler(async (req, res) => {
         depot: true,
       },
     });
+
+    // Increment coupon usage count
+    if (validCoupon) {
+      await tx.coupon.update({
+        where: { id: validCoupon.id },
+        data: { usageCount: { increment: 1 } }
+      });
+    }
     
     // Handle wallet deduction if applicable
+
     if (walletamt > 0 && memberId) {
       console.log(`[SNF Order] Processing wallet deduction of ₹${walletamt} for member ${memberId}`);
       
