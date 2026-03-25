@@ -194,7 +194,18 @@ const register = async (req, res, next) => {
       }
     }
 
+    // Send Welcome WhatsApp Message
+    if (mobile) {
+      try {
+        const { sendWelcomeWhatsAppMessage } = require("../services/whatsAppService");
+        await sendWelcomeWhatsAppMessage({ name, mobile });
+      } catch (waError) {
+        console.error("Failed to send welcome WhatsApp message:", waError);
+      }
+    }
+
     res.status(201).json(finalUser);
+
   } catch (error) {
     next(error);
   }

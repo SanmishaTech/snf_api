@@ -305,16 +305,20 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     let invoiceDetails = null;
     try {
       const { generateAndAttachInvoiceToSNFOrder } = require('../services/snfInvoiceService');
-      const invoiceResult = await generateAndAttachInvoiceToSNFOrder(created.id);
+      await generateAndAttachInvoiceToSNFOrder(created.id);
       invoiceGenerated = true;
-      invoiceDetails = {
-        invoiceNo: invoiceResult.invoice.invoiceNo,
-        invoicePath: invoiceResult.invoice.pdfPath,
-      };
     } catch (invoiceError) {
       console.error('Failed to auto-generate invoice for SNF order:', invoiceError);
-      // Don't fail the order creation if invoice generation fails
     }
+
+    // Send WhatsApp Notification
+    try {
+      const { sendOrderWhatsAppMessage } = require('../services/whatsAppService');
+      await sendOrderWhatsAppMessage(created);
+    } catch (whatsAppError) {
+      console.error('Failed to send WhatsApp message for SNF order:', whatsAppError);
+    }
+
 
     res.status(201).json({
       success: true,
