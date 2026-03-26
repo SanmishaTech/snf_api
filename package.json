@@ -34,6 +34,7 @@
     "jsonwebtoken": "^9.0.1",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.2",
+    "node-cron": "^4.2.1",
     "nodemailer": "^6.9.4",
     "number-to-words": "^1.2.4",
     "pdfmake": "^0.2.9",

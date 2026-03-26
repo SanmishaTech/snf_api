@@ -8,8 +8,6 @@ const dayjs = require('dayjs');
 const sendOrderWhatsAppMessage = async (order) => {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-
   const baseUrl = process.env.WHATSAPP_URL;
 
   if (!token || !phoneNumberId || !baseUrl) {
@@ -20,8 +18,6 @@ const sendOrderWhatsAppMessage = async (order) => {
     });
     return null;
   }
-  console.log('[WhatsApp Service] Using Phone Number ID:', phoneNumberId);
-
 
   // Payment mode mapping (English to Marathi)
   const paymentModeMap = {
@@ -38,9 +34,7 @@ const sendOrderWhatsAppMessage = async (order) => {
     type: 'template',
     template: {
       name: 'general_receipt',
-      language: {
-        code: 'en'
-      },
+      language: { code: 'en' },
       components: [
         {
           type: 'body',
@@ -67,7 +61,6 @@ const sendOrderWhatsAppMessage = async (order) => {
     });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send message:', data);
       return { success: false, error: data };
@@ -89,43 +82,33 @@ const sendOrderWhatsAppMessage = async (order) => {
 const sendWelcomeWhatsAppMessage = async (user) => {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-
   const baseUrl = process.env.WHATSAPP_URL;
 
   if (!token || !phoneNumberId || !baseUrl || !user.mobile) {
     return null;
   }
-  console.log('[WhatsApp Service] Sending Welcome to:', user.mobile, 'using ID:', phoneNumberId);
-
 
   const payload = {
     messaging_product: 'whatsapp',
+    recipient_type: 'individual',
     to: `91${user.mobile}`,
     type: 'template',
     template: {
       name: 'welcome',
-      language: {
-        code: 'en_US'
-      },
+      language: { code: 'en_US' },
       components: [
         {
           type: 'body',
           parameters: [
-            { type: 'text', text: user.name }
+            { type: 'text', text: String(user.name || 'Customer') }
           ]
         }
       ]
     }
   };
 
-
   try {
-
-
-
-
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -146,8 +129,192 @@ const sendWelcomeWhatsAppMessage = async (user) => {
   }
 };
 
-module.exports = {
-  sendOrderWhatsAppMessage,
-  sendWelcomeWhatsAppMessage
+/**
+ * Send Subscription Confirmation WhatsApp message
+ * @param {Object} user - User object (name, mobile)
+ * @param {Object} subscription - Subscription object (startDate, expiryDate, qty, deliverySchedule)
+ * @returns {Promise<Object>} - API response
+ */
+const sendSubscriptionConfirmWhatsAppMessage = async (user, subscription) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user.mobile) {
+    return null;
+  }
+
+  const startDate = dayjs(subscription.startDate).format('DD/MM/YYYY');
+  const endDate = dayjs(subscription.expiryDate).format('DD/MM/YYYY');
+  
+  const scheduleMap = {
+    'DAILY': 'Daily',
+    'WEEKDAYS': 'Select Days',
+    'ALTERNATE_DAYS': 'Alternate Days',
+    'VARYING': 'Varying'
+  };
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'subscription_confirmation',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: user.name },
+            { type: 'text', text: startDate },
+            { type: 'text', text: endDate },
+            { type: 'text', text: subscription.qty.toString() },
+            { type: 'text', text: scheduleMap[subscription.deliverySchedule] || subscription.deliverySchedule }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send subscription confirmation:', data);
+      return { success: false, error: data };
+    }
+    console.log('[WhatsApp Service] Subscription confirmation sent successfully to:', user.mobile);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending subscription confirmation:', error);
+    return { success: false, error: error.message };
+  }
 };
 
+/**
+ * Send WhatsApp Notification for Delivery Confirmation
+ * @param {Object} user User object containing mobile and name
+ * @param {Object} deliveryEntry Delivery entry object containing quantity
+ */
+const sendDeliveryWhatsAppMessage = async (user, deliveryEntry) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'delivery_message',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: user.name || 'Customer' },
+            { type: 'text', text: String(deliveryEntry.quantity || 1) }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send delivery message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Delivery message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending delivery message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send WhatsApp Notification for Subscription Renewal Reminder
+ * @param {Object} user User object containing mobile and name
+ * @param {Object} subscription Subscription object containing expiryDate
+ */
+const sendSubscriptionRenewalWhatsAppMessage = async (user, subscription) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'subscription_renewal_reminder_1',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: user.name || 'Customer' },
+            { type: 'text', text: dayjs(subscription.expiryDate).format('DD/MM/YYYY') }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send renewal reminder message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Renewal reminder message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending renewal reminder message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+module.exports = {
+  sendOrderWhatsAppMessage,
+  sendWelcomeWhatsAppMessage,
+  sendSubscriptionConfirmWhatsAppMessage,
+  sendDeliveryWhatsAppMessage,
+  sendSubscriptionRenewalWhatsAppMessage
+};

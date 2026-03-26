@@ -308,6 +308,19 @@ const updateDeliveryStatus = async (req, res) => {
       } : null
     };
 
+    // Send WhatsApp Delivery Notification if status is DELIVERED
+    if (status === 'DELIVERED') {
+      try {
+        const user = updatedDeliveryEntry.member?.user;
+        if (user && user.mobile) {
+          const { sendDeliveryWhatsAppMessage } = require('../services/whatsAppService');
+          await sendDeliveryWhatsAppMessage(user, updatedDeliveryEntry);
+        }
+      } catch (waError) {
+        console.error('Failed to send delivery confirmation WhatsApp message (Agency):', waError);
+      }
+    }
+
     res.status(200).json(response);
   } catch (error) {
     console.error('Error updating delivery status:', error);

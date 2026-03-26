@@ -17,7 +17,7 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
   const baseStartDate = new Date(startDate);
 
   const lowerSelectedWeekdays = Array.isArray(selectedWeekdays) ? selectedWeekdays.map(day => day.toLowerCase()) : [];
-  
+
   const hasValidAltQty = altQty && typeof altQty === 'number' && altQty > 0;
   let effectiveScheduleType = deliveryScheduleType; // Initialize with the passed type
 
@@ -26,10 +26,10 @@ const generateDeliveryDates = (startDate, periodInDays, deliveryScheduleType, qt
     effectiveScheduleType = hasValidAltQty ? 'VARYING_ALTERNATING' : 'DAILY';
   } else if (deliveryScheduleType === 'ALTERNATE_DAYS') {
     // If 'ALTERNATE_DAYS' is chosen directly, and altQty might be provided for varying quantities on those alternate days.
-    effectiveScheduleType = 'ALTERNATE_DAYS_LOGIC'; 
+    effectiveScheduleType = 'ALTERNATE_DAYS_LOGIC';
   }
   // If deliveryScheduleType is 'SELECT_DAYS' or 'DAILY', effectiveScheduleType remains as is (from initialization).
-  
+
   console.log(`[generateDeliveryDates] Computed effectiveScheduleType: ${effectiveScheduleType}`);
 
   let deliveryCountForAlternating = 0; // Used for VARYING_ALTERNATING and ALTERNATE_DAYS_LOGIC with altQty
@@ -123,7 +123,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       break;
   }
 
-  
+
   // Log the request body for debugging
   console.log('Request body:', req.body);
   console.log('[DEBUG] deliveryInstructions from request:', deliveryInstructions);
@@ -131,7 +131,15 @@ const createSubscription = asyncHandler(async (req, res) => {
   // Get current user's member ID
   const member = await prisma.member.findUnique({
     where: { userId: req.user.id },
-    select: { walletBalance: true, id: true, userId: true }
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          mobile: true
+        }
+      }
+    }
   });
 
   if (!member) {
@@ -168,16 +176,16 @@ const createSubscription = asyncHandler(async (req, res) => {
   // The frontend creates dates like "2025-07-31T18:30:00.000Z" when user selects Aug 1 in IST
   // This happens because frontend creates midnight local time, then converts to UTC
   // We need to determine the user's intended calendar date
-  
+
   // Simple approach: Add 12 hours to the received timestamp to account for timezone differences
   // This ensures we get the correct calendar date that the user intended
   const adjustedDate = new Date(baseDate.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
-  
+
   const year = adjustedDate.getUTCFullYear();
   const month = adjustedDate.getUTCMonth();
   const day = adjustedDate.getUTCDate();
   const startDateOnly = new Date(Date.UTC(year, month, day));
-  
+
   console.log(`[Date Processing] Frontend sent: ${startDate}`);
   console.log(`[Date Processing] Parsed as: ${baseDate.toString()}`);
   console.log(`[Date Processing] Adjusted date (+12h): ${adjustedDate.toString()}`);
@@ -195,9 +203,9 @@ const createSubscription = asyncHandler(async (req, res) => {
       internalScheduleLogicType = 'DAILY';
       dbDeliveryScheduleEnum = 'DAILY';
       break;
-    case 'WEEKDAYS': 
+    case 'WEEKDAYS':
     case 'SELECT-DAYS':
-      internalScheduleLogicType = 'SELECT_DAYS'; 
+      internalScheduleLogicType = 'SELECT_DAYS';
       dbDeliveryScheduleEnum = 'WEEKDAYS'; // Prisma enum is WEEKDAYS for this logic
       if (!weekdays || !Array.isArray(weekdays) || weekdays.length === 0) {
         res.status(400);
@@ -216,7 +224,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       // generateDeliveryDates handles the daily delivery with alternating quantity logic when type is 'VARYING'.
       // For DB storage, this pattern is essentially DAILY deliveries.
       console.log('[SubscriptionController] Frontend sent deliverySchedule: "VARYING". Interpreting as DAILY pattern with varying quantities, but storing as ALTERNATE_DAYS in DB as per user request.');
-      internalScheduleLogicType = 'VARYING'; 
+      internalScheduleLogicType = 'VARYING';
       dbDeliveryScheduleEnum = 'ALTERNATE_DAYS'; // Store as ALTERNATE_DAYS in DB
       break;
     default:
@@ -242,19 +250,19 @@ const createSubscription = asyncHandler(async (req, res) => {
   }
 
   const totalQty = deliveryScheduleDetails.reduce((sum, item) => sum + item.quantity, 0);
-  
+
   // Calculate expiry date from the last delivery schedule entry
   const lastDeliveryDate = deliveryScheduleDetails[deliveryScheduleDetails.length - 1].date;
   const expiryDate = new Date(lastDeliveryDate);
-  
+
   console.log(`[Date Processing] Expiry date set from last delivery schedule entry: ${expiryDate.toISOString()}`);
   console.log(`[Date Processing] Total delivery entries: ${deliveryScheduleDetails.length}, Total quantity: ${totalQty}`);
-  
+
   // Calculate amount based on depot variant pricing and subscription period
   let unitPrice = 0;
   let amount = 0;
   let depotProductVariantId; // Store depot variant ID for later use
-  
+
   if (parsedDeliveryAddressId) {
     // For home delivery subscriptions, fetch depot product variant pricing
     try {
@@ -262,7 +270,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       const deliveryAddress = await prisma.deliveryAddress.findUnique({
         where: { id: parsedDeliveryAddressId }
       });
-      
+
       if (deliveryAddress) {
         // Find depot product variant based on pincode area mapping
         const depotProductVariant = await prisma.depotProductVariant.findFirst({
@@ -279,7 +287,7 @@ const createSubscription = asyncHandler(async (req, res) => {
             }
           }
         });
-        
+
         if (depotProductVariant) {
           // Determine unit price based on subscription period
           switch (parsedPeriod) {
@@ -302,7 +310,7 @@ const createSubscription = asyncHandler(async (req, res) => {
               // For other periods, use MRP or buyOncePrice as fallback
               unitPrice = parseFloat(depotProductVariant.mrp) || parseFloat(depotProductVariant.buyOncePrice) || 0;
           }
-          
+
           // Store the depot variant ID to be used in subscription creation
           depotProductVariantId = depotProductVariant.id;
         }
@@ -312,7 +320,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       // Continue with amount = 0 if pricing lookup fails
     }
   }
-  
+
   // Calculate total amount: unit price * total quantity
   amount = unitPrice * totalQty;
 
@@ -336,7 +344,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       // paymentStatus remains 'PENDING' as there's a balance to be paid
     }
   }
-  
+
   // --- Transactional Database Update ---
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -384,12 +392,12 @@ const createSubscription = asyncHandler(async (req, res) => {
         paymentStatus: paymentStatus,
         deliveryInstructions,
       };
-      
+
       // Connect depot product variant if found
       if (typeof depotProductVariantId !== 'undefined' && depotProductVariantId) {
         subscriptionData.depotProductVariant = { connect: { id: depotProductVariantId } };
       }
-      
+
       console.log('[DEBUG] subscriptionData being saved:', JSON.stringify(subscriptionData, null, 2));
 
       if (parsedDeliveryAddressId) {
@@ -427,21 +435,21 @@ const createSubscription = asyncHandler(async (req, res) => {
       // 4. Generate and create DeliveryScheduleEntry records
       // (deliveryScheduleDetails already calculated outside transaction)
       const deliveryScheduleEntries = deliveryScheduleDetails.map(detail => ({
-          subscriptionId: newSubscription.id, 
-          memberId: member.id,
-          deliveryAddressId: parsedDeliveryAddressId,
-          productId: parsedProductId,
-          deliveryDate: detail.date,
-          quantity: detail.quantity,
-          status: 'PENDING'
+        subscriptionId: newSubscription.id,
+        memberId: member.id,
+        deliveryAddressId: parsedDeliveryAddressId,
+        productId: parsedProductId,
+        deliveryDate: detail.date,
+        quantity: detail.quantity,
+        status: 'PENDING'
       }));
-      
+
       if (deliveryScheduleEntries.length > 0) {
         await tx.deliveryScheduleEntry.createMany({
-            data: deliveryScheduleEntries,
+          data: deliveryScheduleEntries,
         });
       }
-      
+
       // Fetch the complete order with relations for invoice generation
       const completeOrder = await tx.productOrder.findUnique({
         where: { id: newProductOrder.id },
@@ -462,7 +470,7 @@ const createSubscription = asyncHandler(async (req, res) => {
       try {
         invoice = await createInvoiceForOrder(completeOrder);
         console.log('Invoice created successfully:', invoice.invoiceNo);
-        
+
         // Update productOrder with invoice details
         if (invoice && invoice.invoiceNo) {
           await tx.productOrder.update({
@@ -477,7 +485,7 @@ const createSubscription = asyncHandler(async (req, res) => {
         console.error('Error creating invoice:', invoiceError);
         // Don't fail the subscription creation if invoice fails
       }
-      
+
       return {
         subscription: newSubscription,
         order: newProductOrder,
@@ -485,17 +493,27 @@ const createSubscription = asyncHandler(async (req, res) => {
       };
     });
 
+    // Send WhatsApp Notification for Subscription Confirmation
+    try {
+      if (result.subscription.paymentStatus === 'PAID' && member && member.user && member.user.mobile) {
+        const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+        await sendSubscriptionConfirmWhatsAppMessage(member.user, result.subscription);
+      }
+    } catch (waError) {
+      console.error('Failed to send subscription confirmation WhatsApp message:', waError);
+    }
+
     res.status(201).json(result);
 
   } catch (error) {
     console.error('Subscription creation transaction failed:', error);
     // Consider more specific error handling based on Prisma error codes if necessary
     if (error.code === 'P2002' && error.meta && error.meta.target) {
-        res.status(409).json({ message: `A subscription with similar details might already exist or there's a conflict on field(s): ${error.meta.target.join(', ')}.`, details: error.message });
+      res.status(409).json({ message: `A subscription with similar details might already exist or there's a conflict on field(s): ${error.meta.target.join(', ')}.`, details: error.message });
     } else if (error.message.includes('foreign key constraint fails')) {
-        res.status(400).json({ message: "Invalid reference to another entity (e.g., product, address, or member). Please check IDs.", details: error.message });
+      res.status(400).json({ message: "Invalid reference to another entity (e.g., product, address, or member). Please check IDs.", details: error.message });
     } else {
-        res.status(500).json({ message: "Failed to create subscription due to a server error.", details: error.message });
+      res.status(500).json({ message: "Failed to create subscription due to a server error.", details: error.message });
     }
   }
 });
@@ -563,15 +581,15 @@ const getSubscriptions = asyncHandler(async (req, res) => {
   // Transform subscriptions to include depot variant unit information
   const transformedSubscriptions = subscriptions.map(subscription => {
     const transformedSubscription = { ...subscription };
-    
+
     // If there's a depot variant, extract unit from its name and add it to the product
     if (subscription.depotProductVariant && subscription.depotProductVariant.name) {
       const variantName = subscription.depotProductVariant.name;
-      const extractedUnit = variantName.includes('500ml') ? '500ml' : 
-                           variantName.includes('1L') ? '1L' : 
-                           variantName.includes('250ml') ? '250ml' : 
-                           variantName.includes('2L') ? '2L' : 'unit';
-      
+      const extractedUnit = variantName.includes('500ml') ? '500ml' :
+        variantName.includes('1L') ? '1L' :
+          variantName.includes('250ml') ? '250ml' :
+            variantName.includes('2L') ? '2L' : 'unit';
+
       transformedSubscription.product = {
         ...subscription.product,
         depotVariant: {
@@ -581,7 +599,7 @@ const getSubscriptions = asyncHandler(async (req, res) => {
         }
       };
     }
-    
+
     return transformedSubscription;
   });
 
@@ -658,7 +676,14 @@ const updateSubscription = asyncHandler(async (req, res) => {
 
   const subscription = await prisma.subscription.findUnique({
     where: {
-      id: parseInt(req.params.id)
+      id: subscriptionId
+    },
+    include: {
+      member: {
+        include: {
+          user: true
+        }
+      }
     }
   });
 
@@ -696,7 +721,7 @@ const updateSubscription = asyncHandler(async (req, res) => {
     receivedAmount, // <-- Add receivedAmount here
     deliveryInstructions
   } = req.body;
-  
+
   console.log('[DEBUG] updateSubscription - req.body:', req.body);
   console.log('[DEBUG] updateSubscription - deliveryInstructions:', deliveryInstructions);
 
@@ -737,7 +762,7 @@ const updateSubscription = asyncHandler(async (req, res) => {
       };
     }
   }
-  
+
   // Include other fields if they are part of the payload and intended for update
   if (qty !== undefined) updateData.qty = qty; // If admin can change qty
   if (altQty !== undefined) updateData.altQty = altQty; // If admin can change altQty
@@ -786,18 +811,29 @@ const updateSubscription = asyncHandler(async (req, res) => {
   }
 
   console.log('[DEBUG] updateSubscription - Final updateData:', JSON.stringify(updateData, null, 2));
-  
+
   const updatedSubscription = await prisma.subscription.update({
     where: { id: subscriptionId },
     data: updateData,
   });
-  
-  console.log('[DEBUG] updateSubscription - Updated subscription result:', JSON.stringify(updatedSubscription, null, 2));
+
+  // Trigger WhatsApp Confirmation if status changed to PAID
+  if (subscription.paymentStatus !== 'PAID' && updatedSubscription.paymentStatus === 'PAID') {
+    try {
+      const user = subscription.member?.user;
+      if (user && user.mobile) {
+        const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+        await sendSubscriptionConfirmWhatsAppMessage(user, updatedSubscription);
+      }
+    } catch (waError) {
+      console.error('Failed to send subscription confirmation WhatsApp message after update:', waError);
+    }
+  }
 
   // If agency assignment was updated, also update all related delivery schedule entries
   if (agencyId !== undefined) {
-    const deliveryScheduleUpdateData = agencyId === null 
-      ? { agentId: null } 
+    const deliveryScheduleUpdateData = agencyId === null
+      ? { agentId: null }
       : { agentId: Number(agencyId) };
 
     await prisma.deliveryScheduleEntry.updateMany({
@@ -946,7 +982,7 @@ const cancelSubscription = asyncHandler(async (req, res) => {
       };
     });
 
-    const responseMessage = result.refundAmount > 0 
+    const responseMessage = result.refundAmount > 0
       ? `Subscription cancelled successfully. Refund of ₹${result.refundAmount.toFixed(2)} has been credited to your wallet.`
       : 'Subscription cancelled successfully.';
 
@@ -958,9 +994,9 @@ const cancelSubscription = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('Error cancelling subscription:', error);
-    res.status(500).json({ 
-      message: 'Failed to cancel subscription', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to cancel subscription',
+      error: error.message
     });
   }
 });
@@ -1014,7 +1050,7 @@ const renewSubscription = asyncHandler(async (req, res) => {
       daysToAdd = 90;
       break;
   }
-  
+
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + daysToAdd);
 
@@ -1034,22 +1070,22 @@ const renewSubscription = asyncHandler(async (req, res) => {
       paymentReferenceNo: req.body.paymentReferenceNo || null,
       paymentDate: new Date(),
       paymentStatus: 'PAID',
-      
+
       // Connect to existing member
       member: {
         connect: { id: member.id }
       },
-      
+
       // Connect to existing delivery address
       deliveryAddress: {
         connect: { id: subscription.deliveryAddressId }
       },
-      
+
       // Connect to existing product
       product: {
         connect: { id: subscription.productId }
       },
-      
+
       // Connect to agency if needed
       ...(subscription.agencyId ? {
         agency: {
@@ -1095,10 +1131,10 @@ const getDeliveryScheduleByDate = asyncHandler(async (req, res) => {
           // For @db.Date, Prisma expects a DateTime object. 
           // new Date(dateString) where dateString is 'YYYY-MM-DD' will be interpreted as UTC midnight.
           // If your local timezone causes issues, ensure 'date' is treated as UTC.
-          equals: new Date(date), 
+          equals: new Date(date),
         },
       },
-      
+
       _sum: {
         quantity: true,
       },
@@ -1163,7 +1199,7 @@ const getDeliveryScheduleByDate = asyncHandler(async (req, res) => {
         quantity: 0,
       };
       acc[agencyId].products[productKey].quantity += summedQuantity;
-      
+
       return acc;
     }, {});
 
@@ -1201,7 +1237,7 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
           rate: true, // Include rate for refund calculation
           qty: true,
           member: { // To verify ownership via user ID
-            select: { 
+            select: {
               userId: true,
               walletBalance: true
             }
@@ -1273,13 +1309,13 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
         subscription: { rate: deliveryEntry.subscription.rate },
         quantity: deliveryEntry.quantity
       });
-      
+
       console.log(`Calculated refund amount: ${refundAmount} for delivery entry ${entryId}`);
-      
+
       if (refundAmount > 0) {
         const referenceNumber = `SKIP_DELIVERY_${entryId}`;
         const notes = `Refund for skipped delivery - ${deliveryEntry.product?.name || 'Product'} on ${new Date(deliveryEntry.deliveryDate).toLocaleDateString()}`;
-        
+
         walletTransaction = await walletService.creditWallet(
           deliveryEntry.subscription.memberId,
           refundAmount,
@@ -1287,7 +1323,7 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
           notes,
           null // No admin ID for member-initiated skip
         );
-        
+
         refundMessage = ` Refund of ₹${refundAmount.toFixed(2)} has been credited to your wallet.`;
         console.log(`Wallet credited successfully for member ${deliveryEntry.subscription.memberId}: ₹${refundAmount}`);
       } else {
@@ -1362,7 +1398,7 @@ const bulkAssignAgency = asyncHandler(async (req, res) => {
     // Perform bulk update within a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Update all subscriptions
-      const updateData = agencyId === null 
+      const updateData = agencyId === null
         ? { agencyId: null }
         : { agencyId: agencyId };
 
@@ -1374,8 +1410,8 @@ const bulkAssignAgency = asyncHandler(async (req, res) => {
       });
 
       // Update all related delivery schedule entries (only non-delivered entries)
-      const deliveryScheduleUpdateData = agencyId === null 
-        ? { agentId: null } 
+      const deliveryScheduleUpdateData = agencyId === null
+        ? { agentId: null }
         : { agentId: agencyId };
 
       const updatedDeliveryEntries = await tx.deliveryScheduleEntry.updateMany({
@@ -1394,7 +1430,7 @@ const bulkAssignAgency = asyncHandler(async (req, res) => {
 
     console.log(`Bulk assignment completed: ${result.subscriptionsUpdated} subscriptions and ${result.deliveryEntriesUpdated} delivery entries updated with agencyId: ${agencyId}`);
 
-    const message = agencyId === null 
+    const message = agencyId === null
       ? `Successfully removed agency assignment from ${result.subscriptionsUpdated} subscription(s)`
       : `Successfully assigned agency to ${result.subscriptionsUpdated} subscription(s)`;
 

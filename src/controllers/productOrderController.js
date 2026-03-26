@@ -385,6 +385,11 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
     const finalOrder = await prisma.productOrder.findUnique({
       where: { id: result.orderId },
       include: {
+        member: {
+          include: {
+            user: true,
+          },
+        },
         subscriptions: {
           include: {
             deliveryAddress: true,
@@ -403,6 +408,21 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
         }
       },
     });
+
+    // Trigger WhatsApp Confirmation if order is PAID
+    if (result.financialSummary.paymentStatus === 'PAID') {
+      try {
+        const user = finalOrder.member?.user;
+        if (user && user.mobile) {
+          const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+          for (const sub of finalOrder.subscriptions) {
+            await sendSubscriptionConfirmWhatsAppMessage(user, sub);
+          }
+        }
+      } catch (waError) {
+        console.error('Failed to send subscription confirmation WhatsApp messages after order creation:', waError);
+      }
+    }
 
     // Create invoice for the order
     let invoice = null;
@@ -974,6 +994,11 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
   const order = await prisma.productOrder.findUnique({
     where: { id: orderId },
     include: {
+      member: {
+        include: {
+          user: true,
+        },
+      },
       subscriptions: {
         include: {
           depotProductVariant: {
@@ -1046,6 +1071,11 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
       const finalUpdatedOrder = await tx.productOrder.findUnique({
         where: { id: orderId },
         include: {
+          member: {
+            include: {
+              user: true,
+            },
+          },
           subscriptions: {
             include: {
               depotProductVariant: {
@@ -1061,6 +1091,21 @@ const updateProductOrderPayment = asyncHandler(async (req, res) => {
 
       return finalUpdatedOrder;
     });
+
+    // Trigger WhatsApp Confirmation if payment changed to PAID
+    if (order.paymentStatus !== 'PAID' && paymentStatus === 'PAID') {
+      try {
+        const user = result.member?.user;
+        if (user && user.mobile) {
+          const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+          for (const sub of result.subscriptions) {
+            await sendSubscriptionConfirmWhatsAppMessage(user, sub);
+          }
+        }
+      } catch (waError) {
+        console.error('Failed to send subscription confirmation WhatsApp messages after payment update:', waError);
+      }
+    }
 
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
