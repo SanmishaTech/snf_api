@@ -665,6 +665,48 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+
+const sudoLogin = async (req, res, next) => {
+  if (req.user.role !== "ADMIN") {
+    return next(createError(403, "Only admins can perform sudo login"));
+  }
+
+  const { userId } = req.params;
+
+  try {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: parseInt(userId, 10) },
+    });
+
+    if (!targetUser) {
+      return next(createError(404, "Target user not found"));
+    }
+
+    const tokenPayload = {
+      id: targetUser.id,
+      email: targetUser.email,
+      role: targetUser.role,
+      name: targetUser.name,
+      isSudo: true,
+      originalAdminId: req.user.id,
+    };
+
+    const token = jwt.sign(tokenPayload, jwtConfig.secret, {
+      expiresIn: jwtConfig.expiresIn,
+    });
+
+    const { password: _, resetToken: __, resetTokenExpires: ___, ...userWithoutSensitiveData } = targetUser;
+
+    res.json({
+      message: `Impersonating ${targetUser.name}`,
+      token,
+      user: userWithoutSensitiveData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -673,4 +715,5 @@ module.exports = {
   getPolicyText,
   acceptPolicy,
   changePassword,
+  sudoLogin,
 };

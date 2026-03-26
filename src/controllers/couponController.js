@@ -156,12 +156,13 @@ const validateCoupon = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Coupon code is required' });
   }
 
+  const normalizedCode = code.trim().toUpperCase();
   const coupon = await prisma.coupon.findUnique({
-    where: { code: code.toUpperCase() },
+    where: { code: normalizedCode },
   });
 
   if (!coupon || !coupon.isActive) {
-    return res.status(404).json({ success: false, message: 'Invalid or inactive coupon' });
+    return res.status(400).json({ success: false, message: 'Invalid or inactive coupon' });
   }
 
   const now = new Date();

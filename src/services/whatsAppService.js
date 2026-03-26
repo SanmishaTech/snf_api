@@ -118,7 +118,6 @@ const sendWelcomeWhatsAppMessage = async (user) => {
       ]
     }
   };
-  console.log('[WhatsApp Service] Welcome Payload (en_US):', JSON.stringify(payload, null, 2));
 
 
   try {

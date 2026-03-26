@@ -156,6 +156,31 @@ router.post("/reset-password/:token", authController.resetPassword);
 
 /**
  * @swagger
+ * /auth/sudo-login/{userId}:
+ *   post:
+ *     summary: Impersonate a user (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: ID of the user to impersonate
+ *     responses:
+ *       200:
+ *         description: Impersonation successful, returns new token
+ *       403:
+ *         description: Forbidden (not an admin)
+ *       404:
+ *         description: User not found
+ */
+router.post("/sudo-login/:userId", auth, authController.sudoLogin);
+
+/**
+ * @swagger
  * /auth/logout:
  *   post:
  *     summary: Logout a user
