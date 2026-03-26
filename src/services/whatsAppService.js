@@ -311,10 +311,126 @@ const sendSubscriptionRenewalWhatsAppMessage = async (user, subscription) => {
   }
 };
 
+/**
+ * Send WhatsApp Notification for Skipped Delivery
+ * @param {Object} user User object containing mobile and name
+ * @param {Object} skipData object containing date and refundAmount
+ */
+const sendSkipDeliveryWhatsAppMessage = async (user, skipData) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'skip_delivery',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(skipData.date) },
+            { type: 'text', text: String(skipData.refundAmount) }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send skip delivery message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Skip delivery message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending skip delivery message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send WhatsApp Notification for Not Delivered (Attempt Failed)
+ * @param {Object} user User object containing mobile and name
+ * @param {Object} failData object containing reason and refundAmount
+ */
+const sendNotDeliveredWhatsAppMessage = async (user, failData) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'not_delivered',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(failData.reason || 'Delivery attempt failed') },
+            { type: 'text', text: String(failData.refundAmount || '0.00') }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send not delivered message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Not delivered message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending not delivered message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderWhatsAppMessage,
   sendWelcomeWhatsAppMessage,
   sendSubscriptionConfirmWhatsAppMessage,
   sendDeliveryWhatsAppMessage,
-  sendSubscriptionRenewalWhatsAppMessage
+  sendSubscriptionRenewalWhatsAppMessage,
+  sendSkipDeliveryWhatsAppMessage,
+  sendNotDeliveredWhatsAppMessage
 };

@@ -229,7 +229,7 @@ const updateDeliveryStatus = async (req, res) => {
 
     // Handle business logic for different status values
     let walletTransaction = null;
-    if (status === 'SKIP_BY_CUSTOMER') {
+    if (status === 'SKIP_BY_CUSTOMER' || status === 'SKIPPED') {
       // Calculate refund amount and credit to wallet
       const refundAmount = walletService.calculateRefundAmount(deliveryEntry);
       
@@ -318,6 +318,35 @@ const updateDeliveryStatus = async (req, res) => {
         }
       } catch (waError) {
         console.error('Failed to send delivery confirmation WhatsApp message (Agency):', waError);
+      }
+    } else if ((status === 'SKIP_BY_CUSTOMER' || status === 'SKIPPED') && walletTransaction) {
+      try {
+        const user = updatedDeliveryEntry.member?.user;
+        if (user && user.mobile) {
+          const { sendSkipDeliveryWhatsAppMessage } = require('../services/whatsAppService');
+          const dayjs = require('dayjs');
+          const skipData = {
+            date: dayjs(updatedDeliveryEntry.deliveryDate).format('DD/MM/YYYY'),
+            refundAmount: walletTransaction.amount
+          };
+          await sendSkipDeliveryWhatsAppMessage(user, skipData);
+        }
+      } catch (waError) {
+        console.error('Failed to send skip delivery confirmation WhatsApp message:', waError);
+      }
+    } else if (status === 'NOT_DELIVERED' && walletTransaction) {
+      try {
+        const user = updatedDeliveryEntry.member?.user;
+        if (user && user.mobile) {
+          const { sendNotDeliveredWhatsAppMessage } = require('../services/whatsAppService');
+          const failData = {
+            reason: updatedDeliveryEntry.adminNotes || "Delivery attempt failed.",
+            refundAmount: walletTransaction.amount
+          };
+          await sendNotDeliveredWhatsAppMessage(user, failData);
+        }
+      } catch (waError) {
+        console.error('Failed to send not delivered confirmation WhatsApp message:', waError);
       }
     }
 
