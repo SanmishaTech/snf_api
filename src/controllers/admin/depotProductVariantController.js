@@ -109,12 +109,24 @@ module.exports = {
         depotId: queryDepotId,
         page = 1,
         limit = 1000,
+        search,
       } = req.query;
 
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
       const where = {};
+
+      // ------------------------------
+      // Search filter handling
+      // ------------------------------
+      if (search) {
+        where.OR = [
+          { name: { contains: search } },
+          { product: { name: { contains: search } } },
+        ];
+      }
+
       // ------------------------------
       // Depot filter handling
       // ------------------------------
