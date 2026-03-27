@@ -496,8 +496,17 @@ const createSubscription = asyncHandler(async (req, res) => {
     // Send WhatsApp Notification for Subscription Confirmation
     try {
       if (result.subscription.paymentStatus === 'PAID' && member && member.user && member.user.mobile) {
-        const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+        const { sendSubscriptionConfirmWhatsAppMessage, sendWalletDebitWhatsAppMessage } = require('../services/whatsAppService');
         await sendSubscriptionConfirmWhatsAppMessage(member.user, result.subscription);
+
+        // Send Wallet Debit Notification if walletamt >= 0
+        if (result.subscription.walletamt >= 0) {
+          await sendWalletDebitWhatsAppMessage(
+            member.user,
+            result.subscription.walletamt,
+            result.order.orderNo
+          );
+        }
       }
     } catch (waError) {
       console.error('Failed to send subscription confirmation WhatsApp message:', waError);
@@ -995,7 +1004,7 @@ const cancelSubscription = asyncHandler(async (req, res) => {
 
         if (memberInfo && memberInfo.user && memberInfo.user.mobile) {
           console.log(`[WA Debug] Found member mobile: ${memberInfo.user.mobile}. Sending message...`);
-          const { sendCancelledWhatsAppMessage } = require('../services/whatsAppService');
+          const { sendCancelledWhatsAppMessage, sendWalletCreditWhatsAppMessage } = require('../services/whatsAppService');
           const cancelData = {
             orderNo: String(result.subscription.id).padStart(4, '0'),
             reason: (req.user && req.user.role === 'ADMIN') ? 'Cancelled by Admin' : 'Cancelled via dashboard',
@@ -1003,6 +1012,15 @@ const cancelSubscription = asyncHandler(async (req, res) => {
           };
           const waResult = await sendCancelledWhatsAppMessage(memberInfo.user, cancelData);
           console.log('[WA Debug] WhatsApp Service full result:', JSON.stringify(waResult));
+
+          // Also send wallet_credit notification if refund was successful
+          if (result.refundAmount > 0) {
+            await sendWalletCreditWhatsAppMessage(
+              memberInfo.user,
+              result.refundAmount,
+              `CANCEL-SUB-${result.subscription.id}`
+            );
+          }
         } else {
           console.warn('[WA Debug] Skipping WA: Member user or mobile missing', memberInfo?.user?.id);
         }
@@ -1379,6 +1397,21 @@ const skipMemberDelivery = asyncHandler(async (req, res) => {
     message: finalMessage,
     deliveryEntry: updatedDeliveryEntryResult, // Send the updated entry from the transaction
   });
+
+  // Send WhatsApp notification for skip-refund
+  try {
+    const user = deliveryEntry.subscription?.member?.user;
+    if (user && user.mobile && walletTransaction && walletTransaction.amount > 0) {
+      const { sendWalletCreditWhatsAppMessage } = require('../services/whatsAppService');
+      await sendWalletCreditWhatsAppMessage(
+        user,
+        walletTransaction.amount,
+        `SKIP-DEL-${entryId}`
+      );
+    }
+  } catch (waError) {
+    console.error('Failed to send wallet credit WhatsApp message after member skip:', waError);
+  }
 });
 
 // @desc    Bulk assign agency to multiple subscriptions

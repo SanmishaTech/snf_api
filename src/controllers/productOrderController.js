@@ -414,9 +414,18 @@ const createOrderWithSubscriptions = asyncHandler(async (req, res) => {
       try {
         const user = finalOrder.member?.user;
         if (user && user.mobile) {
-          const { sendSubscriptionConfirmWhatsAppMessage } = require('../services/whatsAppService');
+          const { sendSubscriptionConfirmWhatsAppMessage, sendWalletDebitWhatsAppMessage } = require('../services/whatsAppService');
           for (const sub of finalOrder.subscriptions) {
             await sendSubscriptionConfirmWhatsAppMessage(user, sub);
+
+            // Send Wallet Debit Notification if walletamt >= 0
+            if (sub.walletamt >= 0) {
+              await sendWalletDebitWhatsAppMessage(
+                user,
+                sub.walletamt,
+                finalOrder.orderNo
+              );
+            }
           }
         }
       } catch (waError) {

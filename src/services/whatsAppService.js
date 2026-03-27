@@ -485,6 +485,122 @@ const sendCancelledWhatsAppMessage = async (user, cancelData) => {
   }
 };
 
+/**
+ * Send WhatsApp Notification for Wallet Debit
+ * @param {Object} user User object containing mobile and name
+ * @param {Number|String} walletamt Amount debited from wallet
+ * @param {String} orderNo Order number
+ */
+const sendWalletDebitWhatsAppMessage = async (user, walletamt, orderNo) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'wallet_debit',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(walletamt || '0.00') },
+            { type: 'text', text: String(orderNo || 'N/A') }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send wallet debit message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Wallet debit message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending wallet debit message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send WhatsApp Notification for Wallet Credit
+ * @param {Object} user User object containing mobile and name
+ * @param {Number|String} amount Amount credited to wallet
+ * @param {String} orderNo Order number
+ */
+const sendWalletCreditWhatsAppMessage = async (user, amount, orderNo) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'wallet_credit',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(amount || '0.00') },
+            { type: 'text', text: String(orderNo || 'N/A') }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send wallet credit message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Wallet credit message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending wallet credit message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderWhatsAppMessage,
   sendWelcomeWhatsAppMessage,
@@ -493,5 +609,7 @@ module.exports = {
   sendSubscriptionRenewalWhatsAppMessage,
   sendSkipDeliveryWhatsAppMessage,
   sendNotDeliveredWhatsAppMessage,
-  sendCancelledWhatsAppMessage
+  sendCancelledWhatsAppMessage,
+  sendWalletDebitWhatsAppMessage,
+  sendWalletCreditWhatsAppMessage
 };

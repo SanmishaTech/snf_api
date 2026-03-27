@@ -264,6 +264,24 @@ exports.addFundsToWallet = async (req, res, next) => {
       return { updatedMember, transaction };
     });
 
+    // Trigger WhatsApp notification for wallet credit
+    try {
+      const memberWithUser = await prisma.member.findUnique({
+        where: { id: memberIdInt },
+        include: { user: true }
+      });
+      if (memberWithUser && memberWithUser.user && memberWithUser.user.mobile) {
+        const { sendWalletCreditWhatsAppMessage } = require('../../services/whatsAppService');
+        await sendWalletCreditWhatsAppMessage(
+          memberWithUser.user,
+          amountFloat,
+          referenceNumber || 'N/A'
+        );
+      }
+    } catch (waError) {
+      console.error('Failed to send wallet credit WhatsApp message after manual add-funds:', waError);
+    }
+
     res.status(200).json({
       success: true,
       message: `Successfully added ${amountFloat} to member ${memberIdInt}'s wallet. New balance: ${result.updatedMember.walletBalance}`,
@@ -355,6 +373,24 @@ exports.approveWalletTransaction = async (req, res, next) => {
 
       return { approvedTransaction, updatedMember };
     });
+
+    // Trigger WhatsApp notification for wallet credit (approval)
+    try {
+      const memberWithUser = await prisma.member.findUnique({
+        where: { id: result.updatedMember.id },
+        include: { user: true }
+      });
+      if (memberWithUser && memberWithUser.user && memberWithUser.user.mobile) {
+        const { sendWalletCreditWhatsAppMessage } = require('../../services/whatsAppService');
+        await sendWalletCreditWhatsAppMessage(
+          memberWithUser.user,
+          result.approvedTransaction.amount,
+          result.approvedTransaction.referenceNumber || 'N/A'
+        );
+      }
+    } catch (waError) {
+      console.error('Failed to send wallet credit WhatsApp message after transaction approval:', waError);
+    }
 
     res.status(200).json({
       success: true,

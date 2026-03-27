@@ -319,7 +319,7 @@ const updateDeliveryStatus = async (req, res) => {
       } catch (waError) {
         console.error('Failed to send delivery confirmation WhatsApp message (Agency):', waError);
       }
-    } else if ((status === 'SKIP_BY_CUSTOMER' || status === 'SKIPPED') && walletTransaction) {
+    } else if (status === 'SKIP_BY_CUSTOMER' || status === 'SKIPPED') {
       try {
         const user = updatedDeliveryEntry.member?.user;
         if (user && user.mobile) {
@@ -327,21 +327,21 @@ const updateDeliveryStatus = async (req, res) => {
           const dayjs = require('dayjs');
           const skipData = {
             date: dayjs(updatedDeliveryEntry.deliveryDate).format('DD/MM/YYYY'),
-            refundAmount: walletTransaction.amount
+            refundAmount: walletTransaction?.amount || 0
           };
           await sendSkipDeliveryWhatsAppMessage(user, skipData);
         }
       } catch (waError) {
         console.error('Failed to send skip delivery confirmation WhatsApp message:', waError);
       }
-    } else if (status === 'NOT_DELIVERED' && walletTransaction) {
+    } else if (status === 'NOT_DELIVERED') {
       try {
         const user = updatedDeliveryEntry.member?.user;
         if (user && user.mobile) {
           const { sendNotDeliveredWhatsAppMessage } = require('../services/whatsAppService');
           const failData = {
             reason: updatedDeliveryEntry.adminNotes || "Delivery attempt failed.",
-            refundAmount: walletTransaction.amount
+            refundAmount: walletTransaction?.amount || 0
           };
           await sendNotDeliveredWhatsAppMessage(user, failData);
         }
