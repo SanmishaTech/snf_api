@@ -127,12 +127,73 @@ const checkAndSendLapsedSubscriptionReminders = async () => {
   }
 };
 
+/**
+ * Core logic to check for subscriptions expiring tomorrow and send final renewal reminders.
+ */
+const checkAndSendFinalSubscriptionReminders = async () => {
+  console.log('[Final Reminders] Started check');
+  try {
+    // Tomorrow's range
+    const tomorrowStart = dayjs().add(1, 'day').startOf('day').toDate();
+    const tomorrowEnd = dayjs().add(2, 'day').startOf('day').toDate();
+
+    let skip = 0;
+    const take = 500;
+    let hasMore = true;
+    let totalProcessed = 0;
+
+    const { sendSubscriptionRenewalFinalWhatsAppMessage } = require('./whatsAppService');
+
+    while (hasMore) {
+      const subscriptions = await prisma.subscription.findMany({
+        where: {
+          expiryDate: {
+            gte: tomorrowStart,
+            lt: tomorrowEnd,
+          }
+        },
+        include: {
+          member: {
+            include: {
+              user: true
+            }
+          }
+        },
+        skip: skip,
+        take: take,
+        orderBy: { id: 'asc' }
+      });
+
+      if (subscriptions.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const sub of subscriptions) {
+        if (sub.member && sub.member.user && sub.member.user.mobile) {
+          await sendSubscriptionRenewalFinalWhatsAppMessage(sub.member.user);
+        }
+      }
+
+      totalProcessed += subscriptions.length;
+      skip += take;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`[Final Reminders] Completed check. Processed ${totalProcessed} subscriptions.`);
+  } catch (error) {
+    console.error('[Final Reminders] Error running check:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 1:00 AM
   cron.schedule('0 1 * * *', async () => {
     // 1. Regular 3-day reminders
     await checkAndSendSubscriptionReminders();
-    // 2. Lapsed 1-day reminders
+    // 2. Final 1-day reminders (ends tomorrow)
+    await checkAndSendFinalSubscriptionReminders();
+    // 3. Lapsed 1-day reminders (ended yesterday)
     await checkAndSendLapsedSubscriptionReminders();
   }, {
     timezone: "Asia/Kolkata"
@@ -142,5 +203,6 @@ const initCronJobs = () => {
 module.exports = { 
   initCronJobs,
   checkAndSendSubscriptionReminders,
-  checkAndSendLapsedSubscriptionReminders
+  checkAndSendLapsedSubscriptionReminders,
+  checkAndSendFinalSubscriptionReminders
 };

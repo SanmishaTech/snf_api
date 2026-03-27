@@ -655,6 +655,60 @@ const sendSubscriptionRenewalPendingWhatsAppMessage = async (user) => {
   }
 };
 
+/**
+ * Send WhatsApp Notification for Subscription Renewal Final (1 day before expiry)
+ * @param {Object} user User object containing mobile and name
+ */
+const sendSubscriptionRenewalFinalWhatsAppMessage = async (user) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'subscription_renewal_reminder_final',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: user.name || 'Customer' }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send renewal final message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Renewal final message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending renewal final message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderWhatsAppMessage,
   sendWelcomeWhatsAppMessage,
@@ -662,6 +716,7 @@ module.exports = {
   sendDeliveryWhatsAppMessage,
   sendSubscriptionRenewalWhatsAppMessage,
   sendSubscriptionRenewalPendingWhatsAppMessage,
+  sendSubscriptionRenewalFinalWhatsAppMessage,
   sendSkipDeliveryWhatsAppMessage,
   sendNotDeliveredWhatsAppMessage,
   sendCancelledWhatsAppMessage,
