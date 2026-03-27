@@ -275,9 +275,15 @@ const updateDeliveryStatus = async (req, res) => {
                 id: true,
                 name: true,
                 email: true,
+                mobile: true,
               }
             }
           },
+        },
+        subscription: {
+          select: {
+            id: true,
+          }
         },
         deliveryAddress: {
           select: {
@@ -340,6 +346,7 @@ const updateDeliveryStatus = async (req, res) => {
         if (user && user.mobile) {
           const { sendNotDeliveredWhatsAppMessage } = require('../services/whatsAppService');
           const failData = {
+            orderNo: `SUB-${updatedDeliveryEntry.subscription.id}`,
             reason: updatedDeliveryEntry.adminNotes || "Delivery attempt failed.",
             refundAmount: walletTransaction?.amount || 0
           };

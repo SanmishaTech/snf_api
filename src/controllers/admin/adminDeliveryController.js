@@ -268,6 +268,7 @@ const updateDeliveryStatus = async (req, res) => {
         if (user && user.mobile) {
           const { sendNotDeliveredWhatsAppMessage, sendWalletCreditWhatsAppMessage } = require('../../services/whatsAppService');
           const failData = {
+            orderNo: `SUB-${updatedDeliveryEntry.subscription.id}`,
             reason: notes || updatedDeliveryEntry.adminNotes || "Delivery attempt failed.",
             refundAmount: walletTransaction?.amount || 0
           };

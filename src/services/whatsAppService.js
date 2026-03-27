@@ -395,6 +395,7 @@ const sendNotDeliveredWhatsAppMessage = async (user, failData) => {
           type: 'body',
           parameters: [
             { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(failData.orderNo || 'N/A') },
             { type: 'text', text: String(failData.reason || 'Delivery attempt failed') },
             { type: 'text', text: String(failData.refundAmount || '0.00') }
           ]
