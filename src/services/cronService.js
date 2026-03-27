@@ -67,16 +67,80 @@ const checkAndSendSubscriptionReminders = async () => {
   }
 };
 
+/**
+ * Core logic to check for subscriptions that expired yesterday and send renewal pending reminders.
+ */
+const checkAndSendLapsedSubscriptionReminders = async () => {
+  console.log('[Lapsed Reminders] Started check');
+  try {
+    // Yesterday's range
+    const yesterdayStart = dayjs().subtract(1, 'day').startOf('day').toDate();
+    const yesterdayEnd = dayjs().startOf('day').toDate();
+
+    let skip = 0;
+    const take = 500;
+    let hasMore = true;
+    let totalProcessed = 0;
+
+    const { sendSubscriptionRenewalPendingWhatsAppMessage } = require('./whatsAppService');
+
+    while (hasMore) {
+      const subscriptions = await prisma.subscription.findMany({
+        where: {
+          expiryDate: {
+            gte: yesterdayStart,
+            lt: yesterdayEnd,
+          }
+        },
+        include: {
+          member: {
+            include: {
+              user: true
+            }
+          }
+        },
+        skip: skip,
+        take: take,
+        orderBy: { id: 'asc' }
+      });
+
+      if (subscriptions.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const sub of subscriptions) {
+        // Send reminder for every subscription that expired yesterday
+        if (sub.member && sub.member.user && sub.member.user.mobile) {
+          await sendSubscriptionRenewalPendingWhatsAppMessage(sub.member.user);
+        }
+      }
+
+      totalProcessed += subscriptions.length;
+      skip += take;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`[Lapsed Reminders] Completed check. Processed ${totalProcessed} subscriptions.`);
+  } catch (error) {
+    console.error('[Lapsed Reminders] Error running check:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 1:00 AM
   cron.schedule('0 1 * * *', async () => {
+    // 1. Regular 3-day reminders
     await checkAndSendSubscriptionReminders();
+    // 2. Lapsed 1-day reminders
+    await checkAndSendLapsedSubscriptionReminders();
   }, {
-    timezone: "Asia/Kolkata" // Assuming Indian Standard Time based on server locale
+    timezone: "Asia/Kolkata"
   });
 };
 
 module.exports = { 
   initCronJobs,
-  checkAndSendSubscriptionReminders
+  checkAndSendSubscriptionReminders,
+  checkAndSendLapsedSubscriptionReminders
 };
