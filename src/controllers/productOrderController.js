@@ -1240,7 +1240,7 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
 
       // Process wallet refund if wallet amount was used in this order
       let walletTransaction = null;
-      if (order.walletamt && order.walletamt > 0 && req.user.role !== 'ADMIN') {
+      if (order.walletamt && order.walletamt > 0) {
         console.log(`Processing wallet refund of ₹${order.walletamt} for order ${order.orderNo}`);
         
         // Credit the wallet amount back to member's wallet
@@ -1279,6 +1279,11 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
           include: {
             product: true
           }
+        },
+        member: {
+          include: {
+            user: true
+          }
         }
       }
     });
@@ -1292,21 +1297,30 @@ const cancelOrderSubscriptions = asyncHandler(async (req, res) => {
       message += ` ₹${order.walletamt.toFixed(2)} has been refunded to your wallet.`;
     }
 
+    // Send WhatsApp Notification for Order Cancellation
+    try {
+      if (updatedOrder && updatedOrder.member && updatedOrder.member.user && updatedOrder.member.user.mobile) {
+        const { sendCancelledWhatsAppMessage } = require('../services/whatsAppService');
+        const cancelData = {
+          orderNo: updatedOrder.orderNo,
+          reason: (req.user && req.user.role === 'ADMIN') ? 'Cancelled by Admin' : 'Cancelled via dashboard',
+          refundAmount: order.walletamt || 0
+        };
+        await sendCancelledWhatsAppMessage(updatedOrder.member.user, cancelData);
+      }
+    } catch (waError) {
+      console.error('Failed to send order cancellation WhatsApp message:', waError);
+    }
+
     res.status(200).json({
       message,
       order: updatedOrder,
       cancelledCount: result.updatedSubscriptions.count,
       totalSubscriptions: order.subscriptions.length,
       walletRefund: result.walletTransaction ? {
-        success: true,
-        refundAmount: order.walletamt,
-        transactionId: result.walletTransaction.id,
-        message: `₹${order.walletamt.toFixed(2)} refunded to wallet`
-      } : {
-        success: true,
-        refundAmount: 0,
-        message: 'No wallet refund applicable'
-      }
+        amount: order.walletamt,
+        transactionId: result.walletTransaction.id
+      } : null
     });
 
   } catch (error) {

@@ -425,6 +425,66 @@ const sendNotDeliveredWhatsAppMessage = async (user, failData) => {
   }
 };
 
+/**
+ * Send WhatsApp Notification for Cancelled Subscription (Refunded to Wallet)
+ * @param {Object} user User object containing mobile and name
+ * @param {Object} cancelData object containing orderNo, reason, and refundAmount
+ */
+const sendCancelledWhatsAppMessage = async (user, cancelData) => {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const baseUrl = process.env.WHATSAPP_URL;
+
+  if (!token || !phoneNumberId || !baseUrl || !user || !user.mobile) {
+    return null;
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: `91${user.mobile}`,
+    type: 'template',
+    template: {
+      name: 'cancelled_refunded_in_wallet',
+      language: { code: 'en_US' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(user.name || 'Customer') },
+            { type: 'text', text: String(cancelData.orderNo || 'N/A') },
+            { type: 'text', text: String(cancelData.reason || 'Cancelled via dashboard') },
+            { type: 'text', text: String(cancelData.orderNo || 'N/A') },
+            { type: 'text', text: String(cancelData.reason || 'Cancelled via dashboard') },
+            { type: 'text', text: String(cancelData.refundAmount || '0.00') }
+          ]
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[WhatsApp Service] Failed to send cancellation message:', data);
+      return { success: false, error: data };
+    }
+    console.log(`[WhatsApp Service] Cancellation message sent successfully to ${user.mobile}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('[WhatsApp Service] Error sending cancellation message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderWhatsAppMessage,
   sendWelcomeWhatsAppMessage,
@@ -432,5 +492,6 @@ module.exports = {
   sendDeliveryWhatsAppMessage,
   sendSubscriptionRenewalWhatsAppMessage,
   sendSkipDeliveryWhatsAppMessage,
-  sendNotDeliveredWhatsAppMessage
+  sendNotDeliveredWhatsAppMessage,
+  sendCancelledWhatsAppMessage
 };

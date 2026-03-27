@@ -982,6 +982,35 @@ const cancelSubscription = asyncHandler(async (req, res) => {
       };
     });
 
+    // Send WhatsApp Notification for Subscription Cancellation
+    console.log(`[WA Debug] Triggering cancellation notification for sub: ${result.subscription.id}, refund: ${result.refundAmount}`);
+    try {
+      if (result) {
+        // Re-fetch member info to ensure we have the user's mobile number,
+        // especially important if the cancellation was performed by an Admin.
+        const memberInfo = await prisma.member.findUnique({
+          where: { id: result.subscription.memberId },
+          include: { user: true }
+        });
+
+        if (memberInfo && memberInfo.user && memberInfo.user.mobile) {
+          console.log(`[WA Debug] Found member mobile: ${memberInfo.user.mobile}. Sending message...`);
+          const { sendCancelledWhatsAppMessage } = require('../services/whatsAppService');
+          const cancelData = {
+            orderNo: String(result.subscription.id).padStart(4, '0'),
+            reason: (req.user && req.user.role === 'ADMIN') ? 'Cancelled by Admin' : 'Cancelled via dashboard',
+            refundAmount: result.refundAmount
+          };
+          const waResult = await sendCancelledWhatsAppMessage(memberInfo.user, cancelData);
+          console.log('[WA Debug] WhatsApp Service full result:', JSON.stringify(waResult));
+        } else {
+          console.warn('[WA Debug] Skipping WA: Member user or mobile missing', memberInfo?.user?.id);
+        }
+      }
+    } catch (waError) {
+      console.error('[WA Debug] Failed to send cancellation confirmation WhatsApp message:', waError);
+    }
+
     const responseMessage = result.refundAmount > 0
       ? `Subscription cancelled successfully. Refund of ₹${result.refundAmount.toFixed(2)} has been credited to your wallet.`
       : 'Subscription cancelled successfully.';
