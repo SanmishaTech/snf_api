@@ -310,4 +310,19 @@ app.get("*", (req, res, next) => {
   res.sendFile(path.join(frontendDistPath, "index.html"));
 });
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  const status = err.status || 500;
+  const message = err.message || 'Internal Server Error';
+
+  console.error(`[Global Error] ${status}: ${message}`);
+
+  res.status(status).json({
+    success: false,
+    status,
+    message,
+    errors: err.errors || []
+  });
+});
+
 module.exports = app;
