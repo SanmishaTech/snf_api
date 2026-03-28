@@ -334,6 +334,7 @@ const getPublicProducts = asyncHandler(async (req, res, next) => {
             isHidden: false,
           },
         },
+        isSubscription: false, // Exclude subscription products from SNF
       };
 
       if (catIdNum) {
@@ -927,7 +928,9 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
       });
     }
 
-    const whereConditions = {};
+    const whereConditions = {
+      isSubscription: false, // Exclude subscription products from SNF
+    };
     if (catIdNum) {
       whereConditions.categoryId = catIdNum;
     }
