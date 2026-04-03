@@ -39,6 +39,7 @@ model User {
   wastagesCreated       Wastage[]           @relation("WastageCreatedBy")
   wastagesUpdated       Wastage[]           @relation("WastageUpdatedBy")
   auditLogs             AuditLog[]
+  cart                  Cart?
 
   @@index([depotId], map: "users_depotId_fkey")
   @@map("users")
@@ -175,6 +176,7 @@ model Product {
   subscriptions           Subscription[]
   orderItems              OrderItem[]
   wastageDetails          WastageDetail[]
+  cartItems               CartItem[]
   images                  ProductImage[]
 
   @@index([categoryId], map: "products_categoryId_fkey")
@@ -329,6 +331,7 @@ model Member {
   snfOrders               SNFOrder[]              @relation("MemberSNFOrders")
   subscriptions           Subscription[]
   walletTransactions      WalletTransaction[]     @relation("MemberTransactions")
+  cart                    Cart?
 
   @@map("members")
 }
@@ -701,6 +704,7 @@ model DepotProductVariant {
   transfersTo             TransferDetail[]        @relation("TransferToVariant")
   orderItems              OrderItem[]
   wastageDetails          WastageDetail[]
+  cartItems               CartItem[]
 
   @@index([productId])
   @@index([depotId])
@@ -969,4 +973,47 @@ model Coupon {
   updatedAt         DateTime @updatedAt
 
   @@map("coupons")
+}
+
+model Cart {
+  id              Int        @id @default(autoincrement())
+  userId          Int?       @unique
+  memberId        Int?       @unique
+  userUniqueId    String?    @unique
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  items           CartItem[]
+
+  user            User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  member          Member?    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("carts")
+}
+
+model CartItem {
+  id                Int      @id @default(autoincrement())
+  cartId            Int
+  productId         Int
+  variantId         Int      
+  quantity          Int
+  
+  name              String
+  variantName       String
+  price             Decimal  @db.Decimal(10, 2)
+  imageUrl          String?
+  depotId           Int
+  originalDepotId   Int?
+  originalVariantId Int?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  cart              Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id])
+  variant           DepotProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@map("cart_items")
 }

@@ -22,6 +22,7 @@ const wastageRoutes = require("./routes/wastageRoutes");
 const userRoutes = require("./routes/users");
 const deliveryAddressRoutes = require("./routes/deliveryAddressRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const cartRoutes = require("./routes/cartRoutes");
 const adminRoutes = require("./routes/adminRoutes"); // Added for admin routes
 const adminWalletRoutes = require("./routes/admin/wallets");
 const adminMembersRouter = require("./routes/admin/members"); // Added for admin members route
@@ -187,6 +188,7 @@ app.use("/api/product-orders", productOrderRoutes);
 app.use("/api/wastage", wastageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/cart", authMiddleware, cartRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
 app.use(
   "/api/vendors",
