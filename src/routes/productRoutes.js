@@ -91,6 +91,7 @@ const {
   getDepotVariantPricing,
   addProductImages,
   deleteProductImage,
+  getAllTags,
 } = require("../controllers/productController");
 const authMiddleware = require("../middleware/auth"); // Assuming auth middleware is in the same location
 const createUploadMiddleware = require("../middleware/uploadMiddleware");
@@ -130,6 +131,9 @@ const productUploadMiddleware = createUploadMiddleware("products", [
  *         description: Internal server error.
  */
 router.get("/public", allowPublic(), getPublicProductsWithVariants);
+
+// GET /api/products/tags/all - Get all unique tags
+router.get("/tags/all", authMiddleware, getAllTags);
 
 // POST /api/products - Create a new product
 /**

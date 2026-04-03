@@ -1103,6 +1103,35 @@ const deleteProductImage = asyncHandler(async (req, res, next) => {
   res.json({ success: true, message: "Image deleted successfully" });
 });
 
+/**
+ * @desc    Get all unique product tags
+ * @route   GET /api/products/tags/all
+ * @access  Private
+ */
+const getAllTags = asyncHandler(async (req, res, next) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { tags: { not: null, not: "" } },
+      select: { tags: true },
+    });
+    
+    const tagSet = new Set();
+    products.forEach(p => {
+      if (p.tags) {
+        p.tags.split(',').forEach(t => {
+          const trimmed = t.trim();
+          if (trimmed) tagSet.add(trimmed);
+        });
+      }
+    });
+    
+    res.status(200).json(Array.from(tagSet).sort());
+  } catch (error) {
+    console.error("Error fetching tags:", error);
+    next(createError(500, "Failed to fetch tags"));
+  }
+});
+
 module.exports = {
 
   createProduct,
@@ -1116,4 +1145,5 @@ module.exports = {
   getDepotVariantPricing,
   addProductImages,
   deleteProductImage,
+  getAllTags,
 };
