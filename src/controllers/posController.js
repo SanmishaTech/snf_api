@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 /**
  * @desc    Search members by name or mobile for POS (returns all if no query)
  * @route   GET /api/pos/members/search
- * @access  Private (DepotAdmin)
+ * @access  Private (DepotAdmin, ADMIN)
  */
 const searchMembers = asyncHandler(async (req, res) => {
   const { q } = req.query;
@@ -67,7 +67,7 @@ const searchMembers = asyncHandler(async (req, res) => {
 /**
  * @desc    Quick register walk-in customer for POS
  * @route   POST /api/pos/members
- * @access  Private (DepotAdmin)
+ * @access  Private (DepotAdmin, ADMIN)
  */
 const quickRegisterMember = asyncHandler(async (req, res) => {
   const { name, mobile, email = null } = req.body;
@@ -176,7 +176,7 @@ const quickRegisterMember = asyncHandler(async (req, res) => {
 /**
  * @desc    Get depot products for POS (simplified)
  * @route   GET /api/pos/products
- * @access  Private (DepotAdmin)
+ * @access  Private (DepotAdmin, ADMIN)
  */
 const getDepotProducts = asyncHandler(async (req, res) => {
   const { depotId } = req.query;
@@ -253,7 +253,7 @@ const getDepotProducts = asyncHandler(async (req, res) => {
 /**
  * @desc    Create POS order
  * @route   POST /api/pos/orders
- * @access  Private (DepotAdmin)
+ * @access  Private (DepotAdmin, ADMIN)
  */
 const createPosOrder = asyncHandler(async (req, res) => {
   const {
@@ -266,6 +266,12 @@ const createPosOrder = asyncHandler(async (req, res) => {
     paymentMode,
     paymentRefNo = null,
     depotId,
+    payerName = null,
+    utrNo = null,
+    chequeNo = null,
+    bankName = null,
+    transactionId = null,
+    paymentDetails = null,
   } = req.body;
 
   // Validation
@@ -279,9 +285,9 @@ const createPosOrder = asyncHandler(async (req, res) => {
     throw new Error('At least one item is required');
   }
 
-  if (!paymentMode || !['CASH', 'WALLET', 'ONLINE', 'UPI'].includes(paymentMode)) {
+  if (!paymentMode || !['CASH', 'WALLET', 'ONLINE', 'UPI', 'CHEQUE', 'CARD'].includes(paymentMode)) {
     res.status(400);
-    throw new Error('Valid payment mode is required (CASH, WALLET, ONLINE, UPI)');
+    throw new Error('Valid payment mode is required (CASH, WALLET, ONLINE, UPI, CHEQUE, CARD)');
   }
 
   if (!depotId) {
@@ -324,6 +330,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
 
   for (const item of items) {
     const { name, variantName, price, quantity, depotProductVariantId } = item;
+    let variant = null; // Declare here for scope
 
     if (!name || typeof price !== 'number' || typeof quantity !== 'number') {
       res.status(400);
@@ -332,7 +339,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
 
     // Verify stock availability
     if (depotProductVariantId) {
-      const variant = await prisma.depotProductVariant.findUnique({
+      variant = await prisma.depotProductVariant.findUnique({
         where: { id: depotProductVariantId },
       });
 
@@ -352,6 +359,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
       quantity,
       lineTotal,
       depotProductVariantId: depotProductVariantId || null,
+      productId: variant?.productId || null,
     });
   }
 
@@ -362,10 +370,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
   }
 
   const computedTotal = computedSubtotal;
-  if (Math.abs(computedTotal - totalAmount) > 1) {
-    res.status(400);
-    throw new Error('Total amount mismatch');
-  }
+  // tax logic if any...
 
   // Generate order number
   const now = new Date();
@@ -389,7 +394,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
   const orderNo = `${fyPrefix}-${String(nextSeq).padStart(5, '0')}`;
 
   // Determine final payment status
-  const finalPaymentStatus = paymentMode === 'WALLET' || paymentMode === 'CASH' || paymentMode === 'UPI' ? 'PAID' : 'PENDING';
+  const finalPaymentStatus = ['WALLET', 'CASH', 'UPI', 'CHEQUE', 'CARD'].includes(paymentMode) ? 'PAID' : 'PENDING';
 
   // Create order in transaction
   const created = await prisma.$transaction(async (tx) => {
@@ -409,9 +414,9 @@ const createPosOrder = asyncHandler(async (req, res) => {
         pincode: '000000', // POS orders don't need delivery
         subtotal: computedSubtotal,
         deliveryFee: 0,
-        totalAmount: computedTotal,
+        totalAmount: totalAmount,
         walletamt: walletamt,
-        payableAmount: Math.max(0, computedTotal - walletamt),
+        payableAmount: Math.max(0, totalAmount - walletamt),
         paymentMode,
         paymentStatus: finalPaymentStatus,
         paymentRefNo,
@@ -424,6 +429,23 @@ const createPosOrder = asyncHandler(async (req, res) => {
         items: true,
         depot: true,
       },
+    });
+
+    // Create POS Detail with JSON snapshot
+    await tx.posDetail.create({
+      data: {
+        memberId: parseInt(memberId, 10),
+        orderId: order.id,
+        productDetails: items, // JSON snapshot of the cart items
+        paymentMode,
+        payerName,
+        utrNo,
+        chequeNo,
+        bankName,
+        transactionId,
+        amount: totalAmount,
+        paymentDetails,
+      }
     });
 
     // Handle wallet deduction
@@ -465,7 +487,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
         // Create stock ledger entry
         await tx.stockLedger.create({
           data: {
-            productId: 0, // Will be updated from variant
+            productId: item.productId,
             variantId: item.depotProductVariantId,
             depotId: parseInt(depotId, 10),
             transactionDate: new Date(),
@@ -499,7 +521,7 @@ const createPosOrder = asyncHandler(async (req, res) => {
 /**
  * @desc    Get member wallet balance
  * @route   GET /api/pos/members/:id/wallet
- * @access  Private (DepotAdmin)
+ * @access  Private (DepotAdmin, ADMIN)
  */
 const getMemberWallet = asyncHandler(async (req, res) => {
   const { id } = req.params;
