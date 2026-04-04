@@ -48,6 +48,7 @@ const leadRoutes = require("./routes/leadRoutes");
 const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
+const posRoutes = require("./routes/posRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -302,6 +303,7 @@ app.use(
   stockLedgerRoutes
 );
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN", "AGENCY", "VENDOR"), reportRoutes);
+app.use("/api/pos", posRoutes);
 
 // Catch-all route to serve the frontend index.html for Single Page Application routing
 app.get("*", (req, res, next) => {
