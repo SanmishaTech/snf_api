@@ -16,6 +16,27 @@ exports.getDashboardStats = async (req, res, next) => {
       whereConditions.depotId = userDepotId;
     }
 
+    // For AGENCY users, filter by their agency ID
+    if (role === 'AGENCY') {
+      // Prioritize agencyId already on the user object (from auth middleware)
+      if (req.user?.agencyId) {
+        whereConditions.agencyId = req.user.agencyId;
+      } else {
+        // Fallback: lookup if not attached
+        const agency = await prisma.agency.findUnique({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        if (agency) {
+          whereConditions.agencyId = agency.id;
+        } else {
+          // If role is AGENCY but no agency record exists yet, 
+          // force empty results instead of global stats.
+          whereConditions.agencyId = -1; 
+        }
+      }
+    }
+
     // Date ranges for calculations
     const currentDate = new Date();
     const lastMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
@@ -40,10 +61,10 @@ exports.getDashboardStats = async (req, res, next) => {
       // Last Month Revenue
       calculateRevenue(whereConditions, lastMonthStart, currentMonthStart),
       
-      // Current Active Customers (currently active subscriptions + recent orders)
+      // Current Active Customers
       getActiveCustomers(whereConditions),
       
-      // Last Month Active Customers (for comparison)
+      // Last Month Active Customers
       getLastMonthActiveCustomers(whereConditions, lastMonthStart, currentMonthStart),
       
       // Total Orders (current year)
@@ -52,7 +73,7 @@ exports.getDashboardStats = async (req, res, next) => {
       // Last Month Orders
       getTotalOrders(whereConditions, lastMonthStart, currentMonthStart),
       
-      // Low Stock Items (depot variants below minimum)
+      // Low Stock Items
       getLowStockItems(whereConditions),
       
       // Active Subscriptions count
@@ -64,6 +85,14 @@ exports.getDashboardStats = async (req, res, next) => {
     const customersChange = calculatePercentageChange(activeCustomers, lastMonthCustomers);
     const ordersChange = calculatePercentageChange(totalOrders, lastMonthOrders);
 
+    // Correctly identify the dashboard scope for the frontend
+    let dashboardScope = 'global';
+    if (role === 'AGENCY') {
+        dashboardScope = 'agency';
+    } else if (role === 'DEPOT_ADMIN' || role === 'DEPOTADMIN' || role.includes('DEPOT')) {
+        dashboardScope = 'depot';
+    }
+
     const stats = {
       totalRevenue: Math.round(totalRevenue.total || 0),
       revenueChange: revenueChange,
@@ -74,7 +103,7 @@ exports.getDashboardStats = async (req, res, next) => {
       lowStockItems: lowStockItems || 0,
       activeSubscriptions: activeSubscriptions || 0,
       lastUpdated: new Date().toISOString(),
-      scope: role === 'DEPOT_ADMIN' ? 'depot' : 'global'
+      scope: dashboardScope
     };
 
     res.json({
@@ -98,7 +127,9 @@ async function calculateRevenue(whereConditions, startDate, endDate) {
   // Revenue from SNF Orders
   const snfOrdersRevenue = await prisma.sNFOrder.aggregate({
     where: {
-      ...whereConditions,
+      ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+      // NOTE: SNFOrder doesn't have agencyId. If we are an agency, we don't have matching SNFOrders.
+      ...(whereConditions.agencyId && { id: -1 }), // Force 0 revenue for agencies on one-time orders for now
       createdAt: dateFilter,
       paymentStatus: 'PAID'
     },
@@ -112,6 +143,9 @@ async function calculateRevenue(whereConditions, startDate, endDate) {
     where: {
       createdAt: dateFilter,
       paymentStatus: 'PAID',
+      ...(whereConditions.agencyId && {
+        agencyId: whereConditions.agencyId
+      }),
       ...(whereConditions.depotId && {
         depotProductVariant: {
           depotId: whereConditions.depotId
@@ -128,7 +162,8 @@ async function calculateRevenue(whereConditions, startDate, endDate) {
   const currentMonthRevenue = await Promise.all([
     prisma.sNFOrder.aggregate({
       where: {
-        ...whereConditions,
+        ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+        ...(whereConditions.agencyId && { id: -1 }),
         createdAt: {
           gte: currentMonthStart,
           lte: endDate
@@ -146,6 +181,9 @@ async function calculateRevenue(whereConditions, startDate, endDate) {
           lte: endDate
         },
         paymentStatus: 'PAID',
+        ...(whereConditions.agencyId && {
+          agencyId: whereConditions.agencyId
+        }),
         ...(whereConditions.depotId && {
           depotProductVariant: {
             depotId: whereConditions.depotId
@@ -178,6 +216,9 @@ async function getActiveCustomers(whereConditions) {
       expiryDate: {
         gte: currentDate // Not expired
       },
+      ...(whereConditions.agencyId && {
+        agencyId: whereConditions.agencyId
+      }),
       ...(whereConditions.depotId && {
         depotProductVariant: {
           depotId: whereConditions.depotId
@@ -196,7 +237,8 @@ async function getActiveCustomers(whereConditions) {
   
   const recentSNFCustomers = await prisma.sNFOrder.findMany({
     where: {
-      ...whereConditions,
+      ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+      ...(whereConditions.agencyId && { id: -1 }), // Agencies don't have SNFOrders yet
       createdAt: {
         gte: recentOrderDate
       },
@@ -231,6 +273,9 @@ async function getLastMonthActiveCustomers(whereConditions, startDate, endDate) 
       expiryDate: {
         gte: startDate // Was still active during last month
       },
+      ...(whereConditions.agencyId && {
+        agencyId: whereConditions.agencyId
+      }),
       ...(whereConditions.depotId && {
         depotProductVariant: {
           depotId: whereConditions.depotId
@@ -246,7 +291,8 @@ async function getLastMonthActiveCustomers(whereConditions, startDate, endDate) 
   // Get customers with SNF orders during last month
   const lastMonthSNFCustomers = await prisma.sNFOrder.findMany({
     where: {
-      ...whereConditions,
+      ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+      ...(whereConditions.agencyId && { id: -1 }),
       createdAt: {
         gte: startDate,
         lte: endDate
@@ -280,13 +326,17 @@ async function getTotalOrders(whereConditions, startDate, endDate) {
   const [snfOrdersCount, subscriptionsCount] = await Promise.all([
     prisma.sNFOrder.count({
       where: {
-        ...whereConditions,
+        ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+        ...(whereConditions.agencyId && { id: -1 }),
         createdAt: dateFilter
       }
     }),
     prisma.subscription.count({
       where: {
         createdAt: dateFilter,
+        ...(whereConditions.agencyId && {
+          agencyId: whereConditions.agencyId
+        }),
         ...(whereConditions.depotId && {
           depotProductVariant: {
             depotId: whereConditions.depotId
@@ -302,9 +352,10 @@ async function getTotalOrders(whereConditions, startDate, endDate) {
 // Helper function to get low stock items count
 async function getLowStockItems(whereConditions) {
   // Get all depot variants and filter those where closingQty < minimumQty
+  // NOTE: depotProductVariant table DOES NOT have agencyId, so we strictly use depotId
   const variants = await prisma.depotProductVariant.findMany({
     where: {
-      ...whereConditions,
+      ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
       notInStock: false,
       isHidden: false
     },
@@ -333,6 +384,9 @@ async function getActiveSubscriptionsCount(whereConditions) {
       expiryDate: {
         gte: currentDate // Not expired
       },
+      ...(whereConditions.agencyId && {
+        agencyId: whereConditions.agencyId
+      }),
       ...(whereConditions.depotId && {
         depotProductVariant: {
           depotId: whereConditions.depotId
@@ -367,11 +421,31 @@ exports.getRecentActivities = async (req, res, next) => {
       whereConditions.depotId = userDepotId;
     }
 
+    // For AGENCY users, filter by their agency ID
+    if (role === 'AGENCY') {
+      if (req.user?.agencyId) {
+        whereConditions.agencyId = req.user.agencyId;
+      } else {
+        const agency = await prisma.agency.findUnique({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        if (agency) {
+          whereConditions.agencyId = agency.id;
+        } else {
+          whereConditions.agencyId = -1;
+        }
+      }
+    }
+
     // Get recent orders and activities
     const [recentSNFOrders, recentSubscriptions] = await Promise.all([
-      // Recent SNF Orders
+      // Recent SNF Orders (Admin/Depot only, or 0 for Agencies)
       prisma.sNFOrder.findMany({
-        where: whereConditions,
+        where: {
+          ...(whereConditions.depotId && { depotId: whereConditions.depotId }),
+          ...(whereConditions.agencyId && { id: -1 })
+        },
         include: {
           member: {
             include: {
@@ -393,6 +467,9 @@ exports.getRecentActivities = async (req, res, next) => {
       // Recent Subscriptions
       prisma.subscription.findMany({
         where: {
+          ...(whereConditions.agencyId && {
+            agencyId: whereConditions.agencyId
+          }),
           ...(whereConditions.depotId && {
             depotProductVariant: {
               depotId: whereConditions.depotId

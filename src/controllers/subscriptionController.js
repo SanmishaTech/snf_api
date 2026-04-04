@@ -567,15 +567,19 @@ const getSubscriptions = asyncHandler(async (req, res) => {
   };
 
   if (req.user.role !== 'ADMIN') {
-    const member = await prisma.member.findUnique({
-      where: { userId: req.user.id }
-    });
+    if (req.user.role === 'AGENCY' && req.user.agencyId) {
+      whereClause = { agencyId: req.user.agencyId };
+    } else {
+      const member = await prisma.member.findUnique({
+        where: { userId: req.user.id }
+      });
 
-    if (!member) {
-      res.status(400);
-      throw new Error('Member profile not found');
+      if (!member) {
+        res.status(400);
+        throw new Error('Member or Agency profile not found');
+      }
+      whereClause = { memberId: member.id };
     }
-    whereClause = { memberId: member.id };
   }
   // For ADMIN users, whereClause remains empty, fetching all subscriptions.
 

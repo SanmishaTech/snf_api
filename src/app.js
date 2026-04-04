@@ -249,7 +249,7 @@ app.use(
 app.use(
   "/api/subscriptions",
   authMiddleware,
-  roleGuard("ADMIN", "MEMBER"),
+  roleGuard("ADMIN", "MEMBER", "AGENCY"),
   subscriptionRoutes
 );
 app.use("/api/invoices", authMiddleware, invoiceRoutes);
