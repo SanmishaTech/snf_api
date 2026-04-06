@@ -87,10 +87,7 @@ module.exports = {
         }
       }
 
-      // If salesPrice is set, use it as the buyOncePrice (the displayed "Buy Once" price)
-      if (data.salesPrice != null) {
-        data.buyOncePrice = data.salesPrice;
-      }
+      // Let the frontend supply the specific buyOncePrice explicitly.
 
       const created = await prisma.depotProductVariant.create({
         data: { ...data, depotId: finalDepotId },
@@ -265,10 +262,7 @@ module.exports = {
     try {
       const data = depotProductVariantUpdateSchema.parse(req.body);
 
-      // If salesPrice is set, use it as the buyOncePrice (the displayed "Buy Once" price)
-      if (data.salesPrice != null) {
-        data.buyOncePrice = data.salesPrice;
-      }
+      // Let the frontend supply the specific buyOncePrice explicitly.
 
       const updated = await prisma.depotProductVariant.update({
         where: { id },
