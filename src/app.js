@@ -49,6 +49,7 @@ const snfOrderRoutes = require("./routes/snfOrderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const posRoutes = require("./routes/posRoutes");
+const phonePeRoutes = require("./routes/phonePeRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -304,6 +305,7 @@ app.use(
 );
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN", "AGENCY", "VENDOR"), reportRoutes);
 app.use("/api/pos", posRoutes);
+app.use("/api/phonepe", phonePeRoutes);
 
 // Catch-all route to serve the frontend index.html for Single Page Application routing
 app.get("*", (req, res, next) => {

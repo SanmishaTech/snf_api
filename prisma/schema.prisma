@@ -333,6 +333,7 @@ model Member {
   walletTransactions      WalletTransaction[]     @relation("MemberTransactions")
   posDetails              PosDetail[]             @relation("MemberPosDetails")
   cart                    Cart?
+  phonePeTransactions     PhonePeTransaction[]    @relation("MemberPhonePeTransactions")
 
   @@map("members")
 }
@@ -796,11 +797,13 @@ model ProductOrder {
   agency             Agency?        @relation(fields: [agencyId], references: [id])
   member             Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
   subscriptions      Subscription[]
+  phonePeTransactions PhonePeTransaction[] @relation("ProductOrderPhonePeTransactions")
 
   @@index([memberId])
   @@index([agencyId])
   @@map("product_orders")
 }
+
 
 /// SNF one-time checkout orders (non-subscription)
 model SNFOrder {
@@ -836,6 +839,7 @@ model SNFOrder {
   depot         Depot?         @relation(fields: [depotId], references: [id])
   member        Member?        @relation("MemberSNFOrders", fields: [memberId], references: [id])
   posDetail     PosDetail?     @relation("OrderPosDetails")
+  phonePeTransactions PhonePeTransaction[] @relation("SNFOrderPhonePeTransactions")
 
   @@index([memberId])
   @@index([depotId])
@@ -1050,3 +1054,47 @@ model CartItem {
   @@index([cartId])
   @@map("cart_items")
 }
+
+/// PhonePe payment transaction log - tracks every payment attempt
+model PhonePeTransaction {
+  id                  Int           @id @default(autoincrement())
+  merchantOrderId     String        @unique  // our UUID sent to PhonePe
+  phonePeOrderId      String?                // PhonePe's internal order ID returned
+
+  // Links to order (exactly one will be set)
+  productOrderId      Int?
+  snfOrderId          Int?
+  memberId            Int?
+
+  amount              Float                  // amount in rupees
+  amountPaise         Int                    // amount * 100
+
+  state               String        @default("PENDING") // PENDING | COMPLETED | FAILED | CANCELLED
+  paymentMode         String?                // UPI, CARD, NET_BANKING, WALLET etc.
+  transactionId       String?                // PhonePe's transaction ID
+  utr                 String?                // UPI/bank UTR number
+
+  // Raw API data for full audit trail
+  initiateResponse    Json?                  // raw response from client.pay()
+  webhookPayload      Json?                  // raw webhook payload received
+  statusCheckPayload  Json?                  // latest getOrderStatus() response
+
+  errorCode           String?
+  errorMessage        String?       @db.Text
+  redirectUrl         String?       @db.Text // PhonePe checkout page URL
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  member              Member?       @relation("MemberPhonePeTransactions", fields: [memberId], references: [id], onDelete: SetNull)
+  productOrder        ProductOrder? @relation("ProductOrderPhonePeTransactions", fields: [productOrderId], references: [id], onDelete: SetNull)
+  snfOrder            SNFOrder?     @relation("SNFOrderPhonePeTransactions", fields: [snfOrderId], references: [id], onDelete: SetNull)
+
+  @@index([merchantOrderId])
+  @@index([productOrderId])
+  @@index([snfOrderId])
+  @@index([memberId])
+  @@index([state])
+  @@map("phonepe_transactions")
+}
+
