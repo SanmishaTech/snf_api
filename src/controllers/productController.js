@@ -966,7 +966,7 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
         } else {
           // If multiple tags, use AND with contains
           if (!whereConditions.AND) whereConditions.AND = [];
-          
+
           tagsArray.forEach(tag => {
             if (tag === 'pasteurized' || tag === 'pasturized') {
               whereConditions.AND.push({
@@ -1183,7 +1183,6 @@ const getAllTags = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = {
-
   createProduct,
   getAllProducts,
   getPublicProducts,
@@ -1197,3 +1196,4 @@ module.exports = {
   deleteProductImage,
   getAllTags,
 };
+

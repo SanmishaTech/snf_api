@@ -72,9 +72,9 @@ app.use(
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv
-      .split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean)
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
   : ["http://localhost:5173", "https://www.indraai.in"];
 
 const corsOptions = {
@@ -100,7 +100,7 @@ app.use(auditLogger);
 const frontendDistPath =
   process.env.NODE_ENV === "production"
     ? process.env.FRONTEND_PATH ||
-      path.resolve(__dirname, "..", "..", "snf", "dist")
+    path.resolve(__dirname, "..", "..", "snf", "dist")
     : path.resolve(__dirname, "..", "..", "snf", "dist");
 
 console.log(`snf bui ld path: ${frontendDistPath}`);
@@ -120,7 +120,7 @@ app.use("/uploads", express.static(uploadsPath));
 app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
   const invoiceNo = req.params.invoiceNo.replace('.pdf', '');
   const invoicePath = path.resolve(__dirname, "..", "uploads", "invoices", `${invoiceNo}.pdf`);
-  
+
   // Check if file exists
   const fs = require('fs').promises;
   try {
@@ -133,7 +133,7 @@ app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
       const { PrismaClient } = require('@prisma/client');
       const { generateInvoiceForOrder } = require('./services/invoiceService');
       const prisma = new PrismaClient();
-      
+
       // Find the order by invoice number (financial year format: YYNN-NNNNN)
       const productOrder = await prisma.productOrder.findFirst({
         where: { invoiceNo },
@@ -150,14 +150,14 @@ app.use("/uploads/invoices/:invoiceNo", async (req, res, next) => {
           member: { include: { user: true } }
         }
       });
-      
+
       if (productOrder) {
         console.log(`Generating invoice ${invoiceNo} for order ${productOrder.orderNo}`);
         // Generate the invoice
         await generateInvoiceForOrder(productOrder);
-        
+
         await prisma.$disconnect();
-        
+
         // Now serve the newly generated file
         res.sendFile(invoicePath);
       } else {
@@ -311,7 +311,7 @@ app.use("/api/phonepe", phonePeRoutes);
 app.get("*", (req, res, next) => {
   if (req.originalUrl.startsWith("/api/")) {
     // If it's an API route that wasn't matched, let it flow to standard 404 handler
-    return next(); 
+    return next();
   }
   res.sendFile(path.join(frontendDistPath, "index.html"));
 });
