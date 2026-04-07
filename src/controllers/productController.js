@@ -195,6 +195,7 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     sortBy = "createdAt", // Default sort by creation date
     sortOrder = "desc",
     search = "",
+    select: selectFields = "", // Field selection for optimized queries
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -209,7 +210,7 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
 
   const whereConditions = {};
   if (search) {
-    // Basic search on name and URL. Price is Float, so 'contains' is not applicable.
+    // Case-insensitive search on name and URL.
     whereConditions.OR = [
       { name: { contains: search } },
       { url: { contains: search } },
@@ -238,6 +239,20 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
     : "createdAt";
   const orderByDirection = sortOrder === "desc" ? "desc" : "asc";
 
+  // Parse selection fields if provided
+  let select = undefined;
+  let include = {
+    category: true, // Default inclusion
+  };
+
+  if (selectFields) {
+    select = {};
+    selectFields.split(',').forEach(field => {
+      select[field.trim()] = true;
+    });
+    include = undefined; // Prisma doesn't allow both select and include
+  }
+
   try {
     const products = await prisma.product.findMany({
       where: whereConditions,
@@ -246,9 +261,8 @@ const getAllProducts = asyncHandler(async (req, res, next) => {
       orderBy: {
         [orderByField]: orderByDirection,
       },
-      include: {
-        category: true, // Include category data
-      },
+      select,
+      include,
     });
 
     const totalRecords = await prisma.product.count({

@@ -12,20 +12,24 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const search = req.query.search || "";
+    const active = req.query.active; // Can be "true", "false" or undefined (all)
     // Default sort by name, can be overridden by query params e.g. sortBy=email&sortOrder=desc
     const sortBy = req.query.sortBy || "name"; 
     const sortOrder = req.query.sortOrder === "desc" ? "desc" : "asc";
 
     const whereClause = {
-        role: 'MEMBER', // Filter by role MEMBER - Case-sensitive, ensure 'MEMBER' is correct.
-        AND: search ? [ // Apply search if search term exists
-            {
+        role: 'MEMBER', // Filter by role MEMBER
+        AND: [
+            search ? {
                 OR: [
-                    { name: { contains: search } }, // Search for name (case-sensitive by default now)
-                    { email: { contains: search } }, // Search for email (case-sensitive by default now)
+                    { name: { contains: search } },
+                    { email: { contains: search } },
                 ],
-            },
-        ] : [],
+            } : {},
+            (active === "true" || active === "false") ? {
+                active: active === "true"
+            } : {}
+        ],
     };
 
     const totalRecords = await prisma.user.count({
