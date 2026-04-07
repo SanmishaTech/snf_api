@@ -889,7 +889,7 @@ const getDepotVariantPricing = asyncHandler(async (req, res, next) => {
  */
 const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
   try {
-    const { depotId, page = 1, limit = 10, categoryId } = req.query;
+    const { depotId, page = 1, limit = 10, categoryId, search, tags } = req.query;
 
     if (!depotId) {
       return res.status(400).json({
@@ -947,6 +947,42 @@ const getPublicProductsWithVariants = asyncHandler(async (req, res, next) => {
     };
     if (catIdNum) {
       whereConditions.categoryId = catIdNum;
+    }
+
+    if (search) {
+      whereConditions.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (tags) {
+      const tagsArray = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+      if (tagsArray.length > 0) {
+        if (tagsArray.includes('non-dairy')) {
+          whereConditions.isDairyProduct = false;
+        } else if (tagsArray.includes('contains-dairy')) {
+          whereConditions.isDairyProduct = true;
+        } else {
+          // If multiple tags, use AND with contains
+          if (!whereConditions.AND) whereConditions.AND = [];
+          
+          tagsArray.forEach(tag => {
+            if (tag === 'pasteurized' || tag === 'pasturized') {
+              whereConditions.AND.push({
+                OR: [
+                  { tags: { contains: 'pasteurized', mode: 'insensitive' } },
+                  { tags: { contains: 'pasturized', mode: 'insensitive' } }
+                ]
+              });
+            } else {
+              whereConditions.AND.push({
+                tags: { contains: tag, mode: 'insensitive' }
+              });
+            }
+          });
+        }
+      }
     }
 
     // Get total count for pagination
@@ -1128,7 +1164,7 @@ const getAllTags = asyncHandler(async (req, res, next) => {
       where: { tags: { not: null, not: "" } },
       select: { tags: true },
     });
-    
+
     const tagSet = new Set();
     products.forEach(p => {
       if (p.tags) {
@@ -1138,7 +1174,7 @@ const getAllTags = asyncHandler(async (req, res, next) => {
         });
       }
     });
-    
+
     res.status(200).json(Array.from(tagSet).sort());
   } catch (error) {
     console.error("Error fetching tags:", error);
