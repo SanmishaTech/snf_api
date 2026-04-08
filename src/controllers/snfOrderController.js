@@ -53,6 +53,7 @@ const createSNFOrder = asyncHandler(async (req, res) => {
     depotId = null, // Optional depot association
     couponCode = null,
     couponDiscount = 0,
+    deliveryDate = null,
   } = req.body || {};
 
 
@@ -245,6 +246,7 @@ const createSNFOrder = asyncHandler(async (req, res) => {
         paymentStatus,
         paymentRefNo,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
+        deliveryDate: deliveryDate ? new Date(deliveryDate) : new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Default +2 days if not provided
         couponCode: couponCode ? couponCode.toUpperCase() : null,
         couponDiscount: backendCouponDiscount,
         items: {

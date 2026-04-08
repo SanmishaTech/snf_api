@@ -825,6 +825,7 @@ model SNFOrder {
   paymentStatus PaymentStatus  @default(PENDING)
   paymentRefNo  String?
   paymentDate   DateTime?
+  deliveryDate  DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   depotId       Int?
