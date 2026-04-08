@@ -82,4 +82,26 @@ router.get(
   reportController.getExceptionReport
 );
 
+// SNF Delivery List Report
+router.get(
+  '/snf-delivery-list',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getSNFDeliveryListReport
+);
+
+router.get(
+  '/snf-packing-list',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getSNFPackingListReport
+);
+
+router.get(
+  '/snf-stock-requirement',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getSNFStockRequirementReport
+);
+
 module.exports = router;

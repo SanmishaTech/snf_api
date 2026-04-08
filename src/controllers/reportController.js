@@ -24,7 +24,7 @@ exports.getPurchaseOrderReport = async (req, res, next) => {
     if (role === 'VENDOR' && !userVendorId) {
       return next(createError(403, 'Vendor user is not linked to any farmer/vendor record'));
     }
-    
+
     // Date range filter
     if (startDate || endDate) {
       where.orderDate = {};
@@ -155,13 +155,13 @@ exports.getWalletReport = async (req, res, next) => {
     const members = await prisma.member.findMany({
       ...(nameTerm
         ? {
-            where: {
-              OR: [
-                { name: { contains: nameTerm } },
-                { user: { name: { contains: nameTerm } } }
-              ]
-            }
+          where: {
+            OR: [
+              { name: { contains: nameTerm } },
+              { user: { name: { contains: nameTerm } } }
+            ]
           }
+        }
         : {}),
       include: {
         user: {
@@ -220,15 +220,15 @@ exports.getWalletReport = async (req, res, next) => {
 
     const firstPaidSubGroups = memberIds.length
       ? await prisma.subscription.groupBy({
-          by: ['memberId'],
-          where: {
-            memberId: { in: memberIds },
-            paymentStatus: 'PAID'
-          },
-          _min: {
-            createdAt: true
-          }
-        })
+        by: ['memberId'],
+        where: {
+          memberId: { in: memberIds },
+          paymentStatus: 'PAID'
+        },
+        _min: {
+          createdAt: true
+        }
+      })
       : [];
 
     const firstSubscriptionDateByMemberId = new Map(
@@ -239,23 +239,23 @@ exports.getWalletReport = async (req, res, next) => {
     // Note: Many MEMBER users may not have user.depotId set, so user.depot can be empty.
     const subscriptions = memberIds.length
       ? await prisma.subscription.findMany({
-          where: {
-            memberId: { in: memberIds },
-            paymentStatus: { not: 'CANCELLED' }
-          },
-          select: {
-            memberId: true,
-            expiryDate: true,
-            createdAt: true,
-            depotProductVariant: {
-              select: {
-                name: true,
-                depot: { select: { name: true } }
-              }
+        where: {
+          memberId: { in: memberIds },
+          paymentStatus: { not: 'CANCELLED' }
+        },
+        select: {
+          memberId: true,
+          expiryDate: true,
+          createdAt: true,
+          depotProductVariant: {
+            select: {
+              name: true,
+              depot: { select: { name: true } }
             }
-          },
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
-        })
+          }
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      })
       : [];
 
     const now = new Date();
@@ -698,18 +698,18 @@ exports.getDeliveryFilters = async (req, res, next) => {
     }
     try {
       // Get locations for area filtering (used in delivery addresses)
-      areas = await prisma.location.findMany({ 
-        select: { 
-          id: true, 
-          name: true, 
+      areas = await prisma.location.findMany({
+        select: {
+          id: true,
+          name: true,
           city: { select: { name: true } }
-        }, 
+        },
         orderBy: { name: 'asc' },
         include: {
           city: { select: { name: true } }
         }
       });
-      
+
       // Format areas to match expected structure
       areas = areas.map(location => ({
         id: location.id,
@@ -719,9 +719,9 @@ exports.getDeliveryFilters = async (req, res, next) => {
     } catch (e) {
       // Fallback to area masters if locations don't work
       try {
-        areas = await prisma.areaMaster.findMany({ 
-          select: { id: true, name: true }, 
-          orderBy: { name: 'asc' } 
+        areas = await prisma.areaMaster.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' }
         });
         areas = areas.map(area => ({
           id: area.id,
@@ -773,7 +773,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         { subscription: { agencyId: requestedAgencyId } }
       ];
     }
-    
+
     // For area filtering, we need to filter through the delivery address location
     if (areaId) {
       where.deliveryAddress = {
@@ -847,7 +847,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
       const rate = parseFloat(d.subscription?.rate) || 0;
       const quantity = parseInt(d.quantity) || 1;
       const amount = quantity * rate;
-      
+
       // Determine area information - if delivery address exists, check its location
       // If no delivery address or location is present, show Any
       let areaName, areaIdValue, city;
@@ -865,7 +865,7 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         areaIdValue = 'any';
         city = effectiveAddress?.city || d.agent?.city || 'Any';
       }
-      
+
       flat.push({
         orderId: `DSE-${d.id}`,
         deliveryDate: d.deliveryDate,
@@ -881,8 +881,8 @@ exports.getDeliveryAgenciesReport = async (req, res, next) => {
         customerUniqueId: d.member?.user?.userUniqueId || d.subscription?.member?.user?.userUniqueId || '',
         customerMobile: d.member?.user?.mobile || d.subscription?.member?.user?.mobile || '',
         pincode: effectiveAddress?.pincode || '',
-        deliveryAddress: effectiveAddress ? 
-          `${effectiveAddress.plotBuilding}, ${effectiveAddress.streetArea}, ${effectiveAddress.city}` : 
+        deliveryAddress: effectiveAddress ?
+          `${effectiveAddress.plotBuilding}, ${effectiveAddress.streetArea}, ${effectiveAddress.city}` :
           'No address specified',
         areaId: areaIdValue,
         areaName: areaName,
@@ -1001,7 +1001,7 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       const variantName = resolvedVariant?.name ?? 'Unknown Variant';
 
       const status = d.status || 'UNKNOWN';
-      
+
       statusSet.add(status);
 
       const groupKey = `${agencyId}__${variantId}`;
@@ -1040,9 +1040,9 @@ exports.getDeliverySummariesReport = async (req, res, next) => {
       totalAgencies: uniqueAgencyCount,
       statusTotals: {}
     };
-    
+
     statusList.forEach(status => {
-      totals.statusTotals[status] = summaryData.reduce((sum, agency) => 
+      totals.statusTotals[status] = summaryData.reduce((sum, agency) =>
         sum + (agency.statusCounts[status] || 0), 0
       );
     });
@@ -1078,7 +1078,7 @@ function groupDeliveries(data, levels) {
     } else {
       key = row.status || 'unknown';
     }
-    
+
     if (!acc[key]) acc[key] = [];
     acc[key].push(row);
     return acc;
@@ -1086,7 +1086,7 @@ function groupDeliveries(data, levels) {
   const result = [];
   Object.entries(groups).forEach(([id, rows]) => {
     let nodeName, productName, variantName;
-    
+
     if (level === 'agency') {
       nodeName = rows[0].agencyName;
     } else if (level === 'area') {
@@ -1098,7 +1098,7 @@ function groupDeliveries(data, levels) {
     } else {
       nodeName = rows[0].status;
     }
-    
+
     const node = {
       level,
       id,
@@ -1128,10 +1128,10 @@ function groupDeliveries(data, levels) {
 // Helper function to process and group data
 function processGroupedData(orders, groupByLevels) {
   const result = [];
-  
+
   // Flatten order items for easier processing
   const flatData = [];
-  
+
   orders.forEach(order => {
     order.items.forEach(item => {
       flatData.push({
@@ -1140,18 +1140,18 @@ function processGroupedData(orders, groupByLevels) {
         purchaseDate: order.orderDate,
         deliveryDate: order.deliveryDate,
         status: order.status || 'PENDING',
-        
+
         // Vendor/Farmer info
         farmerId: order.vendor?.id,
         farmerName: order.vendor?.name || 'Unknown',
         isDairySupplier: order.vendor?.isDairySupplier,
-        
+
         // Depot info (from item)
         depotId: item.depot?.id,
         depotName: item.depot?.name || 'N/A',
         depotCity: item.depot?.city,
         depotAddress: item.depot?.address,
-        
+
         // Product/Variant info
         productId: item.product?.id,
         productName: item.product?.name || 'Unknown',
@@ -1159,7 +1159,7 @@ function processGroupedData(orders, groupByLevels) {
         variantId: item.depotVariant?.id || item.depotVariantId,
         variantName: item.depotVariant?.name || 'N/A',
         variantMrp: item.depotVariant?.mrp,
-        
+
         // Quantities and amounts
         quantity: item.quantity,
         deliveredQuantity: item.deliveredQuantity || 0,
@@ -1167,11 +1167,11 @@ function processGroupedData(orders, groupByLevels) {
         supervisorQuantity: item.supervisorQuantity || 0,
         purchaseRate: item.priceAtPurchase,
         amount: item.quantity * item.priceAtPurchase,
-        
+
         // Agency info
         agencyId: item.agency?.id,
         agencyName: item.agency?.name || 'N/A',
-        
+
         // Delivery info
         deliveredBy: order.deliveredBy?.name,
         receivedBy: order.receivedBy?.name
@@ -1182,7 +1182,7 @@ function processGroupedData(orders, groupByLevels) {
   // Group data based on specified levels
   if (groupByLevels.includes('farmer')) {
     const farmerGroups = groupBy(flatData, 'farmerId');
-    
+
     Object.entries(farmerGroups).forEach(([farmerId, farmerData]) => {
       const farmerGroup = {
         level: 'farmer',
@@ -1194,7 +1194,7 @@ function processGroupedData(orders, groupByLevels) {
 
       if (groupByLevels.includes('depot')) {
         const depotGroups = groupBy(farmerData, 'depotId');
-        
+
         Object.entries(depotGroups).forEach(([depotId, depotData]) => {
           const depotGroup = {
             level: 'depot',
@@ -1207,7 +1207,7 @@ function processGroupedData(orders, groupByLevels) {
 
           if (groupByLevels.includes('variant')) {
             const variantGroups = groupBy(depotData, 'variantId');
-            
+
             Object.entries(variantGroups).forEach(([variantId, variantData]) => {
               const variantGroup = {
                 level: 'variant',
@@ -1218,7 +1218,7 @@ function processGroupedData(orders, groupByLevels) {
                 data: variantData,
                 totals: calculateGroupTotals(variantData)
               };
-              
+
               depotGroup.data.push(variantGroup);
             });
           } else {
@@ -1229,18 +1229,18 @@ function processGroupedData(orders, groupByLevels) {
         });
       } else if (groupByLevels.includes('variant')) {
         const variantGroups = groupBy(farmerData, 'variantId');
-        
+
         Object.entries(variantGroups).forEach(([variantId, variantData]) => {
           const variantGroup = {
-              level: 'variant',
-              id: variantId,
-              name: variantData[0].variantName,
-              productName: variantData[0].productName,
-              unit: '',
+            level: 'variant',
+            id: variantId,
+            name: variantData[0].variantName,
+            productName: variantData[0].productName,
+            unit: '',
             data: variantData,
             totals: calculateGroupTotals(variantData)
           };
-          
+
           farmerGroup.data.push(variantGroup);
         });
       } else {
@@ -1251,7 +1251,7 @@ function processGroupedData(orders, groupByLevels) {
     });
   } else if (groupByLevels.includes('depot')) {
     const depotGroups = groupBy(flatData, 'depotId');
-    
+
     Object.entries(depotGroups).forEach(([depotId, depotData]) => {
       const depotGroup = {
         level: 'depot',
@@ -1264,7 +1264,7 @@ function processGroupedData(orders, groupByLevels) {
 
       if (groupByLevels.includes('variant')) {
         const variantGroups = groupBy(depotData, 'variantId');
-        
+
         Object.entries(variantGroups).forEach(([variantId, variantData]) => {
           const variantGroup = {
             level: 'variant',
@@ -1275,7 +1275,7 @@ function processGroupedData(orders, groupByLevels) {
             data: variantData,
             totals: calculateGroupTotals(variantData)
           };
-          
+
           depotGroup.data.push(variantGroup);
         });
       } else {
@@ -1286,7 +1286,7 @@ function processGroupedData(orders, groupByLevels) {
     });
   } else if (groupByLevels.includes('variant')) {
     const variantGroups = groupBy(flatData, 'variantId');
-    
+
     Object.entries(variantGroups).forEach(([variantId, variantData]) => {
       const variantGroup = {
         level: 'variant',
@@ -1297,7 +1297,7 @@ function processGroupedData(orders, groupByLevels) {
         data: variantData,
         totals: calculateGroupTotals(variantData)
       };
-      
+
       result.push(variantGroup);
     });
   } else {
@@ -1326,8 +1326,8 @@ function calculateGroupTotals(data) {
     totalQuantity: data.reduce((sum, item) => sum + (item.quantity || 0), 0),
     totalAmount: data.reduce((sum, item) => sum + (item.amount || 0), 0),
     itemCount: data.length,
-    avgRate: data.length > 0 
-      ? data.reduce((sum, item) => sum + (item.purchaseRate || 0), 0) / data.length 
+    avgRate: data.length > 0
+      ? data.reduce((sum, item) => sum + (item.purchaseRate || 0), 0) / data.length
       : 0
   };
 }
@@ -1375,17 +1375,17 @@ exports.getReportFilters = async (req, res, next) => {
           orderBy: { name: 'asc' }
         });
       })(),
-      
+
       // Get depots
       prisma.depot.findMany({
         select: { id: true, name: true, city: true, address: true },
         orderBy: { name: 'asc' }
       }),
-      
+
       // Get products with variants
       prisma.product.findMany({
-        select: { 
-          id: true, 
+        select: {
+          id: true,
           name: true,
           variants: {
             select: { id: true, name: true }
@@ -1443,7 +1443,7 @@ exports.getSubscriptionReports = async (req, res, next) => {
 
     // Build where clause for subscriptions
     const where = {};
-    
+
     // Date range filter (based on subscription start date or creation date)
     if (startDate || endDate) {
       where.startDate = {};
@@ -1565,7 +1565,7 @@ exports.getSubscriptionReports = async (req, res, next) => {
     // Transform data for response
     const transformedData = subscriptions.map(subscription => {
       const isExpired = subscription.expiryDate && new Date(subscription.expiryDate) < currentDate;
-      
+
       return {
         id: subscription.id,
         orderId: subscription.productOrder?.orderNo || null,
@@ -1613,7 +1613,7 @@ exports.getSubscriptionReports = async (req, res, next) => {
     // Calculate summary statistics
     const effectiveLimit = shouldPaginate ? (limitNum || 50) : (totalCount || subscriptions.length || 0);
     const totalPages = shouldPaginate ? Math.ceil(totalCount / effectiveLimit) : 1;
-    
+
     // Get overall statistics (not paginated)
     const stats = await prisma.subscription.groupBy({
       by: ['paymentStatus'],
@@ -2160,5 +2160,260 @@ exports.getRevenueReport = async (req, res, next) => {
   } catch (error) {
     console.error('[getRevenueReport]', error);
     return next(createError(500, error.message || 'Failed to generate revenue report'));
+  }
+};
+
+/**
+ * SNF Delivery List Report
+ * Groups SNF orders by area for a specific depot and date
+ */
+exports.getSNFDeliveryListReport = async (req, res, next) => {
+  try {
+    const { depotId, date } = req.query;
+
+    if (!depotId) {
+      return next(createError(400, 'depotId is required'));
+    }
+
+    const where = {
+      depotId: parseInt(depotId, 10),
+      paymentStatus: {
+        not: 'CANCELLED'
+      }
+    };
+
+    if (date) {
+      const deliveryDate = new Date(date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(deliveryDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      where.deliveryDate = {
+        gte: deliveryDate,
+        lt: nextDay
+      };
+    }
+
+    const orders = await prisma.sNFOrder.findMany({
+      where,
+      include: {
+        items: true,
+        member: {
+          select: {
+            id: true,
+            name: true,
+            user: {
+              select: {
+                mobile: true,
+                userUniqueId: true
+              }
+            }
+          }
+        },
+        depot: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: [
+        { addressLine2: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    // Process grouping by area (addressLine2)
+    const groupedByArea = orders.reduce((acc, order) => {
+      const area = order.addressLine2 || 'Other Areas';
+      if (!acc[area]) {
+        acc[area] = [];
+      }
+      acc[area].push({
+        id: order.id,
+        orderNo: order.orderNo,
+        customerName: order.name,
+        mobile: order.mobile,
+        address: `${order.addressLine1}${order.addressLine2 ? ', ' + order.addressLine2 : ''}, ${order.city}`,
+        pincode: order.pincode,
+        paymentStatus: order.paymentStatus,
+        paymentMode: order.paymentMode,
+        totalAmount: order.totalAmount,
+        items: order.items.map(item => ({
+          name: item.name,
+          variant: item.variantName,
+          quantity: item.quantity
+        }))
+      });
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      data: groupedByArea,
+      filters: {
+        depotId,
+        date
+      }
+    });
+  } catch (error) {
+    console.error('[getSNFDeliveryListReport]', error);
+    return next(createError(500, error.message || 'Failed to generate SNF delivery list report'));
+  }
+};
+
+exports.getSNFPackingListReport = async (req, res, next) => {
+  try {
+    const { depotId, date } = req.query;
+
+    if (!depotId) {
+      return next(createError(400, 'depotId is required'));
+    }
+
+    const where = {
+      depotId: parseInt(depotId, 10),
+      paymentStatus: {
+        not: 'CANCELLED'
+      }
+    };
+
+    if (date) {
+      const deliveryDate = new Date(date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(deliveryDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      where.deliveryDate = {
+        gte: deliveryDate,
+        lt: nextDay
+      };
+    }
+
+    const orders = await prisma.sNFOrder.findMany({
+      where,
+      include: {
+        items: true,
+        member: {
+          select: {
+            id: true,
+            name: true,
+            user: {
+              select: {
+                name: true,
+                userUniqueId: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        { addressLine1: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    // Format for packing list (flat list of orders with their items)
+    const formattedData = orders.map(order => {
+      const memberUser = order.member?.user;
+      const memberName = order.member?.name;
+      
+      // Priority: 1. User Name, 2. Member Name, 3. Order recipient name, 4. "Guest"
+      let customerName = memberUser?.name || memberName || order.name || 'Guest Order';
+      
+      // Append Unique ID if available
+      if (memberUser?.userUniqueId) {
+        customerName = `${customerName} (${memberUser.userUniqueId})`;
+      }
+
+      return {
+        id: order.id,
+        customerName,
+        address: `${order.addressLine1}${order.addressLine2 ? `, ${order.addressLine2}` : ''}, ${order.city}`,
+        pincode: order.pincode,
+        items: order.items.map(item => ({
+          name: item.name,
+          variant: item.variantName,
+          quantity: item.quantity
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    console.error('[getSNFPackingListReport]', error);
+    return next(createError(500, error.message || 'Failed to generate SNF packing list report'));
+  }
+};
+
+exports.getSNFStockRequirementReport = async (req, res, next) => {
+  try {
+    const { depotId, date } = req.query;
+
+    if (!depotId) {
+      return next(createError(400, 'depotId is required'));
+    }
+
+    const where = {
+      depotId: parseInt(depotId, 10),
+      paymentStatus: {
+        not: 'CANCELLED'
+      }
+    };
+
+    if (date) {
+      const deliveryDate = new Date(date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(deliveryDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      where.deliveryDate = {
+        gte: deliveryDate,
+        lt: nextDay
+      };
+    }
+
+    const orders = await prisma.sNFOrder.findMany({
+      where,
+      include: {
+        items: true
+      }
+    });
+
+    // Aggregate by depotProductVariantId
+    const aggregation = {};
+
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        // Use depotProductVariantId as the primary key for variants
+        const key = item.depotProductVariantId ? `dpv-${item.depotProductVariantId}` : `p-${item.productId}-${item.variantName}`;
+        if (!aggregation[key]) {
+          aggregation[key] = {
+            name: item.name,
+            variant: item.variantName,
+            totalQuantity: 0
+          };
+        }
+        aggregation[key].totalQuantity += item.quantity;
+      });
+    });
+
+    const formattedData = Object.values(aggregation).sort((a, b) => 
+      a.name.localeCompare(b.name) || a.variant.localeCompare(b.variant)
+    );
+
+    res.json({
+      success: true,
+      data: formattedData,
+      filters: {
+        depotId,
+        date
+      }
+    });
+  } catch (error) {
+    console.error('[getSNFStockRequirementReport]', error);
+    return next(createError(500, error.message || 'Failed to generate SNF stock requirement report'));
   }
 };
