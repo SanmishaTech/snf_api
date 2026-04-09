@@ -50,6 +50,9 @@ const reportRoutes = require("./routes/reportRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const posRoutes = require("./routes/posRoutes");
 const phonePeRoutes = require("./routes/phonePeRoutes");
+const deliveryPartnerRoutes = require("./routes/deliveryPartnerRoutes");
+const deliveryAssignmentRoutes = require("./routes/deliveryAssignmentRoutes");
+const deliveryAppRoutes = require("./routes/deliveryAppRoutes");
 
 // --- Authorization helpers ---
 const authMiddleware = require("./middleware/auth");
@@ -306,6 +309,25 @@ app.use(
 app.use("/api/reports", authMiddleware, roleGuard("ADMIN", "AGENCY", "VENDOR"), reportRoutes);
 app.use("/api/pos", posRoutes);
 app.use("/api/phonepe", phonePeRoutes);
+
+app.use(
+  "/api/delivery-partners",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  deliveryPartnerRoutes
+);
+app.use(
+  "/api/delivery-assignments",
+  authMiddleware,
+  roleGuard("ADMIN", "DepotAdmin"),
+  deliveryAssignmentRoutes
+);
+app.use(
+  "/api/delivery-app",
+  authMiddleware,
+  roleGuard("DELIVERY_PARTNER"),
+  deliveryAppRoutes
+);
 
 // Catch-all route to serve the frontend index.html for Single Page Application routing
 app.get("*", (req, res, next) => {

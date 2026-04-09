@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 //changes
 
 datasource db {
@@ -9,37 +10,39 @@ datasource db {
 }
 
 model User {
-  id                    Int                 @id @default(autoincrement())
-  userUniqueId          String?             @unique
-  name                  String
-  email                 String              @unique
-  password              String
-  role                  Role
-  mobile                String?             @unique
-  active                Boolean             @default(true)
-  lastLogin             DateTime?
-  resetToken            String?
-  resetTokenExpires     DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  depotId               Int?
-  joiningDate           DateTime?
-  purchasesCreated      Purchase[]          @relation("PurchaseCreatedBy")
-  purchasesUpdated      Purchase[]          @relation("PurchaseUpdatedBy")
-  agency                Agency?
-  member                Member?
-  supervisor            Supervisor?
-  transfersCreated      Transfer[]          @relation("Transfer_createdBy")
-  depot                 Depot?              @relation(fields: [depotId], references: [id])
-  deliveredOrders       VendorOrder[]       @relation("DeliveredBy")
-  receivedOrders        VendorOrder[]       @relation("ReceivedBy")
-  wastageRegisteredOrders VendorOrder[]     @relation("WastageRegisteredBy")
-  vendor                Vendor?
-  processedTransactions WalletTransaction[] @relation("AdminProcessedTransactions")
-  wastagesCreated       Wastage[]           @relation("WastageCreatedBy")
-  wastagesUpdated       Wastage[]           @relation("WastageUpdatedBy")
-  auditLogs             AuditLog[]
-  cart                  Cart?
+  id                       Int                  @id @default(autoincrement())
+  userUniqueId             String?              @unique
+  name                     String
+  email                    String               @unique
+  password                 String
+  role                     Role
+  mobile                   String?              @unique
+  active                   Boolean              @default(true)
+  lastLogin                DateTime?
+  resetToken               String?
+  resetTokenExpires        DateTime?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  depotId                  Int?
+  joiningDate              DateTime?
+  purchasesCreated         Purchase[]           @relation("PurchaseCreatedBy")
+  purchasesUpdated         Purchase[]           @relation("PurchaseUpdatedBy")
+  agency                   Agency?
+  member                   Member?
+  supervisor               Supervisor?
+  transfersCreated         Transfer[]           @relation("Transfer_createdBy")
+  depot                    Depot?               @relation(fields: [depotId], references: [id])
+  deliveredOrders          VendorOrder[]        @relation("DeliveredBy")
+  receivedOrders           VendorOrder[]        @relation("ReceivedBy")
+  wastageRegisteredOrders  VendorOrder[]        @relation("WastageRegisteredBy")
+  vendor                   Vendor?
+  processedTransactions    WalletTransaction[]  @relation("AdminProcessedTransactions")
+  wastagesCreated          Wastage[]            @relation("WastageCreatedBy")
+  wastagesUpdated          Wastage[]            @relation("WastageUpdatedBy")
+  auditLogs                AuditLog[]
+  cart                     Cart?
+  deliveryPartner          DeliveryPartner?
+  deliveryAssignmentsGiven DeliveryAssignment[]
 
   @@index([depotId], map: "users_depotId_fkey")
   @@map("users")
@@ -346,7 +349,7 @@ model Banner {
   listOrder   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
- 
+
   @@map("banners")
 }
 
@@ -374,6 +377,8 @@ model Depot {
   orderItems              OrderItem[]
   wastages                Wastage[]
   agencies                Agency[]
+  deliveryPartners        DeliveryPartner[]
+  deliveryAssignments     DeliveryAssignment[]
 
   @@map("depots")
 }
@@ -446,6 +451,7 @@ model DeliveryScheduleEntry {
   product               Product              @relation(fields: [productId], references: [id])
   subscription          Subscription         @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
   walletTransaction     WalletTransaction?   @relation(fields: [walletTransactionId], references: [id])
+  deliveryAssignment    DeliveryAssignment?
 
   @@index([subscriptionId])
   @@index([memberId])
@@ -573,6 +579,7 @@ model Purchase {
   @@index([updatedById], map: "Purchase_updatedById_fkey")
   @@map("purchases")
 }
+
 //changes
 
 model PurchaseDetail {
@@ -777,26 +784,26 @@ model TransferDetail {
 }
 
 model ProductOrder {
-  id                 Int            @id @default(autoincrement())
-  orderNo            String         @unique
-  memberId           Int
-  totalQty           Int
-  totalAmount        Float
-  walletamt          Float          @default(0)
-  payableamt         Float          @default(0)
-  receivedamt        Float          @default(0)
-  paymentMode        PaymentMode?
-  paymentReferenceNo String?
-  paymentDate        DateTime?
-  paymentStatus      PaymentStatus  @default(PENDING)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  agencyId           Int?
-  invoiceNo          String?        @unique
-  invoicePath        String?
-  agency             Agency?        @relation(fields: [agencyId], references: [id])
-  member             Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  subscriptions      Subscription[]
+  id                  Int                  @id @default(autoincrement())
+  orderNo             String               @unique
+  memberId            Int
+  totalQty            Int
+  totalAmount         Float
+  walletamt           Float                @default(0)
+  payableamt          Float                @default(0)
+  receivedamt         Float                @default(0)
+  paymentMode         PaymentMode?
+  paymentReferenceNo  String?
+  paymentDate         DateTime?
+  paymentStatus       PaymentStatus        @default(PENDING)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  agencyId            Int?
+  invoiceNo           String?              @unique
+  invoicePath         String?
+  agency              Agency?              @relation(fields: [agencyId], references: [id])
+  member              Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  subscriptions       Subscription[]
   phonePeTransactions PhonePeTransaction[] @relation("ProductOrderPhonePeTransactions")
 
   @@index([memberId])
@@ -804,43 +811,43 @@ model ProductOrder {
   @@map("product_orders")
 }
 
-
 /// SNF one-time checkout orders (non-subscription)
 model SNFOrder {
-  id            Int            @id @default(autoincrement())
-  orderNo       String         @unique
-  memberId      Int?
-  name          String
-  email         String?
-  mobile        String
-  addressLine1  String
-  addressLine2  String?
-  city          String
-  state         String?
-  pincode       String
-  subtotal      Float
-  deliveryFee   Float          @default(0)
-  totalAmount   Float
-  paymentMode   PaymentMode?
-  paymentStatus PaymentStatus  @default(PENDING)
-  paymentRefNo  String?
-  paymentDate   DateTime?
-  deliveryDate  DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  depotId       Int?
-  invoiceNo     String?
-  invoicePath   String?
-  payableAmount Float          @default(0)
-  walletamt     Float          @default(0)
-  couponCode    String?
-  couponDiscount Float?         @default(0)
+  id             Int           @id @default(autoincrement())
+  orderNo        String        @unique
+  memberId       Int?
+  name           String
+  email          String?
+  mobile         String
+  addressLine1   String
+  addressLine2   String?
+  city           String
+  state          String?
+  pincode        String
+  subtotal       Float
+  deliveryFee    Float         @default(0)
+  totalAmount    Float
+  paymentMode    PaymentMode?
+  paymentStatus  PaymentStatus @default(PENDING)
+  paymentRefNo   String?
+  paymentDate    DateTime?
+  deliveryDate   DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  depotId        Int?
+  invoiceNo      String?
+  invoicePath    String?
+  payableAmount  Float         @default(0)
+  walletamt      Float         @default(0)
+  couponCode     String?
+  couponDiscount Float?        @default(0)
 
-  items         SNFOrderItem[]
-  depot         Depot?         @relation(fields: [depotId], references: [id])
-  member        Member?        @relation("MemberSNFOrders", fields: [memberId], references: [id])
-  posDetail     PosDetail?     @relation("OrderPosDetails")
+  items               SNFOrderItem[]
+  depot               Depot?               @relation(fields: [depotId], references: [id])
+  member              Member?              @relation("MemberSNFOrders", fields: [memberId], references: [id])
+  posDetail           PosDetail?           @relation("OrderPosDetails")
   phonePeTransactions PhonePeTransaction[] @relation("SNFOrderPhonePeTransactions")
+  deliveryAssignment  DeliveryAssignment?
 
   @@index([memberId])
   @@index([depotId])
@@ -871,27 +878,27 @@ model SNFOrderItem {
 }
 
 model PosDetail {
-  id              Int           @id @default(autoincrement())
-  memberId        Int
-  orderId         Int?          @unique
-  
-  // JSON Snapshot of products at time of purchase
-  productDetails  Json 
-  
-  paymentMode     PaymentMode
-  payerName       String?
-  utrNo           String?
-  chequeNo        String?
-  bankName        String?
-  transactionId   String?
-  amount          Float
-  paymentDetails  String?       @db.Text
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id       Int  @id @default(autoincrement())
+  memberId Int
+  orderId  Int? @unique
 
-  member          Member        @relation("MemberPosDetails", fields: [memberId], references: [id])
-  order           SNFOrder?     @relation("OrderPosDetails", fields: [orderId], references: [id])
+  // JSON Snapshot of products at time of purchase
+  productDetails Json
+
+  paymentMode    PaymentMode
+  payerName      String?
+  utrNo          String?
+  chequeNo       String?
+  bankName       String?
+  transactionId  String?
+  amount         Float
+  paymentDetails String?     @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member Member    @relation("MemberPosDetails", fields: [memberId], references: [id])
+  order  SNFOrder? @relation("OrderPosDetails", fields: [orderId], references: [id])
 
   @@index([memberId])
   @@index([orderId])
@@ -929,6 +936,7 @@ enum Role {
   VENDOR
   DepotAdmin
   SUPERVISOR
+  DELIVERY_PARTNER
 }
 
 enum OrderStatus {
@@ -996,60 +1004,60 @@ enum LeadStatus {
 }
 
 model Coupon {
-  id                Int      @id @default(autoincrement())
-  code              String   @unique
-  discountType      String   // Using String: "PERCENTAGE" or "CASH"
-  discountValue     Float
-  minOrderAmount    Float?
-  fromDate          DateTime?
+  id             Int       @id @default(autoincrement())
+  code           String    @unique
+  discountType   String // Using String: "PERCENTAGE" or "CASH"
+  discountValue  Float
+  minOrderAmount Float?
+  fromDate       DateTime?
 
-  toDate            DateTime?
-  usageLimit        Int?
-  usageCount        Int      @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  toDate     DateTime?
+  usageLimit Int?
+  usageCount Int       @default(0)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@map("coupons")
 }
 
 model Cart {
-  id              Int        @id @default(autoincrement())
-  userId          Int?       @unique
-  memberId        Int?       @unique
-  userUniqueId    String?    @unique
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  
-  items           CartItem[]
+  id           Int      @id @default(autoincrement())
+  userId       Int?     @unique
+  memberId     Int?     @unique
+  userUniqueId String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user            User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  member          Member?    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  member Member? @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("carts")
 }
 
 model CartItem {
-  id                Int      @id @default(autoincrement())
-  cartId            Int
-  productId         Int
-  variantId         Int      
-  quantity          Int
-  
+  id        Int @id @default(autoincrement())
+  cartId    Int
+  productId Int
+  variantId Int
+  quantity  Int
+
   name              String
   variantName       String
-  price             Decimal  @db.Decimal(10, 2)
+  price             Decimal @db.Decimal(10, 2)
   imageUrl          String?
   depotId           Int
   originalDepotId   Int?
   originalVariantId Int?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  cart              Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product           Product  @relation(fields: [productId], references: [id])
-  variant           DepotProductVariant @relation(fields: [variantId], references: [id])
+  cart    Cart                @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product             @relation(fields: [productId], references: [id])
+  variant DepotProductVariant @relation(fields: [variantId], references: [id])
 
   @@unique([cartId, variantId])
   @@index([cartId])
@@ -1058,38 +1066,38 @@ model CartItem {
 
 /// PhonePe payment transaction log - tracks every payment attempt
 model PhonePeTransaction {
-  id                  Int           @id @default(autoincrement())
-  merchantOrderId     String        @unique  // our UUID sent to PhonePe
-  phonePeOrderId      String?                // PhonePe's internal order ID returned
+  id              Int     @id @default(autoincrement())
+  merchantOrderId String  @unique // our UUID sent to PhonePe
+  phonePeOrderId  String? // PhonePe's internal order ID returned
 
   // Links to order (exactly one will be set)
-  productOrderId      Int?
-  snfOrderId          Int?
-  memberId            Int?
+  productOrderId Int?
+  snfOrderId     Int?
+  memberId       Int?
 
-  amount              Float                  // amount in rupees
-  amountPaise         Int                    // amount * 100
+  amount      Float // amount in rupees
+  amountPaise Int // amount * 100
 
-  state               String        @default("PENDING") // PENDING | COMPLETED | FAILED | CANCELLED
-  paymentMode         String?                // UPI, CARD, NET_BANKING, WALLET etc.
-  transactionId       String?                // PhonePe's transaction ID
-  utr                 String?                // UPI/bank UTR number
+  state         String  @default("PENDING") // PENDING | COMPLETED | FAILED | CANCELLED
+  paymentMode   String? // UPI, CARD, NET_BANKING, WALLET etc.
+  transactionId String? // PhonePe's transaction ID
+  utr           String? // UPI/bank UTR number
 
   // Raw API data for full audit trail
-  initiateResponse    Json?                  // raw response from client.pay()
-  webhookPayload      Json?                  // raw webhook payload received
-  statusCheckPayload  Json?                  // latest getOrderStatus() response
+  initiateResponse   Json? // raw response from client.pay()
+  webhookPayload     Json? // raw webhook payload received
+  statusCheckPayload Json? // latest getOrderStatus() response
 
-  errorCode           String?
-  errorMessage        String?       @db.Text
-  redirectUrl         String?       @db.Text // PhonePe checkout page URL
+  errorCode    String?
+  errorMessage String? @db.Text
+  redirectUrl  String? @db.Text // PhonePe checkout page URL
 
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  member              Member?       @relation("MemberPhonePeTransactions", fields: [memberId], references: [id], onDelete: SetNull)
-  productOrder        ProductOrder? @relation("ProductOrderPhonePeTransactions", fields: [productOrderId], references: [id], onDelete: SetNull)
-  snfOrder            SNFOrder?     @relation("SNFOrderPhonePeTransactions", fields: [snfOrderId], references: [id], onDelete: SetNull)
+  member       Member?       @relation("MemberPhonePeTransactions", fields: [memberId], references: [id], onDelete: SetNull)
+  productOrder ProductOrder? @relation("ProductOrderPhonePeTransactions", fields: [productOrderId], references: [id], onDelete: SetNull)
+  snfOrder     SNFOrder?     @relation("SNFOrderPhonePeTransactions", fields: [snfOrderId], references: [id], onDelete: SetNull)
 
   @@index([merchantOrderId])
   @@index([productOrderId])
@@ -1099,3 +1107,76 @@ model PhonePeTransaction {
   @@map("phonepe_transactions")
 }
 
+enum DeliveryPartnerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum DeliveryAssignmentStatus {
+  ASSIGNED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  REASSIGNED
+}
+
+model DeliveryPartner {
+  id               Int                   @id @default(autoincrement())
+  userId           Int                   @unique
+  depotId          Int
+  firstName        String
+  middleName       String?
+  lastName         String
+  dob              DateTime              @db.Date
+  mobile           String                @unique
+  email            String                @unique
+  address1         String
+  city             String
+  state            String
+  pincode          String
+  aadhaar          String?               @db.VarChar(12)
+  profilePhotoUrl  String?
+  status           DeliveryPartnerStatus @default(ACTIVE)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  depot       Depot                @relation(fields: [depotId], references: [id])
+  assignments DeliveryAssignment[]
+
+  @@index([depotId])
+  @@map("delivery_partners")
+}
+
+model DeliveryAssignment {
+  id                Int                      @id @default(autoincrement())
+  depotId           Int
+  deliveryPartnerId Int?
+  deliveryDate      DateTime                 @db.Date
+  status            DeliveryAssignmentStatus @default(ASSIGNED)
+
+  // link to the actual order source
+  snfOrderId              Int? @unique
+  deliveryScheduleEntryId Int? @unique
+
+  assignedById Int?
+  assignedAt   DateTime  @default(now())
+  deliveredAt  DateTime?
+  failedAt     DateTime?
+
+  cashCollected    Decimal? @db.Decimal(10, 2)
+  deliveryPhotoUrl String?
+  deliveryNotes    String?  @db.Text
+
+  depot           Depot            @relation(fields: [depotId], references: [id], onDelete: Cascade)
+  deliveryPartner DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id])
+  assignedBy      User?            @relation(fields: [assignedById], references: [id])
+
+  snfOrder              SNFOrder?              @relation(fields: [snfOrderId], references: [id])
+  deliveryScheduleEntry DeliveryScheduleEntry? @relation(fields: [deliveryScheduleEntryId], references: [id])
+
+  @@index([depotId, deliveryDate])
+  @@index([deliveryPartnerId, deliveryDate])
+  @@map("delivery_assignments")
+}
