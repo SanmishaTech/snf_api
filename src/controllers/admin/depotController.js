@@ -117,6 +117,16 @@ exports.getAllDepots = async (req, res, next) => {
                 skip,
                 take: limit,
                 orderBy: { [sortBy]: sortOrder },
+                include: {
+                    members: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                        }
+                    }
+                }
             }),
             prisma.depot.count({ where: whereClause }),
         ]);
