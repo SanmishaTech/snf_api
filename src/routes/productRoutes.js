@@ -133,7 +133,7 @@ const productUploadMiddleware = createUploadMiddleware("products", [
 router.get("/public", allowPublic(), getPublicProductsWithVariants);
 
 // GET /api/products/tags/all - Get all unique tags
-router.get("/tags/all", authMiddleware, getAllTags);
+router.get("/tags/all", allowPublic(), getAllTags);
 
 // POST /api/products - Create a new product
 /**
