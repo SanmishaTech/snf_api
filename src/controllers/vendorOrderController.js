@@ -205,15 +205,20 @@ exports.createVendorOrder = async (req, res, next) => {
 // @access  Private (ADMIN, AGENCY)
 exports.getAllVendorOrders = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search, status, vendorId, agencyId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, search, status, vendorId, agencyId, depotId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
     if (status) where.status = status;
     if (vendorId) where.vendorId = parseInt(vendorId);
     // If agencyId filter is applied, it's an AND condition with other filters
-    if (agencyId) {
-      where.items = { some: { agencyId: parseInt(agencyId) } };
+    if (agencyId || depotId) {
+      where.items = {
+        some: {
+          ...(agencyId && { agencyId: parseInt(agencyId) }),
+          ...(depotId && { depotId: parseInt(depotId) }),
+        },
+      };
     }
 
     if (search) {

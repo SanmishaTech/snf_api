@@ -1118,6 +1118,7 @@ enum DeliveryAssignmentStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   FAILED
+  NOT_DELIVERED
   REASSIGNED
 }
 

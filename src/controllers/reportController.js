@@ -2262,6 +2262,120 @@ exports.getSNFDeliveryListReport = async (req, res, next) => {
   }
 };
 
+exports.getSNFDeliveryReport = async (req, res, next) => {
+  try {
+    const { depotId, date, status } = req.query;
+
+    if (!depotId) {
+      return next(createError(400, 'depotId is required'));
+    }
+
+    const where = {
+      depotId: parseInt(depotId, 10),
+      paymentStatus: {
+        not: 'CANCELLED'
+      }
+    };
+
+    if (date) {
+      const deliveryDate = new Date(date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(deliveryDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      where.deliveryDate = {
+        gte: deliveryDate,
+        lt: nextDay
+      };
+    }
+
+    // Add status filter
+    if (status && status !== 'ALL') {
+      if (status === 'PENDING') {
+        where.deliveryAssignment = null;
+      } else if (status === 'NOT_DELIVERED') {
+        where.deliveryAssignment = {
+          status: {
+            in: ['NOT_DELIVERED', 'FAILED']
+          }
+        };
+      } else {
+        where.deliveryAssignment = {
+          status: status
+        };
+      }
+    }
+
+    const orders = await prisma.sNFOrder.findMany({
+      where,
+      include: {
+        items: true,
+        depot: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        deliveryAssignment: {
+          include: {
+            deliveryPartner: true
+          }
+        }
+      },
+      orderBy: [
+        { addressLine2: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    // Process grouping by area (addressLine2)
+    const groupedByArea = orders.reduce((acc, order) => {
+      const area = order.addressLine2 || 'Other Areas';
+      if (!acc[area]) {
+        acc[area] = [];
+      }
+      
+      const assignment = order.deliveryAssignment;
+      const partner = assignment?.deliveryPartner;
+      
+      acc[area].push({
+        id: order.id,
+        orderNo: order.orderNo,
+        customerName: order.name,
+        mobile: order.mobile,
+        address: `${order.addressLine1}${order.addressLine2 ? ', ' + order.addressLine2 : ''}, ${order.city}`,
+        pincode: order.pincode,
+        paymentStatus: order.paymentStatus,
+        paymentMode: order.paymentMode,
+        totalAmount: order.totalAmount,
+        status: assignment?.status || 'PENDING',
+        deliveryPartner: partner ? `${partner.firstName} ${partner.lastName}` : 'Unassigned',
+        deliveryPartnerMobile: partner?.mobile || null,
+        deliveredAt: assignment?.deliveredAt,
+        cashCollected: assignment?.cashCollected,
+        items: order.items.map(item => ({
+          name: item.name,
+          variant: item.variantName,
+          quantity: item.quantity
+        }))
+      });
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      data: groupedByArea,
+      filters: {
+        depotId,
+        date
+      }
+    });
+  } catch (error) {
+    console.error('[getSNFDeliveryReport]', error);
+    return next(createError(500, error.message || 'Failed to generate SNF delivery report'));
+  }
+};
+
 exports.getSNFPackingListReport = async (req, res, next) => {
   try {
     const { depotId, date } = req.query;

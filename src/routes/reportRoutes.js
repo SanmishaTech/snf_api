@@ -98,6 +98,13 @@ router.get(
 );
 
 router.get(
+  '/snf-delivery',
+  allowRoles('ADMIN', 'SUPER_ADMIN'),
+  roleGuard(),
+  reportController.getSNFDeliveryReport
+);
+
+router.get(
   '/snf-stock-requirement',
   allowRoles('ADMIN', 'SUPER_ADMIN'),
   roleGuard(),

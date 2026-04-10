@@ -10,39 +10,40 @@ const getPendingOrders = async (req, res, next) => {
       return res.status(400).json({ errors: { message: "depotId required" } });
     }
 
-    const targetDate = dateStr ? dayjs(dateStr) : dayjs();
-    const startOfDay = targetDate.startOf('day').toDate();
-    const endOfDay = targetDate.endOf('day').toDate();
+    let dateFilter = {};
+    if (dateStr) {
+      const targetDate = dayjs(dateStr);
+      dateFilter = {
+        gte: targetDate.startOf('day').toDate(),
+        lte: targetDate.endOf('day').toDate(),
+      };
+    }
 
-    // Find SNF direct orders for this date that are not assigned
+    // Find SNF direct orders that are not assigned
     const snfOrders = await prisma.sNFOrder.findMany({
       where: {
         depotId: parseInt(depotId),
-        deliveryDate: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        ...(dateStr ? { deliveryDate: dateFilter } : {}),
         deliveryAssignment: null, // Only unassigned
       },
       include: {
         items: true,
-      }
+      },
+      orderBy: { deliveryDate: "asc" }
     });
 
     // Find custom subscription deliveries (DeliveryScheduleEntry) not assigned
     const subEntries = await prisma.deliveryScheduleEntry.findMany({
       where: {
         depotId: parseInt(depotId),
-        deliveryDate: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        ...(dateStr ? { deliveryDate: dateFilter } : {}),
         deliveryAssignment: null,
       },
       include: {
         product: true,
         deliveryAddress: true,
-      }
+      },
+      orderBy: { deliveryDate: "asc" }
     });
 
     res.json({ snfOrders, subEntries });
@@ -132,7 +133,7 @@ const getTrackAssignments = async (req, res, next) => {
         snfOrder: { include: { items: true } },
         deliveryScheduleEntry: { include: { deliveryAddress: true, product: true } }
       },
-      orderBy: { assignedAt: "desc" }
+      orderBy: { deliveryDate: "asc" }
     });
 
     res.json({ assignments });

@@ -16,17 +16,20 @@ const getAllSNFOrders = asyncHandler(async (req, res) => {
   const sortBy = req.query.sortBy || 'createdAt';
   const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
-  const where = search
-    ? {
-        OR: [
-          { orderNo: { contains: search } },
-          { name: { contains: search } },
-          { mobile: { contains: search } },
-          { email: { contains: search } },
-          { city: { contains: search } },
-        ],
-      }
-    : {};
+  const where = {};
+  if (search) {
+    where.OR = [
+      { orderNo: { contains: search } },
+      { name: { contains: search } },
+      { mobile: { contains: search } },
+      { email: { contains: search } },
+      { city: { contains: search } },
+    ];
+  }
+  
+  if (req.query.depotId) {
+    where.depotId = parseInt(req.query.depotId, 10);
+  }
 
   const totalRecords = await prisma.sNFOrder.count({ where });
   const totalPages = Math.ceil(totalRecords / limit);

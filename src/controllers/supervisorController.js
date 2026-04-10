@@ -142,7 +142,8 @@ const getAllSupervisors = asyncHandler(async (req, res, next) => {
     sortBy = 'name', 
     sortOrder = 'asc', 
     search = '', 
-    active = 'all' 
+    active = 'all',
+    depotId
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -168,6 +169,10 @@ const getAllSupervisors = asyncHandler(async (req, res, next) => {
     whereConditions.user = {
       active: active === 'true'
     };
+  }
+
+  if (depotId) {
+    whereConditions.depotId = parseInt(depotId);
   }
 
   const validSortByFields = ['name', 'email', 'city', 'createdAt', 'updatedAt']; 

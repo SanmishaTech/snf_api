@@ -17,13 +17,23 @@ const getMyAssignedOrders = async (req, res, next) => {
       return res.status(404).json({ errors: { message: "Delivery profile not found" } });
     }
 
-    const today = dayjs().startOf('day').toDate();
+    const filterDate = req.query.date ? dayjs(req.query.date) : dayjs();
+    const startOfDay = filterDate.startOf('day').toDate();
+    const endOfDay = filterDate.endOf('day').toDate();
     
     const assignments = await prisma.deliveryAssignment.findMany({
       where: {
         deliveryPartnerId: partner.id,
-        // Optional: you can filter only pending assignments or assignments for today
-        // deliveryDate: { gte: today },
+        OR: [
+          { status: { not: 'DELIVERED' } },
+          {
+            status: 'DELIVERED',
+            deliveryDate: {
+              gte: startOfDay,
+              lte: endOfDay,
+            },
+          },
+        ],
       },
       include: {
         snfOrder: { include: { items: true } },
@@ -40,7 +50,7 @@ const getMyAssignedOrders = async (req, res, next) => {
 
 const updateAssignmentStatus = async (req, res, next) => {
   const schema = z.object({
-    status: z.enum(["OUT_FOR_DELIVERY", "DELIVERED", "FAILED"]),
+    status: z.enum(["OUT_FOR_DELIVERY", "DELIVERED", "NOT_DELIVERED"]),
     cashCollected: z.string().optional(), // usually comes from form-data as string
     deliveryNotes: z.string().optional(),
   });
@@ -75,16 +85,11 @@ const updateAssignmentStatus = async (req, res, next) => {
       deliveryNotes: deliveryNotes || assignment.deliveryNotes,
     };
     
-    if (cashCollected) {
-      payload.cashCollected = parseFloat(cashCollected);
-    }
-    if (deliveryPhotoUrl) {
-      payload.deliveryPhotoUrl = deliveryPhotoUrl;
-    }
-
-    if (status === "DELIVERED") {
+    if (status === 'DELIVERED') {
       payload.deliveredAt = new Date();
-    } else if (status === "FAILED") {
+      payload.deliveryPhotoUrl = deliveryPhotoUrl;
+      if (cashCollected) payload.cashCollected = parseFloat(cashCollected);
+    } else if (status === 'NOT_DELIVERED') {
       payload.failedAt = new Date();
     }
 
@@ -93,7 +98,7 @@ const updateAssignmentStatus = async (req, res, next) => {
       data: payload
     });
     
-    // Optionally trigger SNFOrder status update if completed
+    // Optionally trigger SNFOrder status update if completed/failed
     if (updated.status === 'DELIVERED') {
       if (updated.snfOrderId) {
         await prisma.sNFOrder.update({
@@ -105,6 +110,13 @@ const updateAssignmentStatus = async (req, res, next) => {
          await prisma.deliveryScheduleEntry.update({
            where: { id: updated.deliveryScheduleEntryId },
            data: { status: 'DELIVERED' }
+         })
+      }
+    } else if (updated.status === 'NOT_DELIVERED') {
+      if (updated.deliveryScheduleEntryId) {
+         await prisma.deliveryScheduleEntry.update({
+           where: { id: updated.deliveryScheduleEntryId },
+           data: { status: 'NOT_DELIVERED' }
          })
       }
     }

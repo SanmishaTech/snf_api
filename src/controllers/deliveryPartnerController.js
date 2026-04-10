@@ -5,11 +5,20 @@ const { z } = require("zod");
 
 const getDeliveryPartners = async (req, res, next) => {
   try {
-    const { depotId } = req.query;
+    const { depotId, search } = req.query;
     
     const whereClause = {};
     if (depotId) {
       whereClause.depotId = parseInt(depotId);
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { mobile: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ];
     }
     
     // If DepotAdmin accesses, optionally restrict to their depot in production
