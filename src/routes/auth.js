@@ -246,4 +246,6 @@ router.post("/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });
 
+router.get("/email-by-mobile", authController.getEmailByMobile);
+
 module.exports = router;

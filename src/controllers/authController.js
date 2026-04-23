@@ -707,6 +707,33 @@ const sudoLogin = async (req, res, next) => {
   }
 };
 
+const getEmailByMobile = async (req, res, next) => {
+  const { mobile } = req.query;
+  if (!mobile || !/^\d{10}$/.test(mobile)) {
+    return res.status(400).json({ message: "Invalid mobile number" });
+  }
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { mobile },
+      select: { email: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found with this mobile number" });
+    }
+
+    const email = user.email;
+    const [name, domain] = email.split('@');
+    const maskedName = name.length > 2 ? name.substring(0, 2) + "***" : name + "***";
+    const maskedEmail = `${maskedName}@${domain}`;
+
+    res.json({ email, maskedEmail });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -716,4 +743,5 @@ module.exports = {
   acceptPolicy,
   changePassword,
   sudoLogin,
+  getEmailByMobile,
 };
