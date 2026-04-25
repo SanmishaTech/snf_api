@@ -5,10 +5,14 @@ const dayjs = require("dayjs");
 
 const getPendingOrders = async (req, res, next) => {
   try {
-    const { depotId, dateStr } = req.query; // dateStr like "2024-05-15"
+    const { depotId, dateStr, page = 1, limit = 50 } = req.query;
     if (!depotId) {
       return res.status(400).json({ errors: { message: "depotId required" } });
     }
+
+    const pageInt = parseInt(page);
+    const limitInt = parseInt(limit);
+    const skip = (pageInt - 1) * limitInt;
 
     let dateFilter = {};
     if (dateStr) {
@@ -19,34 +23,57 @@ const getPendingOrders = async (req, res, next) => {
       };
     }
 
-    // Find SNF direct orders that are not assigned
-    const snfOrders = await prisma.sNFOrder.findMany({
-      where: {
-        depotId: parseInt(depotId),
-        ...(dateStr ? { deliveryDate: dateFilter } : {}),
-        deliveryAssignment: null, // Only unassigned
-      },
-      include: {
-        items: true,
-      },
-      orderBy: { deliveryDate: "asc" }
-    });
+    const whereSNF = {
+      depotId: parseInt(depotId),
+      ...(dateStr ? { deliveryDate: dateFilter } : {}),
+      deliveryAssignment: null,
+    };
 
-    // Find custom subscription deliveries (DeliveryScheduleEntry) not assigned
-    const subEntries = await prisma.deliveryScheduleEntry.findMany({
-      where: {
-        depotId: parseInt(depotId),
-        ...(dateStr ? { deliveryDate: dateFilter } : {}),
-        deliveryAssignment: null,
-      },
-      include: {
-        product: true,
-        deliveryAddress: true,
-      },
-      orderBy: { deliveryDate: "asc" }
-    });
+    const whereSub = {
+      depotId: parseInt(depotId),
+      ...(dateStr ? { deliveryDate: dateFilter } : {}),
+      deliveryAssignment: null,
+    };
 
-    res.json({ snfOrders, subEntries });
+    const snfCount = await prisma.sNFOrder.count({ where: whereSNF });
+    const subCount = await prisma.deliveryScheduleEntry.count({ where: whereSub });
+    const total = snfCount + subCount;
+
+    let snfOrders = [];
+    let subEntries = [];
+
+    if (skip < snfCount) {
+      const snfTake = Math.min(limitInt, snfCount - skip);
+      snfOrders = await prisma.sNFOrder.findMany({
+        where: whereSNF,
+        include: { items: true, member: { select: { walletBalance: true } } },
+        orderBy: { deliveryDate: "asc" },
+        skip: skip,
+        take: snfTake,
+      });
+
+      if (snfOrders.length < limitInt) {
+        const subTake = limitInt - snfOrders.length;
+        subEntries = await prisma.deliveryScheduleEntry.findMany({
+          where: whereSub,
+          include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true } } },
+          orderBy: { deliveryDate: "asc" },
+          skip: 0,
+          take: subTake,
+        });
+      }
+    } else {
+      const subSkip = skip - snfCount;
+      subEntries = await prisma.deliveryScheduleEntry.findMany({
+        where: whereSub,
+        include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true } } },
+        orderBy: { deliveryDate: "asc" },
+        skip: subSkip,
+        take: limitInt,
+      });
+    }
+
+    res.json({ snfOrders, subEntries, total, page: pageInt, limit: limitInt });
   } catch (error) {
     next(error);
   }
@@ -114,7 +141,7 @@ const assignOrders = async (req, res, next) => {
 
 const getTrackAssignments = async (req, res, next) => {
   try {
-    const { depotId, dateStr } = req.query;
+    const { depotId, dateStr, status, page = 1, limit = 50 } = req.query;
     const whereClause = {};
     if (depotId) whereClause.depotId = parseInt(depotId);
 
@@ -126,17 +153,64 @@ const getTrackAssignments = async (req, res, next) => {
        };
     }
 
+    // Count for Assigned + Out For Delivery
+    const assignedCount = await prisma.deliveryAssignment.count({
+      where: {
+        ...whereClause,
+        status: { in: ['ASSIGNED', 'OUT_FOR_DELIVERY'] }
+      }
+    });
+
+    const deliveredCount = await prisma.deliveryAssignment.count({
+      where: {
+        ...whereClause,
+        status: 'DELIVERED'
+      }
+    });
+
+    const failedCount = await prisma.deliveryAssignment.count({
+      where: {
+        ...whereClause,
+        status: 'NOT_DELIVERED'
+      }
+    });
+
+    // Pagination
+    const pageInt = parseInt(page);
+    const limitInt = parseInt(limit);
+    const skip = (pageInt - 1) * limitInt;
+
+    // Filter by status if provided
+    if (status) {
+      const statusArray = status.split(',');
+      whereClause.status = { in: statusArray };
+    }
+
+    const total = await prisma.deliveryAssignment.count({ where: whereClause });
+
     const assignments = await prisma.deliveryAssignment.findMany({
       where: whereClause,
       include: {
         deliveryPartner: { select: { firstName: true, lastName: true, mobile: true } },
-        snfOrder: { include: { items: true } },
-        deliveryScheduleEntry: { include: { deliveryAddress: true, product: true } }
+        snfOrder: { include: { items: true, member: { select: { walletBalance: true } } } },
+        deliveryScheduleEntry: { include: { deliveryAddress: true, product: true, member: { select: { walletBalance: true } } } }
       },
-      orderBy: { deliveryDate: "asc" }
+      orderBy: { deliveryDate: "asc" },
+      skip: skip,
+      take: limitInt
     });
 
-    res.json({ assignments });
+    res.json({
+      assignments,
+      totals: {
+        assigned: assignedCount,
+        delivered: deliveredCount,
+        failed: failedCount
+      },
+      total,
+      page: pageInt,
+      limit: limitInt
+    });
   } catch (error) {
     next(error);
   }

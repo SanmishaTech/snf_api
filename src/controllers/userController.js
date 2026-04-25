@@ -319,6 +319,21 @@ const createUser = async (req, res, next) => {
       }
     }
 
+    if (finalUser.role === 'MEMBER') {
+      const existingMember = await prisma.member.findUnique({
+        where: { userId: finalUser.id }
+      });
+      if (!existingMember) {
+        await prisma.member.create({
+          data: {
+            userId: finalUser.id,
+            name: finalUser.name,
+            walletBalance: 0,
+          }
+        });
+      }
+    }
+
     res.status(201).json(finalUser);
   } catch (error) {
     next(error);

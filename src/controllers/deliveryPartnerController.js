@@ -227,6 +227,18 @@ const updateDeliveryPartner = async (req, res, next) => {
       }
     }
 
+    // Ensure email is unique (excluding current user)
+    const duplicateEmailUser = await prisma.user.findFirst({
+      where: {
+        email,
+        id: { not: existing.userId }
+      }
+    });
+    if (duplicateEmailUser) {
+      if (typeof req.cleanupUpload === "function") await req.cleanupUpload();
+      return res.status(400).json({ errors: { message: "Email already in use by another user." } });
+    }
+
     // Update in transaction to keep User synced
     const result = await prisma.$transaction(async (tx) => {
       // 1. Update User
