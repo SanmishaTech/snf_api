@@ -93,9 +93,11 @@ const updateDeliveryStatus = async (req, res) => {
 
         if (refundAmount > 0) {
           const referenceNumber = `ADMIN_DELIVERY_${deliveryEntry.id}`;
+          const dayjs = require('dayjs');
+          const formattedDate = dayjs(deliveryEntry.deliveryDate).format('DD/MM/YYYY');
           const transactionNotes = notes ?
-            `Admin: ${notes} - Credit for skipped delivery` :
-            `Credit for skipped delivery - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
+            `Admin: ${notes} - Credit for skipped delivery on ${formattedDate}` :
+            `Credit for skipped delivery on ${formattedDate} - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
 
           walletTransaction = await walletService.creditWallet(
             deliveryEntry.subscription.memberId,
@@ -119,9 +121,11 @@ const updateDeliveryStatus = async (req, res) => {
         if (notDeliveredRefundAmount > 0) {
           // Use a different reference prefix to distinguish from skips
           const referenceNumber = `ADMIN_ND_REFUND_${deliveryEntry.id}`;
+          const dayjs = require('dayjs');
+          const formattedDate = dayjs(deliveryEntry.deliveryDate).format('DD/MM/YYYY');
           const transactionNotes = notes ?
-            `Admin: ${notes} - Refund for undelivered item` :
-            `Refund for undelivered item - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
+            `Admin: ${notes} - Refund for undelivered item on ${formattedDate}` :
+            `Refund for undelivered item on ${formattedDate} - Admin processed - Order ID: ${deliveryEntry.subscription.id}`;
 
           walletTransaction = await walletService.creditWallet(
             deliveryEntry.subscription.memberId,

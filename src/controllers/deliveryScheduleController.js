@@ -235,7 +235,9 @@ const updateDeliveryStatus = async (req, res) => {
       
       if (refundAmount > 0) {
         const referenceNumber = `DELIVERY_${deliveryEntry.id}`;
-        const notes = `Credit for skipped delivery - Order ID: ${deliveryEntry.subscription.id}, Product: ${deliveryEntry.product?.name || 'Product'}`;
+        const dayjs = require('dayjs');
+        const formattedDate = dayjs(deliveryEntry.deliveryDate).format('DD/MM/YYYY');
+        const notes = `Credit for skipped delivery on ${formattedDate} - Order ID: ${deliveryEntry.subscription.id}, Product: ${deliveryEntry.product?.name || 'Product'}`;
         
         walletTransaction = await walletService.creditWallet(
           deliveryEntry.subscription.memberId,
