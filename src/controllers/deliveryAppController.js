@@ -50,8 +50,8 @@ const getMyAssignedOrders = async (req, res, next) => {
 
 const updateAssignmentStatus = async (req, res, next) => {
   const schema = z.object({
-    status: z.enum(["OUT_FOR_DELIVERY", "DELIVERED", "NOT_DELIVERED"]),
-    cashCollected: z.string().optional(), // usually comes from form-data as string
+    status: z.enum(["OUT_FOR_DELIVERY", "DELIVERED", "NOT_DELIVERED", "FAILED"]),
+    cashCollected: z.string().optional(),
     deliveryNotes: z.string().optional(),
   });
 
@@ -74,7 +74,6 @@ const updateAssignmentStatus = async (req, res, next) => {
       return res.status(404).json({ errors: { message: "Assignment not found." } });
     }
 
-    // Verify it belongs to the logged in partner
     const partner = await prisma.deliveryPartner.findUnique({ where: { userId: req.user.id } });
     if (!partner || partner.id !== assignment.deliveryPartnerId) {
        return res.status(403).json({ errors: { message: "Unauthorized assignment update." }});
@@ -89,7 +88,7 @@ const updateAssignmentStatus = async (req, res, next) => {
       payload.deliveredAt = new Date();
       payload.deliveryPhotoUrl = deliveryPhotoUrl;
       if (cashCollected) payload.cashCollected = parseFloat(cashCollected);
-    } else if (status === 'NOT_DELIVERED') {
+    } else if (status === 'NOT_DELIVERED' || status === 'FAILED') {
       payload.failedAt = new Date();
     }
 
@@ -98,26 +97,25 @@ const updateAssignmentStatus = async (req, res, next) => {
       data: payload
     });
     
-    // Optionally trigger SNFOrder status update if completed/failed
     if (updated.status === 'DELIVERED') {
       if (updated.snfOrderId) {
         await prisma.sNFOrder.update({
           where: { id: updated.snfOrderId },
-          data: { paymentStatus: 'PAID' } // Example. Adjust according to business rules.
+          data: { paymentStatus: 'PAID' }
         });
       }
       if (updated.deliveryScheduleEntryId) {
          await prisma.deliveryScheduleEntry.update({
            where: { id: updated.deliveryScheduleEntryId },
            data: { status: 'DELIVERED' }
-         })
+         });
       }
-    } else if (updated.status === 'NOT_DELIVERED') {
+    } else if (updated.status === 'NOT_DELIVERED' || updated.status === 'FAILED') {
       if (updated.deliveryScheduleEntryId) {
          await prisma.deliveryScheduleEntry.update({
            where: { id: updated.deliveryScheduleEntryId },
-           data: { status: 'NOT_DELIVERED' }
-         })
+           data: { status: updated.status }
+         });
       }
     }
 
