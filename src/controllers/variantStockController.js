@@ -27,7 +27,7 @@ module.exports = {
 
   // List / query VariantStocks
   getVariantStocks: asyncHandler(async (req, res, next) => {
-    const { page = 1, limit = 10, productId, variantId, depotId, search } = req.query;
+    const { page = 1, limit = 10, productId, variantId, depotId, search, isDairy } = req.query;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
 
@@ -35,6 +35,10 @@ module.exports = {
     if (productId) where.productId = parseInt(productId, 10);
     if (variantId) where.variantId = parseInt(variantId, 10);
     if (depotId) where.depotId = parseInt(depotId, 10);
+    // Filter by product type: isDairy=true => Indraai, isDairy=false => SNF
+    if (isDairy !== undefined && isDairy !== '') {
+      where.product = { isDairyProduct: isDairy === 'true' };
+    }
     if (search) {
       const searchStr = search.toString();
       where.OR = [

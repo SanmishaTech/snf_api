@@ -38,7 +38,7 @@ module.exports = {
 
   // List / query StockLedgers
   getStockLedgers: asyncHandler(async (req, res, next) => {
-    const { page = 1, limit = 10, productId, variantId, depotId, module } = req.query;
+    const { page = 1, limit = 10, productId, variantId, depotId, module, isDairy } = req.query;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
 
@@ -47,6 +47,10 @@ module.exports = {
     if (variantId) where.variantId = parseInt(variantId, 10);
     if (depotId) where.depotId = parseInt(depotId, 10);
     if (module) where.module = module;
+    // Filter by product type: isDairy=true => Indraai, isDairy=false => SNF
+    if (isDairy !== undefined && isDairy !== '') {
+      where.product = { isDairyProduct: isDairy === 'true' };
+    }
 
     try {
       const [records, totalRecords] = await prisma.$transaction([
