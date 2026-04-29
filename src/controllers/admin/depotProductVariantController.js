@@ -107,12 +107,17 @@ module.exports = {
         page = 1,
         limit = 1000,
         search,
+        isDairy,
       } = req.query;
 
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
       const where = {};
+
+      if (isDairy !== undefined && isDairy !== "") {
+        where.product = { isDairyProduct: isDairy === "true" };
+      }
 
       // ------------------------------
       // Search filter handling
