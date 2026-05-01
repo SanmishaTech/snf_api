@@ -21,7 +21,10 @@ const adminGetUserById = asyncHandler(async (req, res) => {
 
   // Avoid sending password hash from the user object
   const { password, ...userDetails } = memberProfile.user;
-  res.json(userDetails);
+  res.json({
+    ...userDetails,
+    strictCodLimit: memberProfile.strictCodLimit
+  });
 });
 
 // @desc    Update user details by Member ID for admin
@@ -29,7 +32,7 @@ const adminGetUserById = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const adminUpdateUserById = asyncHandler(async (req, res) => {
   const memberId = req.params.userId; // The route param is named userId, but it's conceptually a memberId
-  const { name, email, mobile } = req.body;
+  const { name, email, mobile, strictCodLimit } = req.body;
 
   const memberProfile = await prisma.member.findUnique({
     where: { id: parseInt(memberId) },
@@ -41,6 +44,14 @@ const adminUpdateUserById = asyncHandler(async (req, res) => {
   }
 
   const actualUserId = memberProfile.userId; // Get the actual User ID from the member profile
+
+  // Update member specific fields
+  if (strictCodLimit !== undefined) {
+    await prisma.member.update({
+      where: { id: parseInt(memberId) },
+      data: { strictCodLimit: !!strictCodLimit }
+    });
+  }
 
   // Fetch the user to check current email if email is being changed
   const currentUserState = await prisma.user.findUnique({
@@ -77,7 +88,10 @@ const adminUpdateUserById = asyncHandler(async (req, res) => {
 
   // Avoid sending password hash
   const { password, ...userDetails } = updatedUser;
-  res.json(userDetails);
+  res.json({
+    ...userDetails,
+    strictCodLimit: strictCodLimit !== undefined ? !!strictCodLimit : memberProfile.strictCodLimit
+  });
 });
 
 // @desc    Toggle active status of a user associated with a member by Member ID

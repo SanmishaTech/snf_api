@@ -20,7 +20,7 @@ const getMyAssignedOrders = async (req, res, next) => {
     const filterDate = req.query.date ? dayjs(req.query.date) : dayjs();
     const startOfDay = filterDate.startOf('day').toDate();
     const endOfDay = filterDate.endOf('day').toDate();
-    
+
     const assignments = await prisma.deliveryAssignment.findMany({
       where: {
         deliveryPartnerId: partner.id,
@@ -62,7 +62,7 @@ const updateAssignmentStatus = async (req, res, next) => {
 
   const assignmentId = parseInt(req.params.id);
   const { status, cashCollected, deliveryNotes } = req.body;
-  
+
   let deliveryPhotoUrl = null;
   if (req.file) {
     deliveryPhotoUrl = `/uploads/${req.file.filename}`;
@@ -76,14 +76,14 @@ const updateAssignmentStatus = async (req, res, next) => {
 
     const partner = await prisma.deliveryPartner.findUnique({ where: { userId: req.user.id } });
     if (!partner || partner.id !== assignment.deliveryPartnerId) {
-       return res.status(403).json({ errors: { message: "Unauthorized assignment update." }});
+      return res.status(403).json({ errors: { message: "Unauthorized assignment update." } });
     }
 
     const payload = {
       status,
       deliveryNotes: deliveryNotes || assignment.deliveryNotes,
     };
-    
+
     if (status === 'DELIVERED') {
       payload.deliveredAt = new Date();
       payload.deliveryPhotoUrl = deliveryPhotoUrl;
@@ -96,26 +96,48 @@ const updateAssignmentStatus = async (req, res, next) => {
       where: { id: assignmentId },
       data: payload
     });
-    
+
     if (updated.status === 'DELIVERED') {
       if (updated.snfOrderId) {
-        await prisma.sNFOrder.update({
-          where: { id: updated.snfOrderId },
-          data: { paymentStatus: 'PAID' }
-        });
+        const order = await prisma.sNFOrder.findUnique({ where: { id: updated.snfOrderId } });
+        if (order) {
+          const totalAmount = order.totalAmount || 0;
+          const collected = updated.cashCollected ? parseFloat(updated.cashCollected.toString()) : 0;
+          const deficit = totalAmount - collected;
+
+          if (deficit > 0 && order.memberId) {
+            await prisma.member.update({
+              where: { id: order.memberId },
+              data: { walletBalance: { decrement: deficit } }
+            });
+            await prisma.walletTransaction.create({
+              data: {
+                memberId: order.memberId,
+                amount: -deficit,
+                type: 'DEBIT',
+                status: 'PAID',
+                notes: `Deficit for Order #${order.orderNo}. Collected: ₹${collected}`
+              }
+            });
+          }
+          await prisma.sNFOrder.update({
+            where: { id: updated.snfOrderId },
+            data: { paymentStatus: 'PAID' }
+          });
+        }
       }
       if (updated.deliveryScheduleEntryId) {
-         await prisma.deliveryScheduleEntry.update({
-           where: { id: updated.deliveryScheduleEntryId },
-           data: { status: 'DELIVERED' }
-         });
+        await prisma.deliveryScheduleEntry.update({
+          where: { id: updated.deliveryScheduleEntryId },
+          data: { status: 'DELIVERED' }
+        });
       }
     } else if (updated.status === 'NOT_DELIVERED' || updated.status === 'FAILED') {
       if (updated.deliveryScheduleEntryId) {
-         await prisma.deliveryScheduleEntry.update({
-           where: { id: updated.deliveryScheduleEntryId },
-           data: { status: updated.status }
-         });
+        await prisma.deliveryScheduleEntry.update({
+          where: { id: updated.deliveryScheduleEntryId },
+          data: { status: updated.status }
+        });
       }
     }
 

@@ -13,6 +13,7 @@ const getUserWallet = asyncHandler(async (req, res) => {
     select: {
       id: true,
       walletBalance: true,
+      strictCodLimit: true,
       user: {
         select: {
           name: true,
@@ -78,6 +79,7 @@ const getUserWallet = asyncHandler(async (req, res) => {
     success: true,
     data: {
       balance: member.walletBalance,
+      strictCodLimit: member.strictCodLimit,
       member: {
         name: member.user?.name,
         email: member.user?.email

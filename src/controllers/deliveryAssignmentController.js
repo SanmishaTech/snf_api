@@ -146,11 +146,11 @@ const getTrackAssignments = async (req, res, next) => {
     if (depotId) whereClause.depotId = parseInt(depotId);
 
     if (dateStr) {
-       const targetDate = dayjs(dateStr);
-       whereClause.deliveryDate = {
-         gte: targetDate.startOf('day').toDate(),
-         lte: targetDate.endOf('day').toDate(),
-       };
+      const targetDate = dayjs(dateStr);
+      whereClause.deliveryDate = {
+        gte: targetDate.startOf('day').toDate(),
+        lte: targetDate.endOf('day').toDate(),
+      };
     }
 
     // Count for Assigned + Out For Delivery
