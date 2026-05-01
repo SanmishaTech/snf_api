@@ -35,45 +35,75 @@ const getPendingOrders = async (req, res, next) => {
       deliveryAssignment: null,
     };
 
-    const snfCount = await prisma.sNFOrder.count({ where: whereSNF });
-    const subCount = await prisma.deliveryScheduleEntry.count({ where: whereSub });
-    const total = snfCount + subCount;
+    // 1. Fetch all pending to filter by wallet
+    const snfPending = await prisma.sNFOrder.findMany({
+      where: whereSNF,
+      include: { items: true, member: { select: { walletBalance: true, strictCodLimit: true } } },
+      orderBy: { deliveryDate: "asc" },
+    });
 
-    let snfOrders = [];
-    let subEntries = [];
+    const subPending = await prisma.deliveryScheduleEntry.findMany({
+      where: whereSub,
+      include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true, strictCodLimit: true } } },
+      orderBy: { deliveryDate: "asc" },
+    });
 
-    if (skip < snfCount) {
-      const snfTake = Math.min(limitInt, snfCount - skip);
-      snfOrders = await prisma.sNFOrder.findMany({
-        where: whereSNF,
-        include: { items: true, member: { select: { walletBalance: true } } },
-        orderBy: { deliveryDate: "asc" },
-        skip: skip,
-        take: snfTake,
-      });
-
-      if (snfOrders.length < limitInt) {
-        const subTake = limitInt - snfOrders.length;
-        subEntries = await prisma.deliveryScheduleEntry.findMany({
-          where: whereSub,
-          include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true } } },
-          orderBy: { deliveryDate: "asc" },
-          skip: 0,
-          take: subTake,
-        });
+    // 2. Fetch Failed Deliveries (Reschedule Pending)
+    const failedAssignments = await prisma.deliveryAssignment.findMany({
+      where: {
+        depotId: parseInt(depotId),
+        status: 'NOT_DELIVERED',
+      },
+      include: {
+        snfOrder: { include: { items: true, member: { select: { walletBalance: true, strictCodLimit: true } } } },
+        deliveryScheduleEntry: { include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true, strictCodLimit: true } } } },
+        deliveryPartner: { select: { firstName: true, lastName: true } }
       }
-    } else {
-      const subSkip = skip - snfCount;
-      subEntries = await prisma.deliveryScheduleEntry.findMany({
-        where: whereSub,
-        include: { product: true, deliveryAddress: true, member: { select: { walletBalance: true } } },
-        orderBy: { deliveryDate: "asc" },
-        skip: subSkip,
-        take: limitInt,
-      });
-    }
+    });
 
-    res.json({ snfOrders, subEntries, total, page: pageInt, limit: limitInt });
+    const allItems = [
+      ...snfPending.map(o => ({ ...o, type: 'SNF', holdReason: null })),
+      ...subPending.map(e => ({ ...e, type: 'SUB', holdReason: null }))
+    ];
+
+    const processedHolded = [];
+    const processedReady = [];
+
+    allItems.forEach(item => {
+      const balance = item.member?.walletBalance || 0;
+      const isStrict = item.member?.strictCodLimit || false;
+      
+      if ((isStrict && balance < 0) || balance < -1000) {
+        item.holdReason = balance < -1000 ? 'Credit Limit Exceeded' : 'Strict COD Blocked';
+        processedHolded.push(item);
+      } else {
+        processedReady.push(item);
+      }
+    });
+
+    // Add failed assignments to holded
+    failedAssignments.forEach(asgn => {
+      const item = asgn.snfOrder ? { ...asgn.snfOrder, type: 'SNF' } : { ...asgn.deliveryScheduleEntry, type: 'SUB' };
+      processedHolded.push({
+        ...item,
+        assignmentId: asgn.id,
+        holdReason: 'Failed Delivery (Reschedule Required)',
+        failedAt: asgn.failedAt,
+        prevPartner: asgn.deliveryPartner ? `${asgn.deliveryPartner.firstName} ${asgn.deliveryPartner.lastName}` : null
+      });
+    });
+
+    const totalReady = processedReady.length;
+    const totalHolded = processedHolded.length;
+
+    res.json({
+      orders: processedReady.slice(skip, skip + limitInt),
+      holdedOrders: processedHolded.slice(skip, skip + limitInt),
+      total: totalReady,
+      holdedTotal: totalHolded,
+      page: pageInt,
+      limit: limitInt
+    });
   } catch (error) {
     next(error);
   }
@@ -243,9 +273,41 @@ const unassignOrder = async (req, res, next) => {
   }
 };
 
+const retryOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { deliveryDate } = req.body;
+
+    const assignment = await prisma.deliveryAssignment.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ errors: { message: "Assignment not found" } });
+    }
+
+    const updated = await prisma.deliveryAssignment.update({
+      where: { id: parseInt(id) },
+      data: {
+        status: "ASSIGNED",
+        deliveryDate: dayjs(deliveryDate).toDate(),
+        failedAt: null,
+        deliveredAt: null,
+        deliveryNotes: null,
+        cashCollected: null
+      }
+    });
+
+    res.json({ message: "Delivery rescheduled successfully", assignment: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPendingOrders,
   assignOrders,
   getTrackAssignments,
   unassignOrder,
+  retryOrder,
 };
