@@ -1,6 +1,46 @@
 const dayjs = require('dayjs');
 
 /**
+ * Helper to construct the WhatsApp API endpoint URL.
+ * Handles both official Facebook Graph API and custom wrappers.
+ * @param {string} type - The endpoint type ('messages' or 'marketing_messages')
+ * @returns {string} - The constructed URL
+ */
+const getWhatsAppEndpoint = (type) => {
+  const baseUrl = process.env.WHATSAPP_URL;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!baseUrl) return '';
+
+  // If it's a Facebook Graph API URL, append the phone number ID and type
+  if (baseUrl.includes('graph.facebook.com')) {
+    return `${baseUrl}/${phoneNumberId}/${type}`;
+  }
+
+  // Otherwise, assume it's a complete custom endpoint
+  return baseUrl;
+};
+
+/**
+ * Safely parse JSON from a response, handling potential HTML/error pages.
+ * @param {Response} response - The fetch response object
+ * @returns {Promise<Object>} - Parsed JSON or error object
+ */
+const parseResponse = async (response) => {
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  }
+  const text = await response.text();
+  // If it's HTML, extract a bit of info if possible, otherwise return generic error
+  return {
+    error: 'Invalid response format (not JSON)',
+    status: response.status,
+    snippet: text.substring(0, 200).replace(/<[^>]*>?/gm, '').trim() // Strip tags and return snippet
+  };
+};
+
+/**
  * Send WhatsApp notification for an SNF Order
  * @param {Object} order - The created order object
  * @returns {Promise<Object>} - API response
@@ -51,7 +91,7 @@ const sendOrderWhatsAppMessage = async (order) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -60,7 +100,7 @@ const sendOrderWhatsAppMessage = async (order) => {
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send message:', data);
       return { success: false, error: data };
@@ -108,7 +148,7 @@ const sendWelcomeWhatsAppMessage = async (user) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+    const response = await fetch(getWhatsAppEndpoint('marketing_messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -116,7 +156,7 @@ const sendWelcomeWhatsAppMessage = async (user) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send welcome message:', data);
       return { success: false, error: data };
@@ -178,7 +218,7 @@ const sendSubscriptionConfirmWhatsAppMessage = async (user, subscription) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+    const response = await fetch(getWhatsAppEndpoint('marketing_messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -186,7 +226,7 @@ const sendSubscriptionConfirmWhatsAppMessage = async (user, subscription) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send subscription confirmation:', data);
       return { success: false, error: data };
@@ -234,7 +274,7 @@ const sendDeliveryWhatsAppMessage = async (user, deliveryEntry) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -242,7 +282,7 @@ const sendDeliveryWhatsAppMessage = async (user, deliveryEntry) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send delivery message:', data);
       return { success: false, error: data };
@@ -290,7 +330,7 @@ const sendSubscriptionRenewalWhatsAppMessage = async (user, subscription) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+    const response = await fetch(getWhatsAppEndpoint('marketing_messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -298,7 +338,7 @@ const sendSubscriptionRenewalWhatsAppMessage = async (user, subscription) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send renewal reminder message:', data);
       return { success: false, error: data };
@@ -347,7 +387,7 @@ const sendSkipDeliveryWhatsAppMessage = async (user, skipData) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -355,7 +395,7 @@ const sendSkipDeliveryWhatsAppMessage = async (user, skipData) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send skip delivery message:', data);
       return { success: false, error: data };
@@ -405,7 +445,7 @@ const sendNotDeliveredWhatsAppMessage = async (user, failData) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -413,7 +453,7 @@ const sendNotDeliveredWhatsAppMessage = async (user, failData) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send not delivered message:', data);
       return { success: false, error: data };
@@ -465,7 +505,7 @@ const sendCancelledWhatsAppMessage = async (user, cancelData) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -473,7 +513,7 @@ const sendCancelledWhatsAppMessage = async (user, cancelData) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send cancellation message:', data);
       return { success: false, error: data };
@@ -523,7 +563,7 @@ const sendWalletDebitWhatsAppMessage = async (user, walletamt, orderNo) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -531,7 +571,7 @@ const sendWalletDebitWhatsAppMessage = async (user, walletamt, orderNo) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send wallet debit message:', data);
       return { success: false, error: data };
@@ -581,7 +621,7 @@ const sendWalletCreditWhatsAppMessage = async (user, amount, orderNo) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/messages`, {
+    const response = await fetch(getWhatsAppEndpoint('messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -589,7 +629,7 @@ const sendWalletCreditWhatsAppMessage = async (user, amount, orderNo) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send wallet credit message:', data);
       return { success: false, error: data };
@@ -634,7 +674,7 @@ const sendSubscriptionRenewalPendingWhatsAppMessage = async (user) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+    const response = await fetch(getWhatsAppEndpoint('marketing_messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -642,7 +682,7 @@ const sendSubscriptionRenewalPendingWhatsAppMessage = async (user) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send renewal pending message:', data);
       return { success: false, error: data };
@@ -688,7 +728,7 @@ const sendSubscriptionRenewalFinalWhatsAppMessage = async (user) => {
   };
 
   try {
-    const response = await fetch(`${baseUrl}/${phoneNumberId}/marketing_messages`, {
+    const response = await fetch(getWhatsAppEndpoint('marketing_messages'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -696,7 +736,7 @@ const sendSubscriptionRenewalFinalWhatsAppMessage = async (user) => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await response.json();
+    const data = await parseResponse(response);
     if (!response.ok) {
       console.error('[WhatsApp Service] Failed to send renewal final message:', data);
       return { success: false, error: data };
