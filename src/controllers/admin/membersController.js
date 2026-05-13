@@ -24,10 +24,22 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
                 OR: [
                     { name: { contains: search } },
                     { email: { contains: search } },
+                    { mobile: { contains: search } },
+                    { userUniqueId: { contains: search } },
                 ],
             } : {},
             (active === "true" || active === "false") ? {
                 active: active === "true"
+            } : {},
+            // If the requester is an Agency, only show members assigned to them via subscriptions
+            req.user.role === 'AGENCY' ? {
+                member: {
+                    subscriptions: {
+                        some: {
+                            agencyId: req.user.agencyId
+                        }
+                    }
+                }
             } : {}
         ],
     };
@@ -50,14 +62,12 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
     // Build orderBy based on sortBy field
     let orderBy;
     if (sortBy === 'walletBalance') {
-        // walletBalance is on the member relation, not on User
         orderBy = {
             member: {
                 walletBalance: sortOrder
             }
         };
     } else {
-        // For other fields like name, email, active that exist on User model
         orderBy = {
             [sortBy]: sortOrder
         };
@@ -71,12 +81,27 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
             createdAt: true,
             name: true,
             email: true,
+            mobile: true,
             role: true,
             active: true,
-            member: {      // User has a relation to Member model named 'member'
+            member: {      
                 select: {
                     id: true,
                     walletBalance: true,
+                    subscriptions: {
+                        where: {
+                            // If agency is requesting, only look at THEIR subscriptions for this member
+                            ...(req.user.role === 'AGENCY' ? { agencyId: req.user.agencyId } : {}),
+                            paymentStatus: 'PAID' // Only active/paid subscriptions count for expiry
+                        },
+                        orderBy: {
+                            expiryDate: 'desc'
+                        },
+                        take: 1,
+                        select: {
+                            expiryDate: true
+                        }
+                    }
                 }
             }
         },
@@ -85,19 +110,22 @@ const getAllMembersWithWallets = asyncHandler(async (req, res) => {
         orderBy: orderBy,
     });
 
-    const membersWithWallets = membersData.map(user => ({
-        _id: user.member?.id, // Use the ID from the Member table for _id
-        id: user.member?.id,  // Use the ID from the Member table for id
-        userId: user.id,      // Keep user.id as userId if needed elsewhere
-        userUniqueId: user.userUniqueId || `${new Date(user.createdAt).getFullYear()}-${String(user.id).padStart(4, '0')}`,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-        walletBalance: user.member?.walletBalance ?? 0, // Access balance via user.member.wallet
-        // It's crucial that every User with role 'MEMBER' has an associated Member record
-        // If user.member or user.member.id could be null/undefined, the frontend link might break or need adjustment.
-    }));
+    const membersWithWallets = membersData.map(user => {
+        const latestSubscription = user.member?.subscriptions?.[0];
+        return {
+            _id: user.member?.id,
+            id: user.member?.id,
+            userId: user.id,
+            userUniqueId: user.userUniqueId || `${new Date(user.createdAt).getFullYear()}-${String(user.id).padStart(4, '0')}`,
+            name: user.name,
+            email: user.email,
+            mobile: user.mobile,
+            role: user.role,
+            active: user.active,
+            walletBalance: user.member?.walletBalance ?? 0,
+            subscriptionExpiring: latestSubscription?.expiryDate || null,
+        };
+    });
 
     res.status(200).json({
         members: membersWithWallets,

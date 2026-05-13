@@ -271,7 +271,7 @@ app.use(
 app.use(
   "/api/admin/members",
   authMiddleware,
-  roleGuard("ADMIN"),
+  roleGuard("ADMIN", "AGENCY"),
   adminMembersRouter
 ); // protected admin members
 app.use(
